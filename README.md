@@ -1,17 +1,51 @@
-# Governance, Risk & Compliance
+# CWL GRC
 
-ContextualWisdomLab GRC는 정책, 통제, 리스크, 증거, 컴플라이언스 감사 진실을 소유합니다. 다른 CWL 서비스는 통제·증거 계약만 소비하고, 이 진실은 가져가지 않습니다.
+See which CSAP, SOC 2, and ISMS-P controls still need evidence, then attach the next artifact.
 
-통제가 비어 있으면 어떤 증거가 없는지 보고, 다음에 붙일 증거를 직접 열 수 있어야 합니다.
+This repository is the ContextualWisdomLab home for policy, control, risk, evidence, and compliance-audit truth. Other CWL services consume the control and evidence contracts only.
 
-CSAP, SOC 2, ISMS-P는 이 제품의 통제입니다. SAST/Strix/CodeQL/Semgrep은 CWL Security 레인입니다. PII는 마스킹하지 않고, 목적 한정 인가·암호화·감사로 다룹니다.
+## Do this next
 
-## 제품 경계
+1. Run the officer home: `python -m cwl_grc` (listens on `0.0.0.0:$PORT`, default 8080).
+2. Open `/` and read the uncovered CSAP / SOC 2 / ISMS-P rows.
+3. Attach the next evidence on a gap. Officer names and contact details stay usable; they are not masked.
+4. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}` before you route traffic.
 
-| 소유 | 소비만 |
+## What this slice does
+
+| Action | Where |
 | --- | --- |
-| 정책, 통제, 리스크, 증거, 감사 진실 | Orgmetra 고용, Keyverse 신원, AIS 장부, Billing 검수, naruon 업무, EA 아키텍처 |
+| List official controls | `GET /controls?framework=csap_2026` |
+| See coverage gaps | `GET /controls/uncovered?framework=soc2_tsc_2017` |
+| Store evidence | `POST /evidence-records` with `X-Actor-Id` and `X-Purpose: evidence_binding` |
+| Bind evidence | `POST /control-evidence-bindings` |
+| Probe | `GET /healthz` |
 
-## 지금 할 수 있는 일
+Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `nist_sp_800_53_r5`, `coso_ic_2013`, `coso_erm_2017`.
 
-채 증거가 없는 CSAP / SOC 2 / ISMS-P 통제를 보고, 증거를 붙이세요. 첫 제품 슬라이스가 올라오면 이 문단을 갱신합니다.
+## Product boundary
+
+| This repo owns | Other CWL homes consume only |
+| --- | --- |
+| Policy, control, risk, evidence, audit truth | Orgmetra employment, Keyverse identity, AIS books, Billing metering, naruon office, EA, ontology |
+
+CSAP, SOC 2, and ISMS-P are product controls here. SAST, Strix, CodeQL, and Semgrep stay with CWL Security.
+
+## Run standalone or as a module
+
+```bash
+python -m pip install -e ".[dev]"
+python -m cwl_grc
+```
+
+```python
+from cwl_grc import create_app
+
+app = create_app()
+```
+
+Set `CWL_GRC_EVIDENCE_KEY` (Fernet) in any durable environment. Without it the process uses an ephemeral key and evidence will not survive a restart. Set `CWL_GRC_DATABASE_URL` when you are not using the local SQLite file.
+
+## Citations
+
+Authoritative identifiers and APA 7th references live in `docs/doctoring/REFERENCES.md`. If a citation and the code disagree, fix the code.
