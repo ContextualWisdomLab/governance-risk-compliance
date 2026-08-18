@@ -13,13 +13,16 @@
 - Evidence create and control–evidence binding with declared actor/purpose audit context and encryption at rest.
 - Uncovered-control query and officer home that states the next action.
 - `/healthz` probe, standalone `python -m cwl_grc` entry, and `create_app()` module factory.
-- Product CI for lint, docstring coverage, and 100% test coverage.
+- Product CI for lint, docstring coverage, and 100% statement/branch test coverage.
+- Hash-locked `uv.lock` dependency graph for runtime and development dependencies.
 
 ### Security
 
 - Deny proxy-forwarded and non-loopback HTTP traffic by default while the runtime lacks Keyverse-backed identity and tenant authorization.
 - Document the unauthenticated remote-preview environment switch as an isolated-test-only escape hatch, not as authentication.
 - Preserve exact operational evidence values while requiring purpose-specific field selection, encryption, retention, and audit for the future production boundary.
+- Pin every Product workflow action to an immutable commit and verify the exact pull-request head before testing.
+- Replace mutable `pip install` resolution with `uv sync --locked` and verify lock freshness on every Product run.
 
 ### ADR
 
