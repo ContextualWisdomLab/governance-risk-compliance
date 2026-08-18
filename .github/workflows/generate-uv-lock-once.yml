@@ -1,0 +1,49 @@
+name: Generate uv lock once
+
+on:
+  push:
+    paths:
+      - .github/workflows/generate-uv-lock-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: generate-grc-uv-lock-once
+  cancel-in-progress: false
+
+jobs:
+  generate-lock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+      - name: Checkout product branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: cursor/control-evidence-first-slice-bbe8
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          prune-cache: true
+      - name: Generate, verify, and publish the lock
+        env:
+          BRANCH_NAME: cursor/control-evidence-first-slice-bbe8
+        run: |
+          set -euo pipefail
+          uv lock --python 3.12
+          uv lock --check
+          git rm .github/workflows/generate-uv-lock-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add uv.lock
+          git commit -m "build: add hash-locked uv dependency graph"
+          git push origin "HEAD:${BRANCH_NAME}"
