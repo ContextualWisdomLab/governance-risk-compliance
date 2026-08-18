@@ -5,12 +5,17 @@ from __future__ import annotations
 from cryptography.fernet import Fernet
 
 from cwl_grc import create_app
-from cwl_grc.authorization import PurposeCode, purpose_label, require_purpose
+from cwl_grc.authorization import (
+    PurposeCode,
+    purpose_label,
+    require_purpose,
+    seed_authorization_purposes,
+)
 from cwl_grc.officer_console import parse_control_ref, render_officer_home
 from cwl_grc.catalog import FrameworkCode, framework_label, seed_control_catalog
 from cwl_grc.database import create_session_factory
 from cwl_grc.encryption import EvidenceCipher
-from cwl_grc.models import ControlItem
+from cwl_grc.models import AuthorizationPurpose, ControlItem
 
 
 def test_module_factory_returns_app() -> None:
@@ -31,8 +36,11 @@ def test_seed_is_idempotent_and_keeps_official_identifiers() -> None:
     with factory() as session:
         seed_control_catalog(session)
         seed_control_catalog(session)
+        seed_authorization_purposes(session)
+        seed_authorization_purposes(session)
         count = session.query(ControlItem).count()
         assert count >= 40
+        assert session.query(AuthorizationPurpose).count() == len(PurposeCode)
         csap = (
             session.query(ControlItem)
             .filter_by(catalog_identifier="10.2.1", framework_key=FrameworkCode.CSAP_2026.value)
