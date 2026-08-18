@@ -28,7 +28,7 @@ def test_lists_real_soc2_isms_p_and_csap_identifiers() -> None:
     csap = client.get("/controls", params={"framework": FrameworkCode.CSAP_2026.value})
     assert soc2.status_code == 200
     identifiers = {item["catalog_identifier"] for item in soc2.json()["controls"]}
-    assert {"CC1.1", "CC6.1", "CC6.2", "CC6.3", "P3.1"} <= identifiers
+    assert {"CC1.1", "CC5.3", "CC6.1", "CC6.2", "CC6.3", "P3.1"} <= identifiers
     isms_ids = {item["catalog_identifier"] for item in isms.json()["controls"]}
     assert {"1.1.1", "2.5.1", "3.1.1", "3.1.2"} <= isms_ids
     assert next(item["control_title"] for item in isms.json()["controls"] if item["catalog_identifier"] == "3.1.1") == (
@@ -46,7 +46,9 @@ def test_lists_iso_nist_and_coso_identifiers() -> None:
     erm = client.get("/controls", params={"framework": FrameworkCode.COSO_ERM_2017.value}).json()
     assert {"A.5.1", "A.8.2", "A.8.15"} <= {item["catalog_identifier"] for item in iso["controls"]}
     assert {"AC-2", "AU-2", "IA-2"} <= {item["catalog_identifier"] for item in nist["controls"]}
-    assert {"Principle 1", "Principle 10"} <= {item["catalog_identifier"] for item in ic["controls"]}
+    assert {"Principle 1", "Principle 10", "Principle 12"} <= {
+        item["catalog_identifier"] for item in ic["controls"]
+    }
     assert {"Principle 13", "Principle 20"} <= {item["catalog_identifier"] for item in erm["controls"]}
 
 

@@ -1,4 +1,4 @@
-"""Installable CWL GRC kernel: control catalog, evidence, and coverage."""
+"""Installable CWL GRC kernel: policies, official controls, evidence, and gaps."""
 
 from cwl_grc.app import create_app
 

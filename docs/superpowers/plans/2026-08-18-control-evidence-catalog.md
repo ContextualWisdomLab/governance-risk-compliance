@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** A compliance officer can list official controls, see coverage gaps, and bind evidence.
+**Goal:** A compliance officer can author a versioned policy, see uncovered policy/control gaps, and bind evidence.
 
 **Architecture:** Installable `cwl_grc` FastAPI kernel with 3NF SQLite-ready tables, Fernet evidence encryption, and `/healthz`.
 

@@ -17,8 +17,8 @@ Ship a modular FastAPI kernel that:
 3. Binds evidence to one official control and queries uncovered controls.
 4. Exposes `/healthz` and runs standalone or as `create_app()`.
 
-Rejected alternatives: a catalog-only spreadsheet (cannot bind), and a full policy/risk/audit suite (out of first-slice scope).
+Rejected alternatives: a catalog-only spreadsheet (cannot bind). Policy authoring was later confirmed as part of this same slice; see ADR 0002.
 
 ## Consequences
 
-Other CWL products can consume control/evidence HTTP contracts. Policy, residual risk, and audit-workflow bodies remain later slices. Product CI is local to this repo and does not take org Security/OpenCode/Noema lanes.
+Other CWL products can consume control/evidence HTTP contracts. Residual risk scoring and audit-workflow bodies remain later slices. Product CI is local to this repo and does not take org Security/OpenCode/Noema lanes.

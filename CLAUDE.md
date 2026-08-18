@@ -10,4 +10,4 @@ CWL GRC is the ContextualWisdomLab system of record for policy, control, risk, e
 
 ## Writing guidance
 
-Customer-facing copy must state the next action: list uncovered controls, attach evidence, review a binding, or probe `/healthz`. Avoid vague AI claims. If a citation and the code conflict, fix the code.
+Customer-facing copy must state the next action: author a policy, list uncovered policy/control gaps, attach evidence, review a binding, or probe `/healthz`. Avoid vague AI claims. If a citation and the code conflict, fix the code. Do not invent a second control catalog. Do not add OPA/Rego unless a later slice needs a PDP.

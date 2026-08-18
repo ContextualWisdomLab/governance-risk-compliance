@@ -1,4 +1,4 @@
-"""Purpose-limited authorization for evidence work."""
+"""Purpose-limited authorization for policy and evidence work."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ class PurposeCode(StrEnum):
     COVERAGE_REVIEW = "coverage_review"
     EVIDENCE_BINDING = "evidence_binding"
     HEALTH_PROBE = "health_probe"
+    POLICY_AUTHORING = "policy_authoring"
 
 
 @dataclass(frozen=True)
@@ -52,6 +53,8 @@ def purpose_label(code: PurposeCode) -> str:
             return "Attach or bind evidence"
         case PurposeCode.HEALTH_PROBE:
             return "Probe service health"
+        case PurposeCode.POLICY_AUTHORING:
+            return "Author or revise a policy"
         case _ as unreachable:  # pragma: no cover
             assert_never(unreachable)
 

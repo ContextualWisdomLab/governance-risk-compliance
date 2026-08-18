@@ -19,6 +19,16 @@ from cwl_grc.evidence import bind_control_evidence, create_evidence_record
 from cwl_grc.health import health_payload
 from cwl_grc.models import ControlItem, EvidenceRecord
 from cwl_grc.officer_console import parse_control_ref, render_officer_home
+from cwl_grc.policy import (
+    ControlRef,
+    author_policy,
+    list_policy_documents,
+    list_policy_gaps,
+    parse_control_refs,
+    revise_policy,
+    serialize_gap,
+    serialize_policy,
+)
 
 
 def parse_framework(value: str | None) -> FrameworkCode | None:
@@ -92,6 +102,62 @@ def create_app(
             "controls": [serialize_control(item, covered=False) for item in items],
         }
 
+    @app.post("/policy-documents", status_code=201)
+    def post_policy_document(
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Author a policy mapped only to official catalog identifiers."""
+        decision = require_purpose(x_actor_id, x_purpose, PurposeCode.POLICY_AUTHORING)
+        document = author_policy(
+            session,
+            decision,
+            str(body.get("policy_title", "")),
+            str(body.get("policy_body", "")),
+            parse_control_refs(body.get("control_refs")),
+        )
+        return serialize_policy(session, document)
+
+    @app.post("/policy-documents/{policy_document_id}/versions", status_code=201)
+    def post_policy_version(
+        policy_document_id: str,
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Publish the next immutable policy edition and replacement mappings."""
+        decision = require_purpose(x_actor_id, x_purpose, PurposeCode.POLICY_AUTHORING)
+        document = revise_policy(
+            session,
+            decision,
+            policy_document_id,
+            str(body.get("policy_body", "")),
+            parse_control_refs(body.get("control_refs")),
+        )
+        return serialize_policy(session, document)
+
+    @app.get("/policy-documents")
+    def get_policy_documents(session: Session = Depends(get_session)) -> dict[str, Any]:
+        """List authored policies and their latest official mappings."""
+        return {
+            "next_action": "Review policy gaps and attach the next evidence.",
+            "policies": [serialize_policy(session, document) for document in list_policy_documents(session)],
+        }
+
+    @app.get("/policy-gaps")
+    def get_policy_gaps(
+        session: Session = Depends(get_session),
+        policy_document_id: str | None = None,
+    ) -> dict[str, Any]:
+        """List latest-version policy mappings that still lack evidence."""
+        return {
+            "next_action": "Attach the next evidence on an uncovered policy control.",
+            "gaps": [serialize_gap(gap) for gap in list_policy_gaps(session, policy_document_id)],
+        }
+
     @app.post("/evidence-records", status_code=201)
     def post_evidence(
         body: dict[str, str],
@@ -138,8 +204,37 @@ def create_app(
 
     @app.get("/", response_class=HTMLResponse)
     def officer_home(session: Session = Depends(get_session)) -> str:
-        """Show CSAP / SOC 2 / ISMS-P gaps and the next evidence action."""
-        return render_officer_home(list_uncovered_controls(session, None))
+        """Show policy authoring, policy gaps, and the next evidence action."""
+        return render_officer_home(
+            list_uncovered_controls(session, None),
+            policy_gaps=list_policy_gaps(session, None),
+            catalog_items=list_control_items(session, None),
+        )
+
+    @app.post("/officer/policy")
+    def officer_author_policy(
+        session: Session = Depends(get_session),
+        policy_title: str = Form(),
+        policy_body: str = Form(),
+        actor_identifier: str = Form(),
+        control_refs: list[str] = Form(default=[]),
+    ) -> RedirectResponse:
+        """Author a policy from the officer home and return to the gap list."""
+        decision = require_purpose(
+            actor_identifier,
+            PurposeCode.POLICY_AUTHORING.value,
+            PurposeCode.POLICY_AUTHORING,
+        )
+        refs: list[ControlRef] = []
+        for raw in control_refs:
+            try:
+                framework_key, catalog_identifier = parse_control_ref(raw)
+                framework = FrameworkCode(framework_key)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail="Choose official controls to map.") from exc
+            refs.append(ControlRef(framework, catalog_identifier))
+        author_policy(session, decision, policy_title, policy_body, refs)
+        return RedirectResponse(url="/", status_code=303)
 
     @app.post("/officer/evidence")
     def officer_attach(

@@ -1,4 +1,4 @@
-"""3NF SQLAlchemy objects for the control/evidence first slice."""
+"""3NF SQLAlchemy objects for policies, official controls, and evidence."""
 
 from __future__ import annotations
 
@@ -118,3 +118,63 @@ class AuditEvent(Base):
     resource_kind: Mapped[str] = mapped_column(String(64), nullable=False)
     resource_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class PolicyDocument(Base):
+    """Stable identity of one officer-authored policy."""
+
+    __tablename__ = "policy_document"
+
+    policy_document_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    policy_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    policy_versions: Mapped[list[PolicyVersion]] = relationship(back_populates="policy_document")
+
+
+class PolicyVersion(Base):
+    """One immutable edition of a policy document."""
+
+    __tablename__ = "policy_version"
+    __table_args__ = (
+        UniqueConstraint("policy_document_id", "version_number", name="policy_version_edition"),
+    )
+
+    policy_version_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    policy_document_id: Mapped[str] = mapped_column(
+        ForeignKey("policy_document.policy_document_id"),
+        nullable=False,
+    )
+    version_number: Mapped[int] = mapped_column(nullable=False)
+    policy_body: Mapped[str] = mapped_column(Text, nullable=False)
+    authored_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    authored_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    policy_document: Mapped[PolicyDocument] = relationship(back_populates="policy_versions")
+    policy_control_mappings: Mapped[list[PolicyControlMapping]] = relationship(
+        back_populates="policy_version"
+    )
+
+
+class PolicyControlMapping(Base):
+    """Maps one policy edition to one official catalog control."""
+
+    __tablename__ = "policy_control_mapping"
+    __table_args__ = (
+        UniqueConstraint(
+            "policy_version_id",
+            "control_item_id",
+            name="policy_control_mapping_pair",
+        ),
+    )
+
+    mapping_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    policy_version_id: Mapped[str] = mapped_column(
+        ForeignKey("policy_version.policy_version_id"),
+        nullable=False,
+    )
+    control_item_id: Mapped[str] = mapped_column(
+        ForeignKey("control_item.control_item_id"),
+        nullable=False,
+    )
+    policy_version: Mapped[PolicyVersion] = relationship(back_populates="policy_control_mappings")
+    control_item: Mapped[ControlItem] = relationship()

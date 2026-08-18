@@ -94,6 +94,16 @@ def _seed_rows() -> list[tuple[FrameworkCode, str, str, str, str]]:
         (
             FrameworkCode.SOC2_TSC_2017,
             "TSP 100 2017/2022",
+            "CC5.3",
+            "COSO Principle 12",
+            (
+                "The entity deploys control activities through policies that establish "
+                "what is expected and in procedures that put policies into action."
+            ),
+        ),
+        (
+            FrameworkCode.SOC2_TSC_2017,
+            "TSP 100 2017/2022",
             "CC6.1",
             "Logical access security",
             (
@@ -399,6 +409,16 @@ def _seed_rows() -> list[tuple[FrameworkCode, str, str, str, str]]:
             "Principle 10",
             "Selects and develops control activities",
             "The organization selects and develops control activities that contribute to the mitigation of risks to the achievement of objectives to acceptable levels.",
+        ),
+        (
+            FrameworkCode.COSO_IC_2013,
+            "2013",
+            "Principle 12",
+            "Deploys through policies and procedures",
+            (
+                "The organization deploys control activities through policies that "
+                "establish what is expected and procedures that put policies into action."
+            ),
         ),
         (
             FrameworkCode.COSO_IC_2013,

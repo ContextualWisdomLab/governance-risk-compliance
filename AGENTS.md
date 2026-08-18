@@ -2,7 +2,7 @@
 
 ## Mission
 
-Build ContextualWisdomLab GRC as the system of record for policy, control, risk, evidence, and compliance-audit truth. The first buyer slice is control catalog + evidence binding + uncovered-control query.
+Build ContextualWisdomLab GRC as the system of record for policy, control, risk, evidence, and compliance-audit truth. The first buyer slice is versioned policy authoring + official control catalog + evidence binding + uncovered policy/control query.
 
 ## Hard rules
 
@@ -23,7 +23,7 @@ Build ContextualWisdomLab GRC as the system of record for policy, control, risk,
 
 ## Documentation rules
 
-Keep README, AGENTS, CLAUDE, ARCHITECTURE, CHANGELOG, ADRs, and doctoring references current with code. Customer-facing copy states the next action.
+Keep README, AGENTS, CLAUDE, ARCHITECTURE, CHANGELOG, ADRs, and doctoring references current with code. Customer-facing copy states the next action: author a policy, review policy gaps, attach evidence, or probe `/healthz`.
 
 ## Quality rules
 

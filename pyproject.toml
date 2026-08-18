@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "cwl-grc"
 version = "0.1.0"
-description = "CWL GRC home: control catalog, evidence binding, and coverage gaps."
+description = "CWL GRC home: versioned policies, official controls, evidence, and coverage gaps."
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "ContextualWisdomLab" }]
@@ -27,7 +27,7 @@ dev = [
 ]
 
 [project.scripts]
-cwl-grc = "cwl_grc.__main__:main"
+cwl-grc = "cwl_grc.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["cwl_grc"]

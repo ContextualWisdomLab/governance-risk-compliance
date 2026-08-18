@@ -79,6 +79,7 @@ def test_require_purpose_rejects_blank_actor() -> None:
 
 def test_purpose_labels_and_empty_officer_home() -> None:
     assert purpose_label(PurposeCode.HEALTH_PROBE) == "Probe service health"
+    assert purpose_label(PurposeCode.POLICY_AUTHORING) == "Author or revise a policy"
     html = render_officer_home([])
     assert "Every seeded control in this catalog has evidence" in html
     try:

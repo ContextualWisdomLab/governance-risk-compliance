@@ -2,13 +2,13 @@
 
 ## Outcome
 
-A compliance officer can list CSAP / SOC 2 / ISMS-P controls, see which still lack evidence, and bind the next artifact. The same service also seeds ISO/IEC 27001:2022, NIST SP 800-53 Rev. 5, COSO 2013, and COSO 2017 so later mappings stay on official identifiers.
+A compliance officer can author a versioned policy mapped to official CSAP / SOC 2 / ISMS-P / ISO 27001 controls, see which mapped requirements still lack evidence, and bind the next artifact. The same service also seeds NIST SP 800-53 Rev. 5, COSO 2013, and COSO 2017 so later mappings stay on official identifiers.
 
 ## Approaches considered
 
 1. **Catalog-only spreadsheet** — cheap, but cannot bind evidence or query gaps.
 2. **Recommended: modular FastAPI kernel** — installable `cwl_grc` package plus `python -m cwl_grc` standalone process, SQLite-ready schema, purpose-bound evidence encryption, `/healthz`.
-3. **Full GRC suite** — policy/risk/audit workflows now. Out of scope; those bodies come after this slice is buyer-real.
+3. **Full GRC suite** — residual risk scoring and audit-workflow bodies remain later. Policy authoring is in this slice (ADR 0002).
 
 ## Runtime
 
@@ -18,8 +18,8 @@ A compliance officer can list CSAP / SOC 2 / ISMS-P controls, see which still la
 
 ## Data (3NF, two-or-more-word snake_case)
 
-`control_framework` → `control_item`; `authorization_purpose`; `evidence_record`; `control_evidence_binding`; `audit_event`.
+`policy_document` → `policy_version` → `policy_control_mapping` → `control_item`; `control_framework`; `authorization_purpose`; `evidence_record`; `control_evidence_binding`; `audit_event`.
 
 ## Buyer surface
 
-Officer home lists uncovered CSAP / SOC 2 / ISMS-P rows with the next action: attach evidence. JSON APIs list controls, list uncovered controls, create evidence, and bind evidence. Catalog reads are public text. Evidence create/read/bind require actor + purpose. PII in evidence stays usable (encrypted at rest, never masked).
+Officer home authors a policy, lists uncovered policy requirements, and attaches evidence. JSON and CLI list policies, list policy gaps, create evidence, and bind evidence. Catalog reads are public text. Policy authoring requires `policy_authoring`. Evidence create/read/bind require `evidence_binding`. PII in evidence stays usable (encrypted at rest, never masked).
