@@ -1,15 +1,19 @@
 # CWL GRC
 
-Author a versioned policy, see which mapped CSAP / SOC 2 / ISMS-P / ISO 27001 controls still need evidence, then attach the next artifact.
+Author a versioned policy, see which mapped CSAP / SOC 2 TSC / ISMS-P / ISO/IEC 27001 controls still need evidence, then attach the next artifact.
 
 This repository is the ContextualWisdomLab home for policy, control, risk, evidence, and compliance-audit truth. Other CWL services consume the control and evidence contracts only.
 
-## Do this next
+## Run the developer preview
 
-1. Run the officer tools: `python -m cwl_grc` (listens on `0.0.0.0:$PORT`, default 8080) or `cwl-grc serve`.
-2. Open `/` and author the next policy. Map it only to official catalog identifiers.
-3. Read the policy-gap list. Attach the next evidence on an uncovered mapped control. Officer names and contact details stay usable; they are not masked.
-4. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}` before you route traffic.
+1. Install and start the officer tools with `python -m pip install -e ".[dev]"` and `python -m cwl_grc`, or run `cwl-grc serve`.
+2. Open `/` from the same machine, author the next policy, and map it only to official catalog identifiers.
+3. Read the policy-gap list and attach the next evidence on an uncovered mapped control.
+4. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
+
+The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. The app therefore rejects proxy-forwarded or non-loopback traffic by default. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
+
+`CWL_GRC_ALLOW_UNAUTHENTICATED_REMOTE_PREVIEW=1` is an explicit unsafe escape hatch for an isolated test environment only. It is not authentication and must not be used for customer or Internet traffic.
 
 ## Operator CLI
 
@@ -23,7 +27,7 @@ cwl-grc bind --framework csap_2026 --identifier 10.2.1 \
 cwl-grc policy list
 ```
 
-Each command prints JSON that states the next action.
+Each command prints JSON that states the next action. The CLI is also a developer-preview interface until the same identity and tenant controls are available.
 
 ## What this slice does
 
@@ -38,9 +42,13 @@ Each command prints JSON that states the next action.
 | Bind evidence | `POST /control-evidence-bindings` or `cwl-grc bind` |
 | Probe | `GET /healthz` |
 
-Policy authoring requires `X-Purpose: policy_authoring`. Evidence bind still requires `evidence_binding`. Policies map only to official identifiers: CSAP, SOC 2 TSC, ISMS-P, ISO/IEC 27001:2022, NIST SP 800-53 Rev. 5, COSO 2013, and COSO 2017.
+Policy authoring requires the declared purpose `policy_authoring`. Evidence create and bind require `evidence_binding`. Policies map only to seeded official identifiers: CSAP, SOC 2 TSC, ISMS-P, ISO/IEC 27001:2022, NIST SP 800-53 Rev. 5, COSO 2013, and COSO 2017.
 
 Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `nist_sp_800_53_r5`, `coso_ic_2013`, `coso_erm_2017`.
+
+## Personal-data handling
+
+Evidence may need exact officer names, contact details, or other PII to remain operationally useful. This product does not destructively mask stored evidence. Instead, the production boundary must enforce authenticated identity, tenant and purpose authorization, encrypted storage and transport, immutable audit, retention, and purpose-specific field selection. Views and exports should omit unrelated fields rather than alter values that an authorized workflow needs. The current local preview does not yet satisfy that production boundary.
 
 ## Product boundary
 
@@ -48,7 +56,7 @@ Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `n
 | --- | --- |
 | Policy, control, risk, evidence, audit truth | Orgmetra employment, Keyverse identity, AIS books, Billing metering, naruon office, EA, ontology |
 
-CSAP, SOC 2, and ISMS-P are product controls here. SAST, Strix, CodeQL, and Semgrep stay with CWL Security. Open Policy Agent / Rego is not a policy-document store and is not used in this slice.
+CSAP, SOC 2, and ISMS-P are product-control catalogs here. SAST, Strix, CodeQL, and Semgrep stay with CWL Security. Open Policy Agent / Rego is not a policy-document store and is not used in this slice.
 
 ## Run standalone or as a module
 
