@@ -6,14 +6,15 @@ Build ContextualWisdomLab GRC as the system of record for policy, control, risk,
 
 ## Hard rules
 
-- Never bypass branch protection, required checks, or independent review. Never self-APPROVE, never `--admin`, never mark Draft as Ready.
-- Never use `COPILOT_GITHUB_TOKEN` as a model credential. LLM tests, if any, use `NVIDIA_NIM_API_KEY` only. Prefer contextual-orchestrator when a model is required.
+- Never bypass branch protection, required checks, or independent review. Never self-APPROVE, never `--admin`, never mark Draft as Ready without exact-head evidence.
+- Never use `COPILOT_GITHUB_TOKEN` as a model credential. LLM tests, if any, use contextual-orchestrator and the established provider-secret contract.
 - Never copy Orgmetra, Keyverse, AIS, Billing, naruon, EA, or semantic-data-portal product bodies. Those services consume control/evidence contracts only.
-- Never take `.github` OpenCode, Noema, or Security lanes, TEPP, or LineageWeave #74.
-- CSAP / SOC 2 / ISMS-P are product controls in this repo. Do not invent a second SAST stack.
-- Never blanket-mask PII. Keep it usable with purpose-limited authorization, encryption at rest, and audit.
+- Never take another dedicated-writer repository's work into this branch.
+- CSAP / SOC 2 / ISMS-P are product-control catalogs in this repo. Do not invent a second SAST stack or unverified control identifier.
+- Never treat `X-Actor-Id` or `X-Purpose` as authentication. The HTTP surface remains local-only until Keyverse-backed identity and tenant authorization are implemented.
+- Never blanket-mask or destructively alter PII needed by an authorized workflow. Protect exact values with authenticated purpose and tenant authorization, encrypted storage and transport, audit, retention, and purpose-specific field selection that omits unrelated fields.
 - Never dummy-commit or force-push.
-- Work only in this cloud environment. Do not clone onto a laptop.
+- Work only in the authorized cloud environment.
 
 ## Database rules
 
@@ -23,11 +24,11 @@ Build ContextualWisdomLab GRC as the system of record for policy, control, risk,
 
 ## Documentation rules
 
-Keep README, AGENTS, CLAUDE, ARCHITECTURE, CHANGELOG, ADRs, and doctoring references current with code. Customer-facing copy states the next action: author a policy, review policy gaps, attach evidence, or probe `/healthz`.
+Keep README, AGENTS, CLAUDE, ARCHITECTURE, CHANGELOG, ADRs, and doctoring references current with code. Customer-facing copy states the next action and accurately distinguishes a local developer preview from a production deployment.
 
 ## Quality rules
 
 - Production code requires public docstrings.
-- Focused statement and branch coverage is 100% where tooling exposes it.
-- Tests use real catalog identifiers, not toys.
-- Product CI lives in `.github/workflows/product.yml` only.
+- Production statement and branch coverage must remain 100% where tooling exposes it.
+- Tests use real catalog identifiers and realistic officer workflows.
+- Product CI lives in `.github/workflows/product.yml`; organization-wide review and security lanes remain centrally owned.
