@@ -15,24 +15,41 @@ concurrency:
 jobs:
   product:
     name: Lint, tests, and coverage
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
         with:
+          egress-policy: audit
+      - name: Checkout exact source revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Verify exact source head
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-      - name: Install the product
-        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          prune-cache: true
+      - name: Install the hash-locked product
+        run: uv sync --locked --extra dev
       - name: Lint
-        run: ruff check cwl_grc tests
+        run: uv run ruff check cwl_grc tests
       - name: Docstrings
-        run: interrogate --fail-under 100 cwl_grc
+        run: uv run interrogate --fail-under 100 cwl_grc
       - name: Tests and coverage
-        run: pytest --cov=cwl_grc --cov-report=term-missing --cov-fail-under=100
+        run: >-
+          uv run pytest --cov=cwl_grc --cov-branch
+          --cov-report=term-missing --cov-fail-under=100
       - name: Compile
-        run: python -m compileall -q cwl_grc
+        run: uv run python -m compileall -q cwl_grc tests
+      - name: Verify lock freshness
+        run: uv lock --check
+      - name: Verify clean product tree
+        run: git diff --check
