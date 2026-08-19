@@ -10,9 +10,9 @@ from cwl_grc.app import create_app
 
 
 def main() -> None:
-    """Serve the GRC product on 0.0.0.0 and $PORT."""
+    """Serve the unauthenticated developer preview on loopback and $PORT."""
     port = int(os.environ.get("PORT", "8080"))
-    uvicorn.run(create_app(), host="0.0.0.0", port=port)
+    uvicorn.run(create_app(), host="127.0.0.1", port=port)
 
 
 if __name__ == "__main__":  # pragma: no cover
