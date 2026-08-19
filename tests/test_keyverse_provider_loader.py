@@ -187,9 +187,12 @@ def test_https_endpoint_rejects_untrusted_url_and_resolution_shapes() -> None:
         ("https://keys.example.test/path\\admin", "path"),
     )
     for url, message in invalid_urls:
-        allowed = frozenset({url.split("//")[-1].split("/")[0].split(":")[0]})
         with pytest.raises(KeyverseProviderLoadError, match=message):
-            validate_https_endpoint(url, allowed_hosts=allowed, resolver=_resolver)
+            validate_https_endpoint(
+                url,
+                allowed_hosts=frozenset({"keys.example.test"}),
+                resolver=_resolver,
+            )
 
     def private_resolver(_hostname: str, _port: int) -> tuple[str, ...]:
         return ("10.0.0.7",)
