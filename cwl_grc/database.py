@@ -9,6 +9,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from cwl_grc.migrations import apply_schema_migrations, install_integrity_guards
 from cwl_grc.models import Base
 
 
@@ -24,9 +25,11 @@ def build_engine(database_url: str) -> Engine:
 
 
 def create_session_factory(database_url: str) -> sessionmaker[Session]:
-    """Create tables and return a session factory bound to the product store."""
+    """Create or upgrade tables and return a guarded product session factory."""
     engine = build_engine(database_url)
     Base.metadata.create_all(engine)
+    apply_schema_migrations(engine)
+    install_integrity_guards(engine)
     return sessionmaker(bind=engine, expire_on_commit=False)
 
 
