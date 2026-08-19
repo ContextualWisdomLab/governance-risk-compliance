@@ -177,16 +177,19 @@ def test_jwks_object_shape_and_malformed_rsa_key_are_rejected() -> None:
 
 
 def test_non_string_private_claims_and_invalid_settings_entries_are_rejected() -> None:
-    """Authorization claims and allowlist members are never coerced from other types."""
+    """Registered and private claim types fail closed without coercion."""
     private_key, jwk = _key_material()
     verifier = _verifier(jwk)
+
+    for claims in (_claims(sub=123), _claims(jti=123)):
+        with pytest.raises(AccessTokenValidationError, match="payload"):
+            verifier.verify(_token(private_key, claims=claims))
+
     for claims, label in (
-        (_claims(sub=123), "subject"),
         (_claims(client_id=123), "client"),
         (_claims(role=["compliance_officer"]), "role"),
         (_claims(org=123), "tenant"),
         (_claims(workspace=123), "workspace"),
-        (_claims(jti=123), "token identifier"),
         (_claims(principal_kind=123), "principal kind"),
     ):
         with pytest.raises(AccessTokenValidationError, match=label):
