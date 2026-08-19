@@ -141,6 +141,9 @@ def test_cross_jwt_confusion_and_critical_headers_are_rejected(
     """ID tokens, untyped tokens, and unsupported critical headers never authenticate."""
     private_key, jwk = _new_signing_material("key-1")
     verifier = _verifier(jwk)
+    assert verifier.verify(
+        _token(private_key, typ="application/at+jwt")
+    ).actor_id == "keyverse-subject-019d"
     for typ in ("JWT", "id+jwt", ""):
         with pytest.raises(AccessTokenValidationError, match="access-token type"):
             verifier.verify(_token(private_key, typ=typ))
@@ -195,7 +198,13 @@ def test_issuer_audience_time_and_required_claims_fail_closed() -> None:
     invalid_cases = (
         (_claims(iss="https://attacker.invalid"), "issuer"),
         (_claims(aud="another-api"), "audience"),
-        (_claims(exp=int((NOW - timedelta(minutes=2)).timestamp())), "expired"),
+        (
+            _claims(
+                iat=int((NOW - timedelta(minutes=10)).timestamp()),
+                exp=int((NOW - timedelta(minutes=2)).timestamp()),
+            ),
+            "expired",
+        ),
         (_claims(nbf=int((NOW + timedelta(minutes=2)).timestamp())), "not active"),
         (_claims(iat=int((NOW + timedelta(minutes=2)).timestamp())), "issued-at"),
     )
