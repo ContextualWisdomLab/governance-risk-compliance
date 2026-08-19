@@ -38,11 +38,11 @@ def _rsa_jwk(kid: str) -> tuple[Any, dict[str, Any]]:
 
 
 def _resolver(hostname: str, port: int) -> tuple[str, ...]:
-    """Resolve the two reviewed test hosts to globally routable documentation IPs."""
+    """Resolve reviewed test hosts to globally routable fixture addresses."""
     assert port == 443
     mapping = {
-        "identity.example.test": ("192.0.2.10",),
-        "keys.example.test": ("198.51.100.20", "2001:db8::20"),
+        "identity.example.test": ("1.1.1.1",),
+        "keys.example.test": ("8.8.8.8", "2001:4860:4860::8888"),
     }
     return mapping[hostname]
 
@@ -168,7 +168,7 @@ def test_https_endpoint_is_allowlisted_normalized_and_dns_pinned() -> None:
     assert endpoint.port == 443
     assert endpoint.request_target == "/realms/cwl/protocol/openid-connect/certs"
     assert endpoint.host_header == "keys.example.test"
-    assert endpoint.addresses == ("192.0.2.20", "2001:db8::20")
+    assert endpoint.addresses == ("8.8.8.8", "2001:4860:4860::8888")
 
 
 def test_https_endpoint_rejects_untrusted_url_and_resolution_shapes() -> None:
@@ -248,8 +248,8 @@ def test_provider_loader_validates_metadata_jwks_hashes_and_rotation() -> None:
     assert snapshot.discovery_endpoint.url == DISCOVERY_URL
     assert snapshot.jwks_endpoint.url == JWKS_URL
     assert fetcher.calls == [
-        (DISCOVERY_URL, 64 * 1024, ("192.0.2.10",)),
-        (JWKS_URL, 1024 * 1024, ("192.0.2.20", "2001:db8::20")),
+        (DISCOVERY_URL, 64 * 1024, ("1.1.1.1",)),
+        (JWKS_URL, 1024 * 1024, ("8.8.8.8", "2001:4860:4860::8888")),
     ]
 
     access_settings = KeyverseAccessTokenSettings(
@@ -386,8 +386,8 @@ def test_pinned_fetcher_fails_over_addresses_and_sends_closed_headers() -> None:
     assert first.closed is True
     assert second.closed is True
     assert factory_calls == [
-        ("192.0.2.20", 443, "keys.example.test", 5.0),
-        ("2001:db8::20", 443, "keys.example.test", 5.0),
+        ("8.8.8.8", 443, "keys.example.test", 5.0),
+        ("2001:4860:4860::8888", 443, "keys.example.test", 5.0),
     ]
     assert second.requests == [
         (
