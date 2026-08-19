@@ -17,6 +17,7 @@ from typing import Any, Protocol
 from urllib.parse import unquote, urlsplit
 
 from cwl_grc.keyverse_authentication import (
+    MAX_JWKS_BYTES as ACCESS_TOKEN_MAX_JWKS_BYTES,
     AccessTokenValidationError,
     KeyverseAccessTokenSettings,
     KeyverseAccessTokenVerifier,
@@ -26,7 +27,7 @@ from cwl_grc.keyverse_authentication import (
 
 
 MAX_METADATA_BYTES = 1024 * 1024
-MAX_JWKS_BYTES = 4 * 1024 * 1024
+MAX_JWKS_BYTES = ACCESS_TOKEN_MAX_JWKS_BYTES
 MAX_TIMEOUT_SECONDS = 30.0
 USER_AGENT = "cwl-grc-keyverse-loader/0.1"
 
@@ -75,7 +76,7 @@ class KeyverseProviderLoaderSettings:
         if not 0 < self.metadata_maximum_bytes <= MAX_METADATA_BYTES:
             raise ValueError("Keyverse metadata size must be between 1 byte and 1 MiB.")
         if not 0 < self.jwks_maximum_bytes <= MAX_JWKS_BYTES:
-            raise ValueError("Keyverse JWK size must be between 1 byte and 4 MiB.")
+            raise ValueError("Keyverse JWK size must be between 1 byte and 1 MiB.")
 
 
 @dataclass(frozen=True)
