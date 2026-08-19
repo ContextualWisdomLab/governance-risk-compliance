@@ -20,7 +20,27 @@ Every gate has a stable `id`, `title`, `priority`, `status`, `owner`, canonical 
 - `blocked` and `in_progress` gates must name at least one current blocker.
 - `ready` gates must have no blockers and must name concrete evidence.
 - The manifest belongs to `ContextualWisdomLab/governance-risk-compliance` and targets
-  `production`; foreign issue URLs or repository identities are rejected.
+  `production`; every gate owner must match that repository exactly.
+- The required gate IDs form a closed, versioned set. Missing gates and undeclared replacement
+  gates are rejected rather than allowing a smaller all-ready manifest to certify a release.
+- Each required gate ID is pinned to its reviewed priority and canonical issue number. Changing
+  that mapping requires an explicit validator and regression-test change, not only a manifest edit.
+- Scalar and list string values must be canonical and must not contain surrounding whitespace.
+  Validation rejects ambiguous values instead of silently normalizing them.
+
+The initial closed gate set is:
+
+| Gate ID | Priority | Canonical issue |
+| --- | --- | --- |
+| `identity-tenant-authorization` | P0 | #4 |
+| `postgresql-lifecycle` | P0 | #8 |
+| `evidence-lifecycle-recovery` | P0 | #9 |
+| `release-artifact-provenance` | P0 | #10 |
+| `operability-observability` | P0 | #11 |
+| `api-contract` | P1 | #12 |
+| `risk-management` | P1 | #13 |
+| `audit-management` | P1 | #14 |
+| `readiness-evidence-contract` | P0 | #15 |
 
 ## Validate the evidence contract
 
@@ -51,11 +71,13 @@ release workflow can preserve the exact blocker set as evidence.
 ## Updating a gate
 
 1. Update the canonical issue first with current-head implementation and verification evidence.
-2. Change only the corresponding manifest gate; do not hide work by deleting a required gate.
-3. Keep non-ready blockers concrete and current.
-4. Mark a gate ready only after its implementation evidence exists and no gate-local blocker remains.
-5. Re-run the Product and Production Readiness workflows on the exact pull-request head.
-6. Release only when `--require-ready` succeeds and independent review/security evidence is current.
+2. Change only the corresponding manifest gate; do not hide work by deleting or replacing a
+   required gate.
+3. Keep the gate ID, owner, priority, and canonical issue mapping exact.
+4. Keep non-ready blockers concrete and current.
+5. Mark a gate ready only after its implementation evidence exists and no gate-local blocker remains.
+6. Re-run the Product and Production Readiness workflows on the exact pull-request head.
+7. Release only when `--require-ready` succeeds and independent review/security evidence is current.
 
 The initial register intentionally reports CWL GRC as not production-ready. Issue #4 and
 issues #8 through #14 remain the authoritative work queues; issue #15 owns only this evidence
