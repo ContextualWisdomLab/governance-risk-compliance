@@ -9,7 +9,6 @@ from uuid import uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import update
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from cwl_grc.audit import record_audit_event
@@ -138,14 +137,7 @@ def revise_policy(
         raise HTTPException(status_code=400, detail="A policy revision needs the next edition text.")
     controls = resolve_control_refs(session, refs)
     next_number = _allocate_next_version_number(session, document)
-    try:
-        _write_version(session, decision, document, next_number, body, controls)
-    except IntegrityError as exc:
-        session.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="The policy changed concurrently. Reload it before publishing the next edition.",
-        ) from exc
+    _write_version(session, decision, document, next_number, body, controls)
     record_audit_event(
         session,
         decision,
@@ -284,6 +276,7 @@ def _allocate_next_version_number(
             status_code=409,
             detail="The policy changed concurrently. Reload it before publishing the next edition.",
         )
+    document.current_version_number = next_number
     return next_number
 
 

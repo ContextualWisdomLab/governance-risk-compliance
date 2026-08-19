@@ -82,7 +82,7 @@ def test_csap_source_is_pinned_to_the_2026_07_kisa_notice() -> None:
     """The catalog identifies the official KISA notice for the stored edition."""
     source = framework_source_url(FrameworkCode.CSAP_2026)
     assert "selectGnrlVrtlRcsrmList.do" in source
-    assert "%ED%81%B4%EB%9D%BC%EC%9A%B4%EB%93%9C" in source
+    assert "%ED%81%B4%EB%9D%BC%EC%9A%B0%EB%93%9C" in source
     assert "/main/csap/intro/" not in source
 
 
@@ -110,19 +110,17 @@ def test_audit_events_reject_update_and_delete_at_database_boundary() -> None:
     factory, _document_id = _seeded_policy_factory()
     with factory() as session:
         event_id = session.query(AuditEvent.audit_event_id).first()[0]
-        session.execute(
-            update(AuditEvent)
-            .where(AuditEvent.audit_event_id == event_id)
-            .values(action_name="tampered")
-        )
         with pytest.raises(DBAPIError, match="append-only"):
-            session.commit()
+            session.execute(
+                update(AuditEvent)
+                .where(AuditEvent.audit_event_id == event_id)
+                .values(action_name="tampered")
+            )
         session.rollback()
-        session.execute(
-            delete(AuditEvent).where(AuditEvent.audit_event_id == event_id)
-        )
         with pytest.raises(DBAPIError, match="append-only"):
-            session.commit()
+            session.execute(
+                delete(AuditEvent).where(AuditEvent.audit_event_id == event_id)
+            )
 
 
 def test_finalized_policy_editions_and_mappings_reject_mutation() -> None:
@@ -132,21 +130,22 @@ def test_finalized_policy_editions_and_mappings_reject_mutation() -> None:
         version = session.query(PolicyVersion).one()
         mapping = session.query(PolicyControlMapping).one()
         assert version.is_finalized is True
-        session.execute(
-            update(PolicyVersion)
-            .where(PolicyVersion.policy_version_id == version.policy_version_id)
-            .values(policy_body="tampered")
-        )
         with pytest.raises(DBAPIError, match="immutable"):
-            session.commit()
-        session.rollback()
-        session.execute(
-            delete(PolicyControlMapping).where(
-                PolicyControlMapping.mapping_id == mapping.mapping_id
+            session.execute(
+                update(PolicyVersion)
+                .where(
+                    PolicyVersion.policy_version_id
+                    == version.policy_version_id
+                )
+                .values(policy_body="tampered")
             )
-        )
+        session.rollback()
         with pytest.raises(DBAPIError, match="immutable"):
-            session.commit()
+            session.execute(
+                delete(PolicyControlMapping).where(
+                    PolicyControlMapping.mapping_id == mapping.mapping_id
+                )
+            )
         session.rollback()
         session.add(
             PolicyControlMapping(

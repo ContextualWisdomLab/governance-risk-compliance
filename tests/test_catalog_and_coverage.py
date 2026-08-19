@@ -302,6 +302,6 @@ def test_officer_can_bind_evidence_from_home_form() -> None:
         },
         follow_redirects=False,
     )
-    assert posted.status_code in {201, 303}
+    assert posted.status_code == 303
     gaps = client.get("/controls/uncovered", params={"framework": FrameworkCode.CSAP_2026.value})
     assert "12.3.1" not in {item["catalog_identifier"] for item in gaps.json()["controls"]}

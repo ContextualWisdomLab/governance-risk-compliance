@@ -58,7 +58,13 @@ def framework_source_url(code: FrameworkCode) -> str:
                 "?boardId=bbs_0000000000000014&mode=view&cntId=21"
             )
         case FrameworkCode.CSAP_2026:
-            return "https://isms.kisa.or.kr/main/csap/intro/"
+            return (
+                "https://isms-p.or.kr/ntcn/rcsrm/"
+                "selectGnrlVrtlRcsrmList.do?rcsrmMenuCd=1003&"
+                "searchKeyword=%ED%81%B4%EB%9D%BC%EC%9A%B0%EB%93%9C%EC%84%9C%"
+                "EB%B9%84%EC%8A%A4+%EB%B3%B4%EC%95%88%EC%9D%B8%EC%A6%9D%EA%B8%"
+                "B0%EC%A4%80+%ED%95%B4%EC%84%A4%EC%84%9C"
+            )
         case FrameworkCode.ISO27001_2022:
             return "https://www.iso.org/standard/27001"
         case FrameworkCode.NIST_SP_800_53_R5:
