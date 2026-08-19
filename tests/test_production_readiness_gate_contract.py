@@ -69,7 +69,7 @@ def test_validate_manifest_rejects_unexpected_gate() -> None:
     [
         ("owner", "ContextualWisdomLab/other", "owner must be"),
         ("priority", "P1", "priority must be P0"),
-        ("issue_url", f"{ISSUE_PREFIX}8", rf"issue_url must be .*issues/4"),
+        ("issue_url", f"{ISSUE_PREFIX}8", r"issue_url must be .*issues/4"),
     ],
 )
 def test_validate_manifest_rejects_required_gate_mapping_changes(
