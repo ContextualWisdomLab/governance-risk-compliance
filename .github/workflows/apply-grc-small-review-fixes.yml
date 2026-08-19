@@ -1,0 +1,209 @@
+name: Apply GRC small review fixes
+
+on:
+  push:
+    branches:
+      - cursor/control-evidence-first-slice-bbe8
+    paths:
+      - .github/workflows/apply-grc-small-review-fixes.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-grc-small-review-fixes
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    if: github.repository == 'ContextualWisdomLab/governance-risk-compliance'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+      - name: Checkout product branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: cursor/control-evidence-first-slice-bbe8
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          prune-cache: true
+      - name: Apply exact reviewed replacements
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              content = target.read_text(encoding="utf-8")
+              if old not in content:
+                  raise SystemExit(f"missing expected fragment in {path}: {old!r}")
+              target.write_text(content.replace(old, new, 1), encoding="utf-8")
+
+          replace(
+              "cwl_grc/catalog.py",
+              '        case FrameworkCode.CSAP_2026:\n            return "https://isms.kisa.or.kr/main/csap/intro/"\n',
+              '        case FrameworkCode.CSAP_2026:\n'
+              '            return (\n'
+              '                "https://isms-p.or.kr/ntcn/rcsrm/"\n'
+              '                "selectGnrlVrtlRcsrmList.do?rcsrmMenuCd=1003&"\n'
+              '                "searchKeyword=%ED%81%B4%EB%9D%BC%EC%9A%B0%EB%93%9C%EC%84%9C%"\n'
+              '                "EB%B9%84%EC%8A%A4+%EB%B3%B4%EC%95%88%EC%9D%B8%EC%A6%9D%EA%B8%"\n'
+              '                "B0%EC%A4%80+%ED%95%B4%EC%84%A4%EC%84%9C"\n'
+              '            )\n',
+          )
+          replace(
+              "tests/test_catalog_and_coverage.py",
+              "    assert posted.status_code in {201, 303}\n",
+              "    assert posted.status_code == 303\n",
+          )
+          replace(
+              "tests/test_policy_and_tools.py",
+              '    monkeypatch.setattr("cwl_grc.cli.uvicorn.run", fake_run)\n'
+              '    assert cli_main(["serve"]) == 0\n'
+              '    assert captured == {"host": "0.0.0.0", "port": 8080, "title": "CWL GRC"}\n',
+              '    monkeypatch.setenv(\n'
+              '        "CWL_GRC_EVIDENCE_KEY",\n'
+              '        "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",\n'
+              '    )\n'
+              '    monkeypatch.setattr("cwl_grc.cli.uvicorn.run", fake_run)\n'
+              '    assert cli_main(["serve"]) == 0\n'
+              '    assert captured == {"host": "127.0.0.1", "port": 8080, "title": "CWL GRC"}\n',
+          )
+          replace(
+              "tests/test_integrity_contracts.py",
+              '    assert "%ED%81%B4%EB%9D%BC%EC%9A%B4%EB%93%9C" in source\n',
+              '    assert "%ED%81%B4%EB%9D%BC%EC%9A%B0%EB%93%9C" in source\n',
+          )
+          replace(
+              "tests/test_integrity_contracts.py",
+              '        session.execute(\n'
+              '            update(AuditEvent)\n'
+              '            .where(AuditEvent.audit_event_id == event_id)\n'
+              '            .values(action_name="tampered")\n'
+              '        )\n'
+              '        with pytest.raises(DBAPIError, match="append-only"):\n'
+              '            session.commit()\n',
+              '        with pytest.raises(DBAPIError, match="append-only"):\n'
+              '            session.execute(\n'
+              '                update(AuditEvent)\n'
+              '                .where(AuditEvent.audit_event_id == event_id)\n'
+              '                .values(action_name="tampered")\n'
+              '            )\n',
+          )
+          replace(
+              "tests/test_integrity_contracts.py",
+              '        session.execute(\n'
+              '            delete(AuditEvent).where(AuditEvent.audit_event_id == event_id)\n'
+              '        )\n'
+              '        with pytest.raises(DBAPIError, match="append-only"):\n'
+              '            session.commit()\n',
+              '        with pytest.raises(DBAPIError, match="append-only"):\n'
+              '            session.execute(\n'
+              '                delete(AuditEvent).where(AuditEvent.audit_event_id == event_id)\n'
+              '            )\n',
+          )
+          replace(
+              "tests/test_integrity_contracts.py",
+              '        session.execute(\n'
+              '            update(PolicyVersion)\n'
+              '            .where(PolicyVersion.policy_version_id == version.policy_version_id)\n'
+              '            .values(policy_body="tampered")\n'
+              '        )\n'
+              '        with pytest.raises(DBAPIError, match="immutable"):\n'
+              '            session.commit()\n',
+              '        with pytest.raises(DBAPIError, match="immutable"):\n'
+              '            session.execute(\n'
+              '                update(PolicyVersion)\n'
+              '                .where(\n'
+              '                    PolicyVersion.policy_version_id\n'
+              '                    == version.policy_version_id\n'
+              '                )\n'
+              '                .values(policy_body="tampered")\n'
+              '            )\n',
+          )
+          replace(
+              "tests/test_integrity_contracts.py",
+              '        session.execute(\n'
+              '            delete(PolicyControlMapping).where(\n'
+              '                PolicyControlMapping.mapping_id == mapping.mapping_id\n'
+              '            )\n'
+              '        )\n'
+              '        with pytest.raises(DBAPIError, match="immutable"):\n'
+              '            session.commit()\n',
+              '        with pytest.raises(DBAPIError, match="immutable"):\n'
+              '            session.execute(\n'
+              '                delete(PolicyControlMapping).where(\n'
+              '                    PolicyControlMapping.mapping_id == mapping.mapping_id\n'
+              '                )\n'
+              '            )\n',
+          )
+          replace(
+              "cwl_grc/policy.py",
+              "from sqlalchemy.exc import IntegrityError\n",
+              "",
+          )
+          replace(
+              "cwl_grc/policy.py",
+              '    try:\n'
+              '        _write_version(session, decision, document, next_number, body, controls)\n'
+              '    except IntegrityError as exc:\n'
+              '        session.rollback()\n'
+              '        raise HTTPException(\n'
+              '            status_code=409,\n'
+              '            detail="The policy changed concurrently. Reload it before publishing the next edition.",\n'
+              '        ) from exc\n',
+              '    _write_version(session, decision, document, next_number, body, controls)\n',
+          )
+          replace(
+              "cwl_grc/policy.py",
+              '    if result.rowcount != 1:\n'
+              '        session.rollback()\n'
+              '        raise HTTPException(\n'
+              '            status_code=409,\n'
+              '            detail="The policy changed concurrently. Reload it before publishing the next edition.",\n'
+              '        )\n'
+              '    return next_number\n',
+              '    if result.rowcount != 1:\n'
+              '        session.rollback()\n'
+              '        raise HTTPException(\n'
+              '            status_code=409,\n'
+              '            detail="The policy changed concurrently. Reload it before publishing the next edition.",\n'
+              '        )\n'
+              '    document.current_version_number = next_number\n'
+              '    return next_number\n',
+          )
+          PY
+      - name: Install hash-locked dependencies
+        run: uv sync --locked --extra dev
+      - name: Verify the complete product contract
+        run: |
+          set -euo pipefail
+          uv run ruff check cwl_grc tests
+          uv run interrogate --fail-under 100 cwl_grc
+          uv run pytest --cov=cwl_grc --cov-branch --cov-report=term-missing --cov-fail-under=100
+          uv run python -m compileall -q cwl_grc tests
+          uv lock --check
+          git diff --check
+      - name: Publish verified fixes and remove this workflow
+        env:
+          BRANCH_NAME: cursor/control-evidence-first-slice-bbe8
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/apply-grc-small-review-fixes.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          test -n "$(git status --porcelain)"
+          git commit -m "fix: close current GRC integrity review findings"
+          git push origin "HEAD:${BRANCH_NAME}"
