@@ -157,6 +157,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _require_string(gate: dict[str, Any], field: str, path: str) -> str:
+    """Return one required non-empty string field from a gate."""
     value = gate.get(field)
     if not isinstance(value, str):
         raise ReadinessManifestError(f"{path}.{field} must be a non-empty string.")
@@ -173,6 +174,7 @@ def _require_string_list(
     *,
     allow_empty: bool,
 ) -> list[str]:
+    """Return one required list of non-empty strings from a gate."""
     value = gate.get(field)
     if not isinstance(value, list):
         raise ReadinessManifestError(f"{path}.{field} must be a list.")
@@ -194,6 +196,7 @@ def _require_string_list(
 
 
 def _is_canonical_issue_url(value: str) -> bool:
+    """Return whether ``value`` is a canonical issue URL for this repository."""
     if not value.startswith(ISSUE_URL_PREFIX):
         return False
     issue_number = value.removeprefix(ISSUE_URL_PREFIX)
