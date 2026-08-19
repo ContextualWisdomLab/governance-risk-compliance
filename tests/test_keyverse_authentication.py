@@ -135,27 +135,47 @@ def test_scope_gate_fails_closed_for_missing_or_empty_scope() -> None:
         verifier.verify(_token(private_key, claims=_claims(scope=["openid"])))
 
 
-def test_cross_jwt_confusion_and_critical_headers_are_rejected() -> None:
+def test_cross_jwt_confusion_and_critical_headers_are_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """ID tokens, untyped tokens, and unsupported critical headers never authenticate."""
     private_key, jwk = _new_signing_material("key-1")
     verifier = _verifier(jwk)
     for typ in ("JWT", "id+jwt", ""):
         with pytest.raises(AccessTokenValidationError, match="access-token type"):
             verifier.verify(_token(private_key, typ=typ))
+
+    critical_token = _token(
+        private_key,
+        extra_headers={"crit": ["example"], "example": True},
+    )
+    with pytest.raises(AccessTokenValidationError, match="header"):
+        verifier.verify(critical_token)
+
+    monkeypatch.setattr(
+        jwt,
+        "get_unverified_header",
+        lambda _token: {
+            "alg": "RS256",
+            "typ": "at+jwt",
+            "kid": "key-1",
+            "crit": ["example"],
+        },
+    )
     with pytest.raises(AccessTokenValidationError, match="critical"):
-        verifier.verify(
-            _token(
-                private_key,
-                extra_headers={"crit": ["example"], "example": True},
-            )
-        )
+        verifier.verify(_token(private_key))
 
 
 def test_unsigned_and_wrong_algorithm_tokens_are_rejected() -> None:
     """The resource server accepts only signed RS256 access tokens."""
     _private_key, jwk = _new_signing_material("key-1")
     verifier = _verifier(jwk)
-    unsigned = jwt.encode(_claims(), key="", algorithm="none", headers={"typ": "at+jwt"})
+    unsigned = jwt.encode(
+        _claims(),
+        key="",
+        algorithm="none",
+        headers={"typ": "at+jwt"},
+    )
     with pytest.raises(AccessTokenValidationError, match="RS256"):
         verifier.verify(unsigned)
 
