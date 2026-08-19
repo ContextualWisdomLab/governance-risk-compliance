@@ -29,7 +29,7 @@ from cwl_grc.policy import (
     serialize_gap,
     serialize_policy,
 )
-from cwl_grc.remote_access import remote_preview_enabled, request_is_local
+from cwl_grc.remote_access import request_is_local
 
 
 def parse_framework(value: str | None) -> FrameworkCode | None:
@@ -60,11 +60,19 @@ def create_app(
     database_url: str | None = None,
     evidence_key: str | None = None,
 ) -> FastAPI:
-    """Build the GRC app for module import or a standalone process."""
-    url = database_url or os.environ.get("CWL_GRC_DATABASE_URL", "sqlite:///grc_product.sqlite")
-    key = evidence_key if evidence_key is not None else os.environ.get("CWL_GRC_EVIDENCE_KEY")
+    """Build a local-only GRC app with durable-key enforcement."""
+    url = database_url or os.environ.get(
+        "CWL_GRC_DATABASE_URL",
+        "sqlite:///grc_product.sqlite",
+    )
+    key = evidence_key if evidence_key is not None else os.environ.get(
+        "CWL_GRC_EVIDENCE_KEY"
+    )
     factory = create_session_factory(url)
-    cipher = EvidenceCipher(key)
+    cipher = EvidenceCipher(
+        key,
+        allow_ephemeral=url in {"sqlite://", "sqlite:///:memory:"},
+    )
     with factory() as session:
         seed_control_catalog(session)
         seed_authorization_purposes(session)
@@ -76,27 +84,26 @@ def create_app(
 
     app = FastAPI(title="CWL GRC", version="0.1.0")
     app.state.evidence_cipher = cipher
-    allow_remote_preview = remote_preview_enabled()
 
     @app.middleware("http")
     async def enforce_developer_preview_boundary(
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        """Reject remote preview traffic until an operator makes an explicit unsafe opt-in."""
+        """Reject every non-loopback or proxy-forwarded request until real auth exists."""
         client_host = getattr(request.client, "host", None)
         local_request = request_is_local(
             client_host,
             request.headers.get("x-forwarded-for"),
             request.headers.get("forwarded"),
         )
-        if not allow_remote_preview and not local_request:
+        if not local_request:
             return JSONResponse(
                 status_code=503,
                 content={
                     "detail": (
-                        "Remote preview is disabled. Configure Keyverse-backed identity and tenant "
-                        "authorization before exposing CWL GRC."
+                        "Remote preview is disabled. Configure Keyverse-backed identity and "
+                        "tenant authorization before exposing CWL GRC."
                     )
                 },
             )
@@ -170,7 +177,10 @@ def create_app(
         """List authored policies and their latest official mappings."""
         return {
             "next_action": "Review policy gaps and attach the next evidence.",
-            "policies": [serialize_policy(session, document) for document in list_policy_documents(session)],
+            "policies": [
+                serialize_policy(session, document)
+                for document in list_policy_documents(session)
+            ],
         }
 
     @app.get("/policy-gaps")
@@ -181,7 +191,10 @@ def create_app(
         """List latest-version policy mappings that still lack evidence."""
         return {
             "next_action": "Attach the next evidence on an uncovered policy control.",
-            "gaps": [serialize_gap(gap) for gap in list_policy_gaps(session, policy_document_id)],
+            "gaps": [
+                serialize_gap(gap)
+                for gap in list_policy_gaps(session, policy_document_id)
+            ],
         }
 
     @app.post("/evidence-records", status_code=201)
@@ -225,7 +238,9 @@ def create_app(
             "binding_id": binding.binding_id,
             "control_item_id": binding.control_item_id,
             "evidence_record_id": binding.evidence_record_id,
-            "next_action": "Review remaining uncovered controls and attach the next evidence.",
+            "next_action": (
+                "Review remaining uncovered controls and attach the next evidence."
+            ),
         }
 
     @app.get("/", response_class=HTMLResponse)
@@ -257,7 +272,10 @@ def create_app(
                 framework_key, catalog_identifier = parse_control_ref(raw)
                 framework = FrameworkCode(framework_key)
             except ValueError as exc:
-                raise HTTPException(status_code=400, detail="Choose official controls to map.") from exc
+                raise HTTPException(
+                    status_code=400,
+                    detail="Choose official controls to map.",
+                ) from exc
             refs.append(ControlRef(framework, catalog_identifier))
         author_policy(session, decision, policy_title, policy_body, refs)
         return RedirectResponse(url="/", status_code=303)
@@ -277,13 +295,35 @@ def create_app(
             try:
                 framework, catalog_identifier = parse_control_ref(control_ref)
             except ValueError as exc:
-                raise HTTPException(status_code=400, detail="Choose an uncovered control.") from exc
+                raise HTTPException(
+                    status_code=400,
+                    detail="Choose an uncovered control.",
+                ) from exc
         parsed = parse_framework(framework)
         if parsed is None or not catalog_identifier:
-            raise HTTPException(status_code=400, detail="Name the official control to bind.")
-        decision = require_purpose(actor_identifier, PurposeCode.EVIDENCE_BINDING.value, PurposeCode.EVIDENCE_BINDING)
-        record = create_evidence_record(session, cipher, decision, evidence_title, payload_text)
-        bind_control_evidence(session, decision, parsed, catalog_identifier, record.evidence_record_id)
+            raise HTTPException(
+                status_code=400,
+                detail="Name the official control to bind.",
+            )
+        decision = require_purpose(
+            actor_identifier,
+            PurposeCode.EVIDENCE_BINDING.value,
+            PurposeCode.EVIDENCE_BINDING,
+        )
+        record = create_evidence_record(
+            session,
+            cipher,
+            decision,
+            evidence_title,
+            payload_text,
+        )
+        bind_control_evidence(
+            session,
+            decision,
+            parsed,
+            catalog_identifier,
+            record.evidence_record_id,
+        )
         return RedirectResponse(url="/", status_code=303)
 
     return app
