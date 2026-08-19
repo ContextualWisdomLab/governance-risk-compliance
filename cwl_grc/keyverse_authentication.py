@@ -127,7 +127,13 @@ class KeyverseAccessTokenVerifier:
                 "The Keyverse access-token time bounds are invalid."
             )
         skew = timedelta(seconds=self._settings.clock_skew_seconds)
-        if now >= expires_at + skew:
+        try:
+            expiration_boundary = expires_at + skew
+        except OverflowError as exc:
+            raise AccessTokenValidationError(
+                "The Keyverse expiration claim is invalid."
+            ) from exc
+        if now >= expiration_boundary:
             raise AccessTokenValidationError("The Keyverse access token is expired.")
         if "nbf" in payload:
             not_before = _numeric_date(payload["nbf"], "not-before")
