@@ -15,11 +15,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  lock-test-publish:
-    # This reviewed one-shot refreshes the lock only after the TDD kernel exists.
+  lock-publish:
+    # Product CI executes the full immutable-head gate after this lock-only mutation.
     if: github.repository == 'ContextualWisdomLab/governance-risk-compliance'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
@@ -38,19 +38,13 @@ jobs:
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           prune-cache: true
-      - name: Refresh the locked dependency graph
-        run: uv lock --python 3.12
-      - name: Install and verify the complete product
+      - name: Refresh and install the locked dependency graph
         run: |
           set -euo pipefail
+          uv lock --python 3.12
           uv sync --locked --extra dev
-          uv run ruff check cwl_grc tests
-          uv run interrogate --fail-under 100 cwl_grc
-          uv run pytest --cov=cwl_grc --cov-branch --cov-report=term-missing --cov-fail-under=100
-          uv run python -m compileall -q cwl_grc tests
           uv lock --check
-          git diff --check
-      - name: Publish verified kernel and remove this workflow
+      - name: Publish the lock and remove this workflow
         env:
           BRANCH_NAME: feat/keyverse-jwt-auth-kernel
         run: |
@@ -58,7 +52,6 @@ jobs:
           git rm .github/workflows/verify-keyverse-auth-kernel-once.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          test -n "$(git status --porcelain)"
-          git commit -m "feat: verify Keyverse JWT access-token kernel"
+          git add uv.lock
+          git commit -m "build: lock the Keyverse JWT verification dependency"
           git push origin "HEAD:${BRANCH_NAME}"
