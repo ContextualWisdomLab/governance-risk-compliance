@@ -284,11 +284,18 @@ def create_app(
     def post_binding(
         body: dict[str, str],
         session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
         x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Bind stored evidence to one official control identifier."""
-        decision = require_purpose(x_actor_id, x_purpose, PurposeCode.EVIDENCE_BINDING)
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.EVIDENCE_BINDING,
+            "grc.evidence.write",
+        )
         framework = parse_framework(body.get("framework"))
         if framework is None:
             raise HTTPException(status_code=400, detail="Name the official framework.")
