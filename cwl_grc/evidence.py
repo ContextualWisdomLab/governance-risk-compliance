@@ -23,13 +23,14 @@ def create_evidence_record(
     evidence_title: str,
     payload_text: str,
 ) -> EvidenceRecord:
-    """Store one evidence artifact under a purpose-limited actor."""
+    """Store one evidence artifact under an exact tenant and purpose-limited actor."""
     title = evidence_title.strip()
     payload = payload_text.strip()
     if not title or not payload:
         raise HTTPException(status_code=400, detail="Evidence needs a title and the next artifact text.")
     record = EvidenceRecord(
         evidence_record_id=uuid4().hex,
+        tenant_id=decision.tenant_id,
         evidence_title=title,
         collector_actor=decision.actor_identifier,
         purpose_code=decision.purpose_code.value,
@@ -55,15 +56,23 @@ def bind_control_evidence(
     catalog_identifier: str,
     evidence_record_id: str,
 ) -> ControlEvidenceBinding:
-    """Bind an evidence artifact to one official control identifier."""
+    """Bind same-tenant evidence to one official control identifier."""
     control = get_control_item(session, framework, catalog_identifier)
     if control is None:
         raise HTTPException(status_code=404, detail="That official control is not in the catalog.")
-    evidence = session.get(EvidenceRecord, evidence_record_id)
+    evidence = (
+        session.query(EvidenceRecord)
+        .filter_by(
+            evidence_record_id=evidence_record_id,
+            tenant_id=decision.tenant_id,
+        )
+        .one_or_none()
+    )
     if evidence is None:
         raise HTTPException(status_code=404, detail="That evidence artifact is not on file.")
     binding = ControlEvidenceBinding(
         binding_id=uuid4().hex,
+        tenant_id=decision.tenant_id,
         control_item_id=control.control_item_id,
         evidence_record_id=evidence.evidence_record_id,
         bound_by_actor=decision.actor_identifier,
