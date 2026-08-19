@@ -17,6 +17,11 @@ from cwl_grc.database import create_session_factory, session_dependency
 from cwl_grc.encryption import EvidenceCipher
 from cwl_grc.evidence import bind_control_evidence, create_evidence_record
 from cwl_grc.health import health_payload
+from cwl_grc.keyverse_authentication import (
+    AccessTokenValidationError,
+    KeyverseAccessTokenVerifier,
+    require_access_scopes,
+)
 from cwl_grc.models import ControlItem, EvidenceRecord
 from cwl_grc.officer_console import parse_control_ref, render_officer_home
 from cwl_grc.policy import (
@@ -59,8 +64,9 @@ def create_app(
     *,
     database_url: str | None = None,
     evidence_key: str | None = None,
+    access_token_verifier: KeyverseAccessTokenVerifier | None = None,
 ) -> FastAPI:
-    """Build a local-only GRC app with durable-key enforcement."""
+    """Build a local-only GRC app with optional Keyverse route authentication."""
     url = database_url or os.environ.get(
         "CWL_GRC_DATABASE_URL",
         "sqlite:///grc_product.sqlite",
@@ -81,6 +87,44 @@ def create_app(
     def get_session() -> Iterator[Session]:
         """Yield the request session."""
         yield from session_dependency(factory)
+
+    def require_request_actor(
+        authorization: str | None,
+        declared_actor: str | None,
+        purpose_value: str | None,
+        required_purpose: PurposeCode,
+        required_scope: str,
+    ):
+        """Return a purpose decision using signed identity when Keyverse is enabled."""
+        actor_identifier = declared_actor
+        if access_token_verifier is not None:
+            if authorization is None:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Present a Keyverse bearer token before this action.",
+                )
+            scheme, separator, token = authorization.partition(" ")
+            if scheme.casefold() != "bearer" or not separator or not token or " " in token:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Present one Keyverse bearer token before this action.",
+                )
+            try:
+                principal = access_token_verifier.verify(token)
+            except AccessTokenValidationError as exc:
+                raise HTTPException(
+                    status_code=401,
+                    detail="The Keyverse bearer token is invalid.",
+                ) from exc
+            try:
+                require_access_scopes(principal, {required_scope})
+            except AccessTokenValidationError as exc:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"This action requires the {required_scope} scope.",
+                ) from exc
+            actor_identifier = principal.actor_id
+        return require_purpose(actor_identifier, purpose_value, required_purpose)
 
     app = FastAPI(title="CWL GRC", version="0.1.0")
     app.state.evidence_cipher = cipher
@@ -201,11 +245,18 @@ def create_app(
     def post_evidence(
         body: dict[str, str],
         session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
         x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Store the next evidence artifact without masking PII."""
-        decision = require_purpose(x_actor_id, x_purpose, PurposeCode.EVIDENCE_BINDING)
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.EVIDENCE_BINDING,
+            "grc.evidence.write",
+        )
         record = create_evidence_record(
             session,
             cipher,
