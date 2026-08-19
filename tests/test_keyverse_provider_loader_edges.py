@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import socket
-import ssl
 from datetime import datetime, timezone
 from typing import Any
 
@@ -231,7 +230,13 @@ def test_default_resolver_and_host_header_helpers_cover_ipv6_and_ports(
         "getaddrinfo",
         lambda hostname, port, type: [
             (socket.AF_INET, type, 6, "", ("8.8.8.8", port)),
-            (socket.AF_INET6, type, 6, "", ("2001:4860:4860::8888", port, 0, 0)),
+            (
+                socket.AF_INET6,
+                type,
+                6,
+                "",
+                ("2001:4860:4860::8888", port, 0, 0),
+            ),
         ],
     )
     assert _system_resolver("keys.example.test", 443) == (
@@ -239,7 +244,9 @@ def test_default_resolver_and_host_header_helpers_cover_ipv6_and_ports(
         "2001:4860:4860::8888",
     )
     assert _format_host_header("keys.example.test", 443) == "keys.example.test"
-    assert _format_host_header("keys.example.test", 8443) == "keys.example.test:8443"
+    assert _format_host_header("keys.example.test", 8443) == (
+        "keys.example.test:8443"
+    )
     assert _format_host_header("2001:4860:4860::8888", 443) == (
         "[2001:4860:4860::8888]"
     )
@@ -318,6 +325,7 @@ def test_loader_default_clock_and_injected_default_fetcher(
             constructed.append(timeout_seconds)
 
         def fetch(self, endpoint: ValidatedHttpsEndpoint, maximum_bytes: int) -> bytes:
+            """Return the static document for one validated endpoint."""
             return static.fetch(endpoint, maximum_bytes)
 
     monkeypatch.setattr(loader_module, "PinnedHttpsDocumentFetcher", FakePinnedFetcher)
@@ -334,8 +342,6 @@ def test_pinned_connection_factory_and_connect_preserve_tls_hostname(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The real connection factory dials the pinned IP but wraps TLS for the host."""
-    fake_context = object()
-    monkeypatch.setattr(ssl, "create_default_context", lambda: fake_context)
     connection = _create_pinned_connection(
         "8.8.8.8",
         443,
@@ -355,6 +361,7 @@ def test_pinned_connection_factory_and_connect_preserve_tls_hostname(
             self.calls: list[tuple[object, str]] = []
 
         def wrap_socket(self, sock: object, *, server_hostname: str) -> object:
+            """Return a fake TLS socket and record SNI."""
             self.calls.append((sock, server_hostname))
             return wrapped_socket
 
@@ -366,7 +373,11 @@ def test_pinned_connection_factory_and_connect_preserve_tls_hostname(
         timeout=5.0,
         context=context,  # type: ignore[arg-type]
     )
-    monkeypatch.setattr(socket, "create_connection", lambda *args, **kwargs: raw_socket)
+    monkeypatch.setattr(
+        socket,
+        "create_connection",
+        lambda *args, **kwargs: raw_socket,
+    )
     pinned.connect()
     assert pinned.sock is wrapped_socket
     assert context.calls == [(raw_socket, "keys.example.test")]
