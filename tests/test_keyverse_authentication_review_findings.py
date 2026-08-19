@@ -101,6 +101,16 @@ def test_impossible_access_token_time_windows_are_rejected_before_clock_skew() -
             verifier.verify(_token(private_key, claims))
 
 
+def test_expiration_skew_overflow_fails_closed_as_validation_error() -> None:
+    """A maximum representable NumericDate cannot leak a datetime OverflowError."""
+    private_key, jwk = _material()
+    verifier = _verifier(jwk)
+    with pytest.raises(AccessTokenValidationError, match="expiration claim"):
+        verifier.verify(
+            _token(private_key, _claims(exp=253402300799))
+        )
+
+
 def test_jwks_parser_cannot_raise_the_hard_one_mebibyte_limit() -> None:
     """The caller may lower the JWK limit but can never raise or disable it."""
     _private_key, jwk = _material()
