@@ -4,7 +4,17 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    LargeBinary,
+    String,
+    Text,
+    UniqueConstraint,
+    false,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -20,7 +30,7 @@ class ControlFramework(Base):
     framework_key: Mapped[str] = mapped_column(String(64), primary_key=True)
     official_title: Mapped[str] = mapped_column(String(255), nullable=False)
     edition_label: Mapped[str] = mapped_column(String(64), nullable=False)
-    source_url: Mapped[str] = mapped_column(String(512), nullable=False)
+    source_url: Mapped[str] = mapped_column(String(1024), nullable=False)
     control_items: Mapped[list[ControlItem]] = relationship(back_populates="control_framework")
 
 
@@ -121,23 +131,35 @@ class AuditEvent(Base):
 
 
 class PolicyDocument(Base):
-    """Stable identity of one officer-authored policy."""
+    """Stable identity and optimistic revision counter for one authored policy."""
 
     __tablename__ = "policy_document"
+    __table_args__ = (
+        CheckConstraint(
+            "current_version_number >= 0",
+            name="policy_document_version_nonnegative",
+        ),
+    )
 
     policy_document_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     policy_title: Mapped[str] = mapped_column(String(255), nullable=False)
     created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    current_version_number: Mapped[int] = mapped_column(
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
     policy_versions: Mapped[list[PolicyVersion]] = relationship(back_populates="policy_document")
 
 
 class PolicyVersion(Base):
-    """One immutable edition of a policy document."""
+    """One immutable edition of a policy document after finalization."""
 
     __tablename__ = "policy_version"
     __table_args__ = (
         UniqueConstraint("policy_document_id", "version_number", name="policy_version_edition"),
+        CheckConstraint("version_number > 0", name="policy_version_number_positive"),
     )
 
     policy_version_id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -149,6 +171,12 @@ class PolicyVersion(Base):
     policy_body: Mapped[str] = mapped_column(Text, nullable=False)
     authored_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
     authored_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    is_finalized: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=false(),
+    )
     policy_document: Mapped[PolicyDocument] = relationship(back_populates="policy_versions")
     policy_control_mappings: Mapped[list[PolicyControlMapping]] = relationship(
         back_populates="policy_version"
