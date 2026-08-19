@@ -1,0 +1,200 @@
+"""Validate the versioned production-readiness evidence contract."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any
+
+
+EXPECTED_REPOSITORY = "ContextualWisdomLab/governance-risk-compliance"
+EXPECTED_SCHEMA_VERSION = 1
+EXPECTED_TARGET = "production"
+ISSUE_URL_PREFIX = f"https://github.com/{EXPECTED_REPOSITORY}/issues/"
+ALLOWED_PRIORITIES = frozenset({"P0", "P1", "P2"})
+ALLOWED_STATUSES = frozenset({"blocked", "in_progress", "ready"})
+
+
+class ReadinessManifestError(ValueError):
+    """Report a malformed or internally inconsistent readiness manifest."""
+
+
+def load_manifest(path: Path) -> dict[str, Any]:
+    """Read one UTF-8 JSON readiness manifest from ``path``."""
+    try:
+        contents = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ReadinessManifestError(f"Readiness manifest {path} cannot be read.") from exc
+    try:
+        manifest = json.loads(contents)
+    except json.JSONDecodeError as exc:
+        raise ReadinessManifestError(
+            f"Readiness manifest {path} is not valid JSON."
+        ) from exc
+    if not isinstance(manifest, dict):
+        raise ReadinessManifestError("Readiness manifest must contain a JSON object.")
+    return manifest
+
+
+def validate_manifest(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    """Validate ``manifest`` and return its ordered production gates."""
+    if manifest.get("schema_version") != EXPECTED_SCHEMA_VERSION:
+        raise ReadinessManifestError(
+            f"schema_version must be {EXPECTED_SCHEMA_VERSION}."
+        )
+    if manifest.get("repository") != EXPECTED_REPOSITORY:
+        raise ReadinessManifestError(f"repository must be {EXPECTED_REPOSITORY}.")
+    if manifest.get("target") != EXPECTED_TARGET:
+        raise ReadinessManifestError(f"target must be {EXPECTED_TARGET}.")
+
+    gates = manifest.get("gates")
+    if not isinstance(gates, list) or not gates:
+        raise ReadinessManifestError("gates must be a non-empty list.")
+
+    validated: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for index, candidate in enumerate(gates):
+        path = f"gates[{index}]"
+        if not isinstance(candidate, dict):
+            raise ReadinessManifestError(f"{path} must be an object.")
+        gate = candidate
+        gate_id = _require_string(gate, "id", path)
+        _require_string(gate, "title", path)
+        priority = _require_string(gate, "priority", path)
+        status = _require_string(gate, "status", path)
+        _require_string(gate, "owner", path)
+        issue_url = _require_string(gate, "issue_url", path)
+        _require_string_list(
+            gate,
+            "required_evidence",
+            path,
+            allow_empty=False,
+        )
+        blockers = _require_string_list(gate, "blockers", path, allow_empty=True)
+        evidence = _require_string_list(gate, "evidence", path, allow_empty=True)
+
+        if gate_id in seen_ids:
+            raise ReadinessManifestError(f"duplicate gate id: {gate_id}.")
+        seen_ids.add(gate_id)
+        if priority not in ALLOWED_PRIORITIES:
+            allowed = ", ".join(sorted(ALLOWED_PRIORITIES))
+            raise ReadinessManifestError(f"{path}.priority must be one of: {allowed}.")
+        if status not in ALLOWED_STATUSES:
+            allowed = ", ".join(sorted(ALLOWED_STATUSES))
+            raise ReadinessManifestError(f"{path}.status must be one of: {allowed}.")
+        if not _is_canonical_issue_url(issue_url):
+            raise ReadinessManifestError(
+                f"{path}.issue_url must be a canonical issue URL for {EXPECTED_REPOSITORY}."
+            )
+        if status == "ready":
+            if blockers:
+                raise ReadinessManifestError(f"{path}: ready gate must not have blockers.")
+            if not evidence:
+                raise ReadinessManifestError(
+                    f"{path}: ready gate must name concrete evidence."
+                )
+        elif not blockers:
+            raise ReadinessManifestError(
+                f"{path}: {status} gate must name at least one blocker."
+            )
+
+        validated.append(gate)
+    return validated
+
+
+def readiness_summary(gates: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Return a deterministic readiness result for validated ``gates``."""
+    blocking_gates: list[dict[str, Any]] = []
+    ready_gate_count = 0
+    for gate in gates:
+        if gate["status"] == "ready":
+            ready_gate_count += 1
+        else:
+            blocking_gates.append(
+                {
+                    "id": gate["id"],
+                    "priority": gate["priority"],
+                    "status": gate["status"],
+                    "issue_url": gate["issue_url"],
+                    "blockers": gate["blockers"],
+                }
+            )
+    return {
+        "production_ready": not blocking_gates,
+        "gate_count": len(gates),
+        "ready_gate_count": ready_gate_count,
+        "blocking_gates": blocking_gates,
+    }
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Validate a manifest and optionally require every production gate to be ready."""
+    parser = argparse.ArgumentParser(
+        prog="cwl-grc-production-readiness",
+        description="Validate the CWL GRC production-readiness evidence contract.",
+    )
+    parser.add_argument("manifest", type=Path)
+    parser.add_argument(
+        "--require-ready",
+        action="store_true",
+        help="Exit 1 while any validated production gate is not ready.",
+    )
+    args = parser.parse_args(argv)
+    try:
+        gates = validate_manifest(load_manifest(args.manifest))
+    except ReadinessManifestError as exc:
+        print(json.dumps({"error": str(exc), "valid": False}, sort_keys=True))
+        return 2
+
+    summary = readiness_summary(gates)
+    summary["valid"] = True
+    print(json.dumps(summary, sort_keys=True))
+    if args.require_ready and not summary["production_ready"]:
+        return 1
+    return 0
+
+
+def _require_string(gate: dict[str, Any], field: str, path: str) -> str:
+    value = gate.get(field)
+    if not isinstance(value, str):
+        raise ReadinessManifestError(f"{path}.{field} must be a non-empty string.")
+    normalized = value.strip()
+    if not normalized:
+        raise ReadinessManifestError(f"{path}.{field} must be a non-empty string.")
+    return normalized
+
+
+def _require_string_list(
+    gate: dict[str, Any],
+    field: str,
+    path: str,
+    *,
+    allow_empty: bool,
+) -> list[str]:
+    value = gate.get(field)
+    if not isinstance(value, list):
+        raise ReadinessManifestError(f"{path}.{field} must be a list.")
+    if not allow_empty and not value:
+        raise ReadinessManifestError(f"{path}.{field} must not be empty.")
+    normalized: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ReadinessManifestError(
+                f"{path}.{field} must contain non-empty strings."
+            )
+        text = item.strip()
+        if not text:
+            raise ReadinessManifestError(
+                f"{path}.{field} must contain non-empty strings."
+            )
+        normalized.append(text)
+    return normalized
+
+
+def _is_canonical_issue_url(value: str) -> bool:
+    if not value.startswith(ISSUE_URL_PREFIX):
+        return False
+    issue_number = value.removeprefix(ISSUE_URL_PREFIX)
+    return bool(issue_number) and issue_number.isdigit()

@@ -66,3 +66,16 @@ Production exposure requires Keyverse-backed OIDC signature, issuer, audience, t
 ## Service extraction
 
 The kernel is already a separately importable package. Extracting the process onto its own host must preserve `/healthz`, `/policy-documents`, `/policy-gaps`, `/controls`, `/controls/uncovered`, and the evidence bind contract while replacing the preview boundary with the authenticated Keyverse and tenant-authorization adapter.
+
+## Production-readiness evidence gate
+
+The repository carries `docs/production/production-readiness.json` as a versioned evidence
+register rather than deriving production status from a green unit-test workflow. The
+`cwl_grc.production_readiness` validator enforces repository identity, canonical issue links,
+priority/status enums, unique gates, required evidence, and blocker/evidence consistency.
+
+Ordinary pull-request validation proves that this contract is well formed. Release promotion
+must invoke the same validator with `--require-ready`, which fails closed until every gate is
+ready. The initial register keeps the local-preview boundary truthful while #4 and #8–#14
+remain incomplete; it does not replace exact-head Product, security, or independent-review
+evidence.
