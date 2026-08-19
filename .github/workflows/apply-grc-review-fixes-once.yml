@@ -1,0 +1,332 @@
+name: Apply GRC review fixes once
+
+on:
+  push:
+    paths:
+      - .github/workflows/apply-grc-review-fixes-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-grc-review-fixes-once
+  cancel-in-progress: false
+
+jobs:
+  apply-and-verify:
+    if: github.ref == 'refs/heads/cursor/control-evidence-first-slice-bbe8'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+      - name: Checkout exact product branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: cursor/control-evidence-first-slice-bbe8
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          prune-cache: true
+      - name: Apply exact reviewed replacements
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"expected source fragment missing from {path}: {old!r}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace(
+              ".github/workflows/product.yml",
+              "      - name: Verify clean product tree\n        run: git diff --check\n",
+              "      - name: Verify clean product tree\n"
+              "        run: |\n"
+              "          git diff --check\n"
+              "          test -z \"$(git status --porcelain)\"\n",
+          )
+          replace(
+              "cwl_grc/catalog.py",
+              "        case FrameworkCode.CSAP_2026:\n"
+              "            return \"https://isms.kisa.or.kr/main/csap/intro/\"\n",
+              "        case FrameworkCode.CSAP_2026:\n"
+              "            return (\n"
+              "                \"https://isms-p.or.kr/ntcn/rcsrm/\"\n"
+              "                \"selectGnrlVrtlRcsrmList.do?rcsrmMenuCd=1003&\"\n"
+              "                \"searchKeyword=%ED%81%B4%EB%9D%BC%EC%9A%B0%EB%93%9C%EC%84%9C%\"\n"
+              "                \"EB%B9%84%EC%8A%A4+%EB%B3%B4%EC%95%88%EC%9D%B8%EC%A6%9D%EA%B8%\"\n"
+              "                \"B0%EC%A4%80+%ED%95%B4%EC%84%A4%EC%84%9C\"\n"
+              "            )\n",
+          )
+          replace("ARCHITECTURE.md", "probe[/healthz/]", "probe[/healthz]")
+          replace(
+              "ARCHITECTURE.md",
+              "3. **Preview network boundary**: rejects proxy-forwarded and non-loopback traffic unless an operator deliberately enables the unsafe remote-preview escape hatch.\n"
+              "4. **CLI tools**: `cwl-grc policy`, `cwl-grc gaps`, `cwl-grc bind`, and `cwl-grc serve`.\n"
+              "5. **Kernel package**: `create_app()` for modular composition; `python -m cwl_grc` for standalone HTTP.\n"
+              "6. **Store**: 3NF SQLite by default, PostgreSQL-ready URL via `CWL_GRC_DATABASE_URL`.\n",
+              "3. **Preview network boundary**: always rejects proxy-forwarded and non-loopback traffic; no runtime override exists before Keyverse authentication.\n"
+              "4. **CLI tools**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and the local Uvicorn `cwl-grc serve`.\n"
+              "5. **Kernel package**: `create_app()` for modular composition; `python -m cwl_grc` for standalone local HTTP.\n"
+              "6. **Store**: 3NF SQLite by default, PostgreSQL-ready URL via `CWL_GRC_DATABASE_URL`, versioned schema upgrades, and database triggers that protect audit and finalized policy history.\n",
+          )
+          replace(
+              "ARCHITECTURE.md",
+              "The current HTTP surface is an unauthenticated developer preview. `X-Actor-Id` and `X-Purpose` are audit and purpose declarations, not proof of identity. The application therefore denies non-loopback or proxy-forwarded traffic by default. `CWL_GRC_ALLOW_UNAUTHENTICATED_REMOTE_PREVIEW=1` is an explicit unsafe test-only override; it does not make the deployment production-ready.\n",
+              "The current HTTP surface is an unauthenticated developer preview. `X-Actor-Id` and `X-Purpose` are audit and purpose declarations, not proof of identity. The application binds its command-line server to loopback and always denies non-loopback or proxy-forwarded traffic. There is no unauthenticated remote-preview override.\n",
+          )
+          replace(
+              "ARCHITECTURE.md",
+              "| `policy_document` | Stable policy identity and title |\n"
+              "| `policy_version` | Immutable edition (body + author + version number) |\n"
+              "| `policy_control_mapping` | Edition → official `control_item` only |\n",
+              "| `policy_document` | Stable policy identity, title, and optimistic current-version counter |\n"
+              "| `policy_version` | Edition finalized exactly once; database triggers reject later update/delete |\n"
+              "| `policy_control_mapping` | Edition → official `control_item`; insert only before finalization and never update/delete |\n",
+          )
+          replace(
+              "README.md",
+              "1. Install and start the officer tools with `python -m pip install -e \".[dev]\"` and `python -m cwl_grc`, or run `cwl-grc serve`.\n",
+              "1. Install with `python -m pip install -e \".[dev]\"`, set a durable Fernet `CWL_GRC_EVIDENCE_KEY`, then run `python -m cwl_grc` or `cwl-grc serve`.\n",
+          )
+          replace(
+              "README.md",
+              "The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. The app therefore rejects proxy-forwarded or non-loopback traffic by default. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.\n\n"
+              "`CWL_GRC_ALLOW_UNAUTHENTICATED_REMOTE_PREVIEW=1` is an explicit unsafe escape hatch for an isolated test environment only. It is not authentication and must not be used for customer or Internet traffic.\n",
+              "The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. The command-line server binds to loopback, and the app always rejects proxy-forwarded or non-loopback traffic. No runtime bypass exists. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.\n",
+          )
+          replace(
+              "README.md",
+              "Each command prints JSON that states the next action. The CLI is also a developer-preview interface until the same identity and tenant controls are available.\n",
+              "The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `bind` print JSON that states the next action. `cwl-grc serve` starts the local Uvicorn server and does not print data JSON. Running `cwl-grc policy` without `author`, `revise`, or `list` is invalid and exits with code 2. The CLI remains a developer-preview interface until the same identity and tenant controls are available.\n",
+          )
+          replace(
+              "README.md",
+              "| Author or revise a policy | `POST /policy-documents`, `POST /policy-documents/{id}/versions`, or `cwl-grc policy` |\n"
+              "| List policies | `GET /policy-documents` |\n",
+              "| Author or revise a policy | `POST /policy-documents`, `POST /policy-documents/{id}/versions`, `cwl-grc policy author`, or `cwl-grc policy revise` |\n"
+              "| List policies | `GET /policy-documents` or `cwl-grc policy list` |\n",
+          )
+          replace(
+              "README.md",
+              "Set `CWL_GRC_EVIDENCE_KEY` (Fernet) in any durable environment. Without it the process uses an ephemeral key and evidence will not survive a restart. Set `CWL_GRC_DATABASE_URL` when you are not using the local SQLite file.\n",
+              "Set `CWL_GRC_EVIDENCE_KEY` (Fernet) for every durable store; startup fails when a persistent database has no key. Ephemeral key generation is limited to explicitly selected in-memory SQLite tests. Set `CWL_GRC_DATABASE_URL` when you are not using the local SQLite file.\n",
+          )
+          replace(
+              "docs/adr/0001-control-evidence-first-slice.md",
+              "5. Treats the HTTP surface as a local developer preview. It rejects proxy-forwarded and non-loopback traffic by default until Keyverse-backed identity and tenant authorization are implemented.\n"
+              "6. Keeps an explicitly named unauthenticated remote-preview override only for isolated testing. The override is not production authentication.\n",
+              "5. Treats the HTTP surface as a local developer preview. It always rejects proxy-forwarded and non-loopback traffic until Keyverse-backed identity and tenant authorization are implemented.\n"
+              "6. Requires durable evidence-key material for every persistent database; only explicitly selected in-memory tests may use an ephemeral key.\n"
+              "7. Finalizes each policy edition once and installs database guards that reject audit mutation, finalized policy mutation, mapping changes, and stale concurrent version allocation.\n",
+          )
+          replace(
+              "docs/doctoring/REFERENCES.md",
+              "Korea Internet & Security Agency. (2026). *클라우드컴퓨팅서비스 보안인증(CSAP)* [Cloud computing service security certification]. https://isms.kisa.or.kr/main/csap/intro/\n\n"
+              "Korea Internet & Security Agency. (2026, July). *클라우드서비스 보안인증기준 해설서* [Cloud service security certification criteria commentary]. https://www.isms-p.or.kr/ntcn/rcsrm/selectGnrlVrtlRcsrmList.do\n",
+              "Korea Internet & Security Agency. (2026, July 6). *2026년 클라우드서비스 보안인증기준 해설서(2026.07)* [2026 cloud service security certification criteria commentary]. File corrected July 28, 2026. https://isms-p.or.kr/ntcn/rcsrm/selectGnrlVrtlRcsrmList.do?rcsrmMenuCd=1003&searchKeyword=%ED%81%B4%EB%9D%BC%EC%9A%B0%EB%93%9C%EC%84%9C%EB%B9%84%EC%8A%A4+%EB%B3%B4%EC%95%88%EC%9D%B8%EC%A6%9D%EA%B8%B0%EC%A4%80+%ED%95%B4%EC%84%A4%EC%84%9C\n",
+          )
+          replace(
+              "cwl_grc/__main__.py",
+              '    """Serve the GRC product on 0.0.0.0 and $PORT."""\n',
+              '    """Serve the unauthenticated developer preview on loopback and $PORT."""\n',
+          )
+          replace(
+              "cwl_grc/__main__.py",
+              '    uvicorn.run(create_app(), host="0.0.0.0", port=port)\n',
+              '    uvicorn.run(create_app(), host="127.0.0.1", port=port)\n',
+          )
+          replace(
+              "cwl_grc/cli.py",
+              '    """Serve the GRC product on 0.0.0.0 and $PORT."""\n',
+              '    """Serve the unauthenticated developer preview on loopback and $PORT."""\n',
+          )
+          replace(
+              "cwl_grc/cli.py",
+              '    uvicorn.run(create_app(), host="0.0.0.0", port=port)\n',
+              '    uvicorn.run(create_app(), host="127.0.0.1", port=port)\n',
+          )
+          replace(
+              "tests/test_catalog_and_coverage.py",
+              "    assert posted.status_code in {201, 303}\n",
+              "    assert posted.status_code == 303\n",
+          )
+          replace(
+              "tests/test_kernel.py",
+              "from cryptography.fernet import Fernet\n\n",
+              "from cryptography.fernet import Fernet\nimport pytest\n\n",
+          )
+          replace(
+              "tests/test_kernel.py",
+              "def test_evidence_cipher_generates_ephemeral_key_when_absent() -> None:\n"
+              "    cipher = EvidenceCipher(None)\n"
+              "    assert cipher.decrypt(cipher.encrypt(\"usable PII\")) == \"usable PII\"\n",
+              "def test_evidence_cipher_requires_explicit_ephemeral_mode() -> None:\n"
+              "    with pytest.raises(ValueError, match=\"evidence key\"):\n"
+              "        EvidenceCipher(None)\n"
+              "    cipher = EvidenceCipher(None, allow_ephemeral=True)\n"
+              "    assert cipher.decrypt(cipher.encrypt(\"usable PII\")) == \"usable PII\"\n",
+          )
+          replace(
+              "tests/test_kernel.py",
+              "    monkeypatch.setenv(\"PORT\", \"9099\")\n",
+              "    monkeypatch.setenv(\"PORT\", \"9099\")\n"
+              "    monkeypatch.setenv(\n"
+              "        \"CWL_GRC_EVIDENCE_KEY\",\n"
+              "        \"MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=\",\n"
+              "    )\n",
+          )
+          replace(
+              "tests/test_kernel.py",
+              '    assert captured == {"host": "0.0.0.0", "port": 9099, "title": "CWL GRC"}\n',
+              '    assert captured == {"host": "127.0.0.1", "port": 9099, "title": "CWL GRC"}\n',
+          )
+
+          Path("tests/test_remote_access.py").write_text(
+              '''"""Regression tests for the fail-closed developer-preview network boundary."""\n\n'
+              'from __future__ import annotations\n\n'
+              'from fastapi.testclient import TestClient\n\n'
+              'from cwl_grc import create_app\n'
+              'from cwl_grc.remote_access import request_is_local\n\n\n'
+              'def test_local_request_classifier_fails_closed() -> None:\n'
+              '    """Only direct loopback and the in-process test client count as local."""\n'
+              '    assert request_is_local("testclient", None, None) is True\n'
+              '    assert request_is_local("localhost", None, None) is True\n'
+              '    assert request_is_local("127.0.0.1", None, None) is True\n'
+              '    assert request_is_local("::1", None, None) is True\n'
+              '    assert request_is_local("198.51.100.23", None, None) is False\n'
+              '    assert request_is_local("not-an-address", None, None) is False\n'
+              '    assert request_is_local(None, None, None) is False\n'
+              '    assert request_is_local("127.0.0.1", "198.51.100.23", None) is False\n'
+              '    assert request_is_local("127.0.0.1", None, "for=198.51.100.23") is False\n\n\n'
+              'def test_forwarded_remote_preview_is_always_denied(monkeypatch) -> None:  # noqa: ANN001\n'
+              '    """No environment value can expose the unauthenticated HTTP surface."""\n'
+              '    monkeypatch.setenv("CWL_GRC_ALLOW_UNAUTHENTICATED_REMOTE_PREVIEW", "1")\n'
+              '    client = TestClient(create_app(database_url="sqlite://", evidence_key=None))\n\n'
+              '    local = client.get("/healthz")\n'
+              '    forwarded = client.get(\n'
+              '        "/healthz",\n'
+              '        headers={"X-Forwarded-For": "198.51.100.23"},\n'
+              '    )\n'
+              '    standardized = client.get(\n'
+              '        "/healthz",\n'
+              '        headers={"Forwarded": "for=198.51.100.23"},\n'
+              '    )\n\n'
+              '    assert local.status_code == 200\n'
+              '    for response in (forwarded, standardized):\n'
+              '        assert response.status_code == 503\n'
+              '        assert response.json() == {\n'
+              '            "detail": (\n'
+              '                "Remote preview is disabled. Configure Keyverse-backed identity "\n'
+              '                "and tenant authorization before exposing CWL GRC."\n'
+              '            )\n'
+              '        }\n''',
+              encoding="utf-8",
+          )
+
+          integrity_path = Path("tests/test_integrity_contracts.py")
+          integrity = integrity_path.read_text(encoding="utf-8")
+          integrity = integrity.replace(
+              "from sqlalchemy import delete, update\n",
+              "from sqlalchemy import create_engine, delete, inspect, text, update\n",
+              1,
+          )
+          integrity = integrity.replace(
+              "from cwl_grc.encryption import EvidenceCipher\n",
+              "from cwl_grc.encryption import EvidenceCipher\n"
+              "from cwl_grc.migrations import (\n"
+              "    apply_schema_migrations,\n"
+              "    integrity_guard_statements,\n"
+              ")\n",
+              1,
+          )
+          integrity += '''\n\ndef test_schema_migration_upgrades_legacy_policy_tables_and_is_idempotent(tmp_path: Path) -> None:\n'
+              '    """A pre-integrity SQLite store receives counters, finalization, and a receipt."""\n'
+              '    engine = create_engine(f"sqlite:///{tmp_path / \'legacy.sqlite\'}")\n'
+              '    with engine.begin() as connection:\n'
+              '        connection.execute(text(\n'
+              '            "CREATE TABLE policy_document ("\n'
+              '            "policy_document_id VARCHAR(64) PRIMARY KEY, "\n'
+              '            "policy_title VARCHAR(255) NOT NULL, "\n'
+              '            "created_by_actor VARCHAR(128) NOT NULL, "\n'
+              '            "created_at TIMESTAMP NOT NULL)"\n'
+              '        ))\n'
+              '        connection.execute(text(\n'
+              '            "CREATE TABLE policy_version ("\n'
+              '            "policy_version_id VARCHAR(64) PRIMARY KEY, "\n'
+              '            "policy_document_id VARCHAR(64) NOT NULL, "\n'
+              '            "version_number INTEGER NOT NULL, "\n'
+              '            "policy_body TEXT NOT NULL, "\n'
+              '            "authored_by_actor VARCHAR(128) NOT NULL, "\n'
+              '            "authored_at TIMESTAMP NOT NULL)"\n'
+              '        ))\n'
+              '    apply_schema_migrations(engine)\n'
+              '    apply_schema_migrations(engine)\n'
+              '    policy_columns = {column["name"] for column in inspect(engine).get_columns("policy_document")}\n'
+              '    version_columns = {column["name"] for column in inspect(engine).get_columns("policy_version")}\n'
+              '    assert "current_version_number" in policy_columns\n'
+              '    assert "is_finalized" in version_columns\n'
+              '    with engine.connect() as connection:\n'
+              '        count = connection.execute(text("SELECT COUNT(*) FROM schema_migration")).scalar_one()\n'
+              '    assert count == 1\n\n\n'
+              'def test_integrity_guard_ddl_covers_supported_and_unknown_dialects() -> None:\n'
+              '    """SQLite and PostgreSQL receive equivalent guards; other stores fail closed."""\n'
+              '    sqlite_ddl = "\\n".join(integrity_guard_statements("sqlite"))\n'
+              '    postgres_ddl = "\\n".join(integrity_guard_statements("postgresql"))\n'
+              '    assert "audit_event_block_update" in sqlite_ddl\n'
+              '    assert "policy_control_mapping_require_open_version" in sqlite_ddl\n'
+              '    assert "prevent_audit_event_mutation" in postgres_ddl\n'
+              '    assert "prevent_policy_mapping_mutation" in postgres_ddl\n'
+              '    with pytest.raises(ValueError, match="Unsupported GRC database dialect"):\n'
+              '        integrity_guard_statements("mysql")\n'''
+          integrity_path.write_text(integrity, encoding="utf-8")
+
+          changelog = Path("CHANGELOG.md")
+          text_value = changelog.read_text(encoding="utf-8")
+          marker = "### Security\n\n"
+          addition = (
+              "- Remove the unauthenticated remote-preview override and bind local servers to loopback.\n"
+              "- Require durable Fernet key material for every persistent evidence store.\n"
+              "- Enforce append-only audit events and finalized policy editions/mappings with database triggers.\n"
+              "- Serialize policy revision allocation with an optimistic database counter and `409 Conflict`.\n"
+              "- Pin the CSAP 2026.07 catalog source to the official KISA resource notice.\n"
+          )
+          if marker not in text_value:
+              raise SystemExit("CHANGELOG security section missing")
+          changelog.write_text(text_value.replace(marker, marker + addition, 1), encoding="utf-8")
+          PY
+      - name: Install hash-locked dependencies
+        run: uv sync --locked --extra dev
+      - name: Run full exact-head-equivalent verification
+        run: |
+          set -euo pipefail
+          uv run ruff check cwl_grc tests
+          uv run interrogate --fail-under 100 cwl_grc
+          uv run pytest --cov=cwl_grc --cov-branch --cov-report=term-missing --cov-fail-under=100
+          uv run python -m compileall -q cwl_grc tests
+          uv lock --check
+          git diff --check
+      - name: Publish verified fixes and remove one-shot workflow
+        env:
+          BRANCH_NAME: cursor/control-evidence-first-slice-bbe8
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/apply-grc-review-fixes-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          test -n "$(git status --porcelain)"
+          git commit -m "fix: enforce durable GRC history and local-only access"
+          git push origin "HEAD:${BRANCH_NAME}"
