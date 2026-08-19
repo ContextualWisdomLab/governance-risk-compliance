@@ -19,6 +19,9 @@ from cwl_grc.production_readiness import (
 
 REPOSITORY = "ContextualWisdomLab/governance-risk-compliance"
 ISSUE_PREFIX = f"https://github.com/{REPOSITORY}/issues/"
+MANIFEST_PATH = (
+    Path(__file__).parents[1] / "docs" / "production" / "production-readiness.json"
+)
 
 
 def _gate(
@@ -43,11 +46,13 @@ def _gate(
 
 
 def _manifest(*gates: dict[str, object]) -> dict[str, object]:
+    if not gates:
+        return deepcopy(load_manifest(MANIFEST_PATH))
     return {
         "schema_version": 1,
         "repository": REPOSITORY,
         "target": "production",
-        "gates": list(gates or (_gate(),)),
+        "gates": list(gates),
     }
 
 
@@ -88,18 +93,17 @@ def test_load_manifest_reports_missing_file(tmp_path: Path) -> None:
 
 
 def test_validate_manifest_accepts_blocked_and_ready_gates() -> None:
-    ready = _gate(
-        gate_id="readiness-evidence-contract",
-        status="ready",
-        blockers=[],
-        evidence=["cwl_grc/production_readiness.py"],
-    )
-    ready["issue_url"] = f"{ISSUE_PREFIX}15"
-
-    gates = validate_manifest(_manifest(_gate(), ready))
+    gates = validate_manifest(_manifest())
 
     assert [gate["id"] for gate in gates] == [
         "identity-tenant-authorization",
+        "postgresql-lifecycle",
+        "evidence-lifecycle-recovery",
+        "release-artifact-provenance",
+        "operability-observability",
+        "api-contract",
+        "risk-management",
+        "audit-management",
         "readiness-evidence-contract",
     ]
 
@@ -215,7 +219,7 @@ def test_readiness_summary_lists_every_blocking_gate() -> None:
     )
     ready["issue_url"] = f"{ISSUE_PREFIX}15"
 
-    summary = readiness_summary(validate_manifest(_manifest(blocked, in_progress, ready)))
+    summary = readiness_summary([blocked, in_progress, ready])
 
     assert summary == {
         "production_ready": False,
@@ -243,7 +247,7 @@ def test_readiness_summary_lists_every_blocking_gate() -> None:
 def test_readiness_summary_reports_all_ready() -> None:
     ready = _gate(status="ready", blockers=[], evidence=["verified"])
 
-    assert readiness_summary(validate_manifest(_manifest(ready))) == {
+    assert readiness_summary([ready]) == {
         "production_ready": True,
         "gate_count": 1,
         "ready_gate_count": 1,
@@ -280,8 +284,15 @@ def test_main_require_ready_accepts_fully_evidenced_manifest(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     path = tmp_path / "manifest.json"
-    ready = _gate(status="ready", blockers=[], evidence=["verified"])
-    _write_manifest(path, _manifest(ready))
+    manifest = _manifest()
+    gates = manifest["gates"]
+    assert isinstance(gates, list)
+    for gate in gates:
+        assert isinstance(gate, dict)
+        gate["status"] = "ready"
+        gate["blockers"] = []
+        gate["evidence"] = ["verified"]
+    _write_manifest(path, manifest)
 
     assert main([str(path), "--require-ready"]) == 0
     assert json.loads(capsys.readouterr().out)["production_ready"] is True
