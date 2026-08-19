@@ -52,7 +52,9 @@ def main(argv: list[str] | None = None) -> int:
                 {
                     "error": exc.detail,
                     "status_code": exc.status_code,
-                    "next_action": "Use an official catalog identifier, then attach the next evidence.",
+                    "next_action": (
+                        "Use an official catalog identifier, then attach the next evidence."
+                    ),
                 }
             )
         )
@@ -60,19 +62,25 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def serve_http() -> int:
-    """Serve the GRC product on 0.0.0.0 and $PORT."""
+    """Serve the unauthenticated developer preview on loopback and $PORT."""
     port = int(os.environ.get("PORT", "8080"))
-    uvicorn.run(create_app(), host="0.0.0.0", port=port)
+    uvicorn.run(create_app(), host="127.0.0.1", port=port)
     return 0
 
 
 def _parser() -> argparse.ArgumentParser:
     """Build the operator command parser."""
-    parser = argparse.ArgumentParser(prog="cwl-grc", description="CWL GRC officer tools")
+    parser = argparse.ArgumentParser(
+        prog="cwl-grc",
+        description="CWL GRC officer tools",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     policy = sub.add_parser("policy", help="Author, revise, or list policies")
     policy_sub = policy.add_subparsers(dest="policy_command", required=True)
-    author = policy_sub.add_parser("author", help="Author a policy mapped to official controls")
+    author = policy_sub.add_parser(
+        "author",
+        help="Author a policy mapped to official controls",
+    )
     author.add_argument("--title", required=True)
     author.add_argument("--body", required=True)
     author.add_argument("--map", action="append", default=[], dest="maps")
@@ -112,22 +120,43 @@ def _policy_command(namespace: argparse.Namespace) -> int:
     session = _open_session()
     try:
         if action == "author":
-            decision = AuthorizationDecision(namespace.actor, PurposeCode.POLICY_AUTHORING)
+            decision = AuthorizationDecision(
+                namespace.actor,
+                PurposeCode.POLICY_AUTHORING,
+            )
             refs = [parse_cli_control_map(raw) for raw in namespace.maps]
-            document = author_policy(session, decision, namespace.title, namespace.body, refs)
+            document = author_policy(
+                session,
+                decision,
+                namespace.title,
+                namespace.body,
+                refs,
+            )
             session.commit()
             print(json.dumps(serialize_policy(session, document)))
             return 0
         if action == "revise":
-            decision = AuthorizationDecision(namespace.actor, PurposeCode.POLICY_AUTHORING)
+            decision = AuthorizationDecision(
+                namespace.actor,
+                PurposeCode.POLICY_AUTHORING,
+            )
             refs = [parse_cli_control_map(raw) for raw in namespace.maps]
-            document = revise_policy(session, decision, namespace.policy_id, namespace.body, refs)
+            document = revise_policy(
+                session,
+                decision,
+                namespace.policy_id,
+                namespace.body,
+                refs,
+            )
             session.commit()
             print(json.dumps(serialize_policy(session, document)))
             return 0
         if action == "list":
             payload: dict[str, Any] = {
-                "policies": [serialize_policy(session, document) for document in list_policy_documents(session)],
+                "policies": [
+                    serialize_policy(session, document)
+                    for document in list_policy_documents(session)
+                ],
                 "next_action": "Review policy gaps and attach the next evidence.",
             }
             print(json.dumps(payload))
@@ -145,7 +174,9 @@ def _gaps_command(policy_document_id: str | None) -> int:
         print(
             json.dumps(
                 {
-                    "next_action": "Attach the next evidence on an uncovered policy control.",
+                    "next_action": (
+                        "Attach the next evidence on an uncovered policy control."
+                    ),
                     "gaps": [serialize_gap(gap) for gap in gaps],
                 }
             )
@@ -160,11 +191,23 @@ def _bind_command(namespace: argparse.Namespace) -> int:
     session = _open_session()
     cipher = EvidenceCipher(os.environ.get("CWL_GRC_EVIDENCE_KEY"))
     try:
-        decision = AuthorizationDecision(namespace.actor, PurposeCode.EVIDENCE_BINDING)
+        decision = AuthorizationDecision(
+            namespace.actor,
+            PurposeCode.EVIDENCE_BINDING,
+        )
         framework = parse_framework(namespace.framework)
         if framework is None:
-            raise HTTPException(status_code=400, detail="Name the official framework.")
-        record = create_evidence_record(session, cipher, decision, namespace.title, namespace.payload)
+            raise HTTPException(
+                status_code=400,
+                detail="Name the official framework.",
+            )
+        record = create_evidence_record(
+            session,
+            cipher,
+            decision,
+            namespace.title,
+            namespace.payload,
+        )
         binding = bind_control_evidence(
             session,
             decision,
@@ -181,7 +224,10 @@ def _bind_command(namespace: argparse.Namespace) -> int:
                     "evidence_record_id": record.evidence_record_id,
                     "payload_text": cipher.decrypt(record.ciphertext_payload),
                     "control": serialize_control(binding.control_item),
-                    "next_action": "Review remaining uncovered policy controls and attach the next evidence.",
+                    "next_action": (
+                        "Review remaining uncovered policy controls and attach the next "
+                        "evidence."
+                    ),
                 }
             )
         )
@@ -192,7 +238,10 @@ def _bind_command(namespace: argparse.Namespace) -> int:
 
 def _open_session() -> Session:
     """Open a seeded product session for a one-shot CLI command."""
-    url = os.environ.get("CWL_GRC_DATABASE_URL", "sqlite:///grc_product.sqlite")
+    url = os.environ.get(
+        "CWL_GRC_DATABASE_URL",
+        "sqlite:///grc_product.sqlite",
+    )
     factory = create_session_factory(url)
     session = factory()
     seed_control_catalog(session)
