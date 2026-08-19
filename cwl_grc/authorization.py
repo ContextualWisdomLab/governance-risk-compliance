@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-
 from typing import assert_never
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from cwl_grc.models import AuthorizationPurpose
+
+
+LOCAL_DEVELOPMENT_TENANT = "local_development"
 
 
 class PurposeCode(StrEnum):
@@ -24,10 +26,11 @@ class PurposeCode(StrEnum):
 
 @dataclass(frozen=True)
 class AuthorizationDecision:
-    """An actor acting under one declared purpose."""
+    """An actor acting for one exact tenant under one declared purpose."""
 
     actor_identifier: str
     purpose_code: PurposeCode
+    tenant_id: str = LOCAL_DEVELOPMENT_TENANT
 
 
 def seed_authorization_purposes(session: Session) -> None:
@@ -63,13 +66,17 @@ def require_purpose(
     actor_identifier: str | None,
     purpose_value: str | None,
     required: PurposeCode,
+    *,
+    tenant_id: str = LOCAL_DEVELOPMENT_TENANT,
 ) -> AuthorizationDecision:
-    """Accept only a named actor acting under the required purpose."""
+    """Accept only a named actor, exact tenant, and required declared purpose."""
     if not actor_identifier or not purpose_value:
         raise HTTPException(
             status_code=401,
             detail="State the actor and purpose before touching evidence.",
         )
+    if not tenant_id:
+        raise HTTPException(status_code=401, detail="Resolve the tenant before this action.")
     try:
         purpose_code = PurposeCode(purpose_value)
     except ValueError as exc:
@@ -79,4 +86,4 @@ def require_purpose(
             status_code=403,
             detail=f"This action requires {required.value}.",
         )
-    return AuthorizationDecision(actor_identifier, purpose_code)
+    return AuthorizationDecision(actor_identifier, purpose_code, tenant_id)
