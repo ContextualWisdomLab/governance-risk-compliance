@@ -23,6 +23,7 @@ ISSUER = "https://identity.example.test/realms/cwl"
 AUDIENCE = "cwl-grc-api"
 CLIENT_ID = "cwl-grc-web"
 ROLE = "compliance_officer"
+SOC2_FRAMEWORK = "soc2_tsc_2017"
 
 
 def _material() -> tuple[Any, dict[str, Any]]:
@@ -106,7 +107,7 @@ def test_binding_route_rejects_identity_header_without_bearer() -> None:
             "X-Purpose": "evidence_binding",
         },
         json={
-            "framework": "SOC2",
+            "framework": SOC2_FRAMEWORK,
             "catalog_identifier": "CC1.1",
             "evidence_record_id": "not-reached",
         },
@@ -124,7 +125,7 @@ def test_binding_route_requires_evidence_write_scope() -> None:
             "X-Purpose": "evidence_binding",
         },
         json={
-            "framework": "SOC2",
+            "framework": SOC2_FRAMEWORK,
             "catalog_identifier": "CC1.1",
             "evidence_record_id": "not-reached",
         },
@@ -145,7 +146,7 @@ def test_verified_evidence_writer_can_bind_existing_evidence() -> None:
             "X-Purpose": "evidence_binding",
         },
         json={
-            "framework": "SOC2",
+            "framework": SOC2_FRAMEWORK,
             "catalog_identifier": "CC1.1",
             "evidence_record_id": evidence_record_id,
         },
