@@ -8,6 +8,8 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import HTTPException
+from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from cwl_grc.audit import record_audit_event
@@ -93,7 +95,7 @@ def author_policy(
     policy_body: str,
     refs: list[ControlRef],
 ) -> PolicyDocument:
-    """Create a policy document and its first edition."""
+    """Create a policy document and its first finalized edition."""
     title = policy_title.strip()
     body = policy_body.strip()
     if not title or not body:
@@ -104,6 +106,7 @@ def author_policy(
         policy_title=title,
         created_by_actor=decision.actor_identifier,
         created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        current_version_number=1,
     )
     session.add(document)
     session.flush()
@@ -126,7 +129,7 @@ def revise_policy(
     policy_body: str,
     refs: list[ControlRef],
 ) -> PolicyDocument:
-    """Append an immutable edition whose mappings replace the previous set."""
+    """Atomically allocate and append the next immutable policy edition."""
     document = session.get(PolicyDocument, policy_document_id)
     if document is None:
         raise HTTPException(status_code=404, detail="That policy document is not on file.")
@@ -134,8 +137,15 @@ def revise_policy(
     if not body:
         raise HTTPException(status_code=400, detail="A policy revision needs the next edition text.")
     controls = resolve_control_refs(session, refs)
-    next_number = current_version(session, document).version_number + 1
-    _write_version(session, decision, document, next_number, body, controls)
+    next_number = _allocate_next_version_number(session, document)
+    try:
+        _write_version(session, decision, document, next_number, body, controls)
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="The policy changed concurrently. Reload it before publishing the next edition.",
+        ) from exc
     record_audit_event(
         session,
         decision,
@@ -148,15 +158,18 @@ def revise_policy(
 
 
 def current_version(session: Session, document: PolicyDocument) -> PolicyVersion:
-    """Return the latest edition of a policy document."""
+    """Return the latest finalized edition of a policy document."""
     version = (
         session.query(PolicyVersion)
-        .filter_by(policy_document_id=document.policy_document_id)
+        .filter_by(
+            policy_document_id=document.policy_document_id,
+            is_finalized=True,
+        )
         .order_by(PolicyVersion.version_number.desc())
         .first()
     )
     if version is None:  # pragma: no cover
-        raise HTTPException(status_code=404, detail="That policy has no editions.")
+        raise HTTPException(status_code=404, detail="That policy has no finalized editions.")
     return version
 
 
@@ -249,6 +262,31 @@ def serialize_gap(gap: PolicyGap) -> dict[str, Any]:
     }
 
 
+def _allocate_next_version_number(
+    session: Session,
+    document: PolicyDocument,
+) -> int:
+    """Advance a policy revision counter only when the caller holds the current value."""
+    expected_number = document.current_version_number
+    next_number = expected_number + 1
+    result = session.execute(
+        update(PolicyDocument)
+        .where(
+            PolicyDocument.policy_document_id == document.policy_document_id,
+            PolicyDocument.current_version_number == expected_number,
+        )
+        .values(current_version_number=next_number)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="The policy changed concurrently. Reload it before publishing the next edition.",
+        )
+    return next_number
+
+
 def _write_version(
     session: Session,
     decision: AuthorizationDecision,
@@ -257,7 +295,7 @@ def _write_version(
     policy_body: str,
     controls: list[ControlItem],
 ) -> PolicyVersion:
-    """Persist one immutable edition and its official control mappings."""
+    """Persist mappings while an edition is open, then finalize it once."""
     version = PolicyVersion(
         policy_version_id=uuid4().hex,
         policy_document_id=document.policy_document_id,
@@ -265,6 +303,7 @@ def _write_version(
         policy_body=policy_body,
         authored_by_actor=decision.actor_identifier,
         authored_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        is_finalized=False,
     )
     session.add(version)
     session.flush()
@@ -280,4 +319,7 @@ def _write_version(
                 control_item_id=control.control_item_id,
             )
         )
+    session.flush()
+    version.is_finalized = True
+    session.flush()
     return version
