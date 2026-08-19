@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   lock-test-publish:
+    # This reviewed one-shot refreshes the lock only after the TDD kernel exists.
     if: github.repository == 'ContextualWisdomLab/governance-risk-compliance'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
