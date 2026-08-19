@@ -1,3 +1,5 @@
+"""Regression tests for the production-readiness evidence contract."""
+
 from __future__ import annotations
 
 import json
