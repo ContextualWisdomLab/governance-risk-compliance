@@ -18,6 +18,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
+LOCAL_DEVELOPMENT_TENANT = "local_development"
+
+
 class Base(DeclarativeBase):
     """Declarative base for GRC-owned tables."""
 
@@ -67,11 +70,14 @@ class AuthorizationPurpose(Base):
 
 
 class EvidenceRecord(Base):
-    """One evidence artifact whose payload stays usable to authorized officers."""
+    """One tenant-owned evidence artifact kept usable for authorized officers."""
 
     __tablename__ = "evidence_record"
 
     evidence_record_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
     evidence_title: Mapped[str] = mapped_column(String(255), nullable=False)
     collector_actor: Mapped[str] = mapped_column(String(128), nullable=False)
     purpose_code: Mapped[str] = mapped_column(
@@ -86,7 +92,7 @@ class EvidenceRecord(Base):
 
 
 class ControlEvidenceBinding(Base):
-    """Binds one evidence artifact to one official control identifier."""
+    """Binds tenant-owned evidence to one official control identifier."""
 
     __tablename__ = "control_evidence_binding"
     __table_args__ = (
@@ -98,6 +104,9 @@ class ControlEvidenceBinding(Base):
     )
 
     binding_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
     control_item_id: Mapped[str] = mapped_column(
         ForeignKey("control_item.control_item_id"),
         nullable=False,
@@ -117,11 +126,14 @@ class ControlEvidenceBinding(Base):
 
 
 class AuditEvent(Base):
-    """Append-only record of an authorized GRC action."""
+    """Append-only record of an authorized tenant-scoped GRC action."""
 
     __tablename__ = "audit_event"
 
     audit_event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
     actor_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
     purpose_code: Mapped[str] = mapped_column(String(64), nullable=False)
     action_name: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -131,7 +143,7 @@ class AuditEvent(Base):
 
 
 class PolicyDocument(Base):
-    """Stable identity and optimistic revision counter for one authored policy."""
+    """Stable tenant-owned identity and optimistic revision counter for one policy."""
 
     __tablename__ = "policy_document"
     __table_args__ = (
@@ -142,6 +154,9 @@ class PolicyDocument(Base):
     )
 
     policy_document_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
     policy_title: Mapped[str] = mapped_column(String(255), nullable=False)
     created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
@@ -154,7 +169,7 @@ class PolicyDocument(Base):
 
 
 class PolicyVersion(Base):
-    """One immutable edition of a policy document after finalization."""
+    """One immutable tenant-owned edition of a policy after finalization."""
 
     __tablename__ = "policy_version"
     __table_args__ = (
@@ -163,6 +178,9 @@ class PolicyVersion(Base):
     )
 
     policy_version_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
     policy_document_id: Mapped[str] = mapped_column(
         ForeignKey("policy_document.policy_document_id"),
         nullable=False,
@@ -184,7 +202,7 @@ class PolicyVersion(Base):
 
 
 class PolicyControlMapping(Base):
-    """Maps one policy edition to one official catalog control."""
+    """Maps one tenant-owned policy edition to one official catalog control."""
 
     __tablename__ = "policy_control_mapping"
     __table_args__ = (
@@ -196,6 +214,9 @@ class PolicyControlMapping(Base):
     )
 
     mapping_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
     policy_version_id: Mapped[str] = mapped_column(
         ForeignKey("policy_version.policy_version_id"),
         nullable=False,
