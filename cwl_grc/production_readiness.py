@@ -15,6 +15,17 @@ EXPECTED_TARGET = "production"
 ISSUE_URL_PREFIX = f"https://github.com/{EXPECTED_REPOSITORY}/issues/"
 ALLOWED_PRIORITIES = frozenset({"P0", "P1", "P2"})
 ALLOWED_STATUSES = frozenset({"blocked", "in_progress", "ready"})
+REQUIRED_GATE_CONTRACTS = {
+    "identity-tenant-authorization": ("P0", 4),
+    "postgresql-lifecycle": ("P0", 8),
+    "evidence-lifecycle-recovery": ("P0", 9),
+    "release-artifact-provenance": ("P0", 10),
+    "operability-observability": ("P0", 11),
+    "api-contract": ("P1", 12),
+    "risk-management": ("P1", 13),
+    "audit-management": ("P1", 14),
+    "readiness-evidence-contract": ("P0", 15),
+}
 
 
 class ReadinessManifestError(ValueError):
@@ -64,7 +75,7 @@ def validate_manifest(manifest: dict[str, Any]) -> list[dict[str, Any]]:
         _require_string(gate, "title", path)
         priority = _require_string(gate, "priority", path)
         status = _require_string(gate, "status", path)
-        _require_string(gate, "owner", path)
+        owner = _require_string(gate, "owner", path)
         issue_url = _require_string(gate, "issue_url", path)
         _require_string_list(
             gate,
@@ -84,6 +95,8 @@ def validate_manifest(manifest: dict[str, Any]) -> list[dict[str, Any]]:
         if status not in ALLOWED_STATUSES:
             allowed = ", ".join(sorted(ALLOWED_STATUSES))
             raise ReadinessManifestError(f"{path}.status must be one of: {allowed}.")
+        if owner != EXPECTED_REPOSITORY:
+            raise ReadinessManifestError(f"{path}.owner must be {EXPECTED_REPOSITORY}.")
         if not _is_canonical_issue_url(issue_url):
             raise ReadinessManifestError(
                 f"{path}.issue_url must be a canonical issue URL for {EXPECTED_REPOSITORY}."
@@ -101,6 +114,30 @@ def validate_manifest(manifest: dict[str, Any]) -> list[dict[str, Any]]:
             )
 
         validated.append(gate)
+
+    required_ids = set(REQUIRED_GATE_CONTRACTS)
+    missing_ids = required_ids - seen_ids
+    if missing_ids:
+        missing = ", ".join(sorted(missing_ids))
+        raise ReadinessManifestError(f"missing required gate ids: {missing}.")
+    unexpected_ids = seen_ids - required_ids
+    if unexpected_ids:
+        unexpected = ", ".join(sorted(unexpected_ids))
+        raise ReadinessManifestError(f"unexpected gate ids: {unexpected}.")
+
+    for index, gate in enumerate(validated):
+        path = f"gates[{index}]"
+        gate_id = gate["id"]
+        expected_priority, issue_number = REQUIRED_GATE_CONTRACTS[gate_id]
+        if gate["priority"] != expected_priority:
+            raise ReadinessManifestError(
+                f"{path}.priority must be {expected_priority} for required gate {gate_id}."
+            )
+        expected_issue_url = f"{ISSUE_URL_PREFIX}{issue_number}"
+        if gate["issue_url"] != expected_issue_url:
+            raise ReadinessManifestError(
+                f"{path}.issue_url must be {expected_issue_url} for required gate {gate_id}."
+            )
     return validated
 
 
@@ -164,7 +201,11 @@ def _require_string(gate: dict[str, Any], field: str, path: str) -> str:
     normalized = value.strip()
     if not normalized:
         raise ReadinessManifestError(f"{path}.{field} must be a non-empty string.")
-    return normalized
+    if normalized != value:
+        raise ReadinessManifestError(
+            f"{path}.{field} must not contain surrounding whitespace."
+        )
+    return value
 
 
 def _require_string_list(
@@ -191,7 +232,11 @@ def _require_string_list(
             raise ReadinessManifestError(
                 f"{path}.{field} must contain non-empty strings."
             )
-        normalized.append(text)
+        if text != item:
+            raise ReadinessManifestError(
+                f"{path}.{field} must not contain surrounding whitespace."
+            )
+        normalized.append(item)
     return normalized
 
 
