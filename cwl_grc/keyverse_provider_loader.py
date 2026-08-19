@@ -69,7 +69,9 @@ class KeyverseProviderLoaderSettings:
             raise ValueError("Keyverse requires a non-empty JWK host allowlist.")
         object.__setattr__(self, "allowed_jwks_hosts", normalized_hosts)
         if not 0 < self.timeout_seconds <= MAX_TIMEOUT_SECONDS:
-            raise ValueError("Keyverse timeout must be greater than 0 and at most 30 seconds.")
+            raise ValueError(
+                "Keyverse timeout must be greater than 0 and at most 30 seconds."
+            )
         if not 0 < self.metadata_maximum_bytes <= MAX_METADATA_BYTES:
             raise ValueError("Keyverse metadata size must be between 1 byte and 1 MiB.")
         if not 0 < self.jwks_maximum_bytes <= MAX_JWKS_BYTES:
@@ -155,7 +157,9 @@ class PinnedHttpsDocumentFetcher:
     ) -> None:
         """Configure one bounded timeout and injectable pinned-connection factory."""
         if not 0 < timeout_seconds <= MAX_TIMEOUT_SECONDS:
-            raise ValueError("Keyverse timeout must be greater than 0 and at most 30 seconds.")
+            raise ValueError(
+                "Keyverse timeout must be greater than 0 and at most 30 seconds."
+            )
         self._timeout_seconds = timeout_seconds
         self._connection_factory = connection_factory or _create_pinned_connection
 
@@ -292,7 +296,8 @@ def validate_https_endpoint(
     if not parsed.hostname:
         raise KeyverseProviderLoadError("Keyverse endpoint must include a host.")
     try:
-        port = parsed.port or 443
+        parsed_port = parsed.port
+        port = 443 if parsed_port is None else parsed_port
     except ValueError as exc:
         raise KeyverseProviderLoadError("Keyverse endpoint port is invalid.") from exc
     if not 1 <= port <= 65535:
