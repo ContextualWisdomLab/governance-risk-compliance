@@ -83,8 +83,15 @@ class _FailingConnection:
     def __init__(self) -> None:
         self.closed = False
 
-    def request(self, _method: str, _target: str, _headers: dict[str, str]) -> None:
-        """Simulate an address-level timeout."""
+    def request(
+        self,
+        _method: str,
+        _target: str,
+        *,
+        headers: dict[str, str],
+    ) -> None:
+        """Simulate an address-level timeout after validating request headers."""
+        assert headers["Accept"] == "application/json"
         raise TimeoutError("timed out")
 
     def getresponse(self) -> Any:
