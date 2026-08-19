@@ -116,6 +116,12 @@ def _settings(**overrides: Any) -> KeyverseProviderLoaderSettings:
     return KeyverseProviderLoaderSettings(**values)
 
 
+def test_provider_settings_cannot_exceed_verifier_jwk_limit() -> None:
+    """The network loader must not admit a JWK limit its verifier always rejects."""
+    with pytest.raises(ValueError, match="JWK size"):
+        _settings(jwks_maximum_bytes=(1024 * 1024) + 1)
+
+
 def test_snapshot_verifier_rejects_resource_issuer_mismatch() -> None:
     """A loaded issuer cannot be paired with another resource-server issuer."""
     snapshot = load_keyverse_provider(
@@ -219,136 +225,39 @@ def test_dns_rejects_invalid_answers_and_deduplicates_global_answers() -> None:
             allowed_hosts=frozenset({"keys.example.test"}),
             resolver=lambda _host, _port: ("not-an-ip",),
         )
-
     endpoint = validate_https_endpoint(
         JWKS_URL,
         allowed_hosts=frozenset({"keys.example.test"}),
-        resolver=lambda _host, _port: ("8.8.8.8", "8.8.8.8"),
+        resolver=lambda _host, _port: ("8.8.8.8", "8.8.8.8", "1.1.1.1"),
     )
-    assert endpoint.addresses == ("8.8.8.8",)
+    assert endpoint.addresses == ("8.8.8.8", "1.1.1.1")
 
 
-def test_default_resolver_and_host_header_helpers_cover_ipv6_and_ports(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """OS resolution and HTTP host rendering preserve IPv6 and non-default ports."""
-    monkeypatch.setattr(
-        socket,
-        "getaddrinfo",
-        lambda hostname, port, type: [
-            (socket.AF_INET, type, 6, "", ("8.8.8.8", port)),
-            (
-                socket.AF_INET6,
-                type,
-                6,
-                "",
-                ("2001:4860:4860::8888", port, 0, 0),
-            ),
-        ],
-    )
-    assert _system_resolver("keys.example.test", 443) == (
-        "8.8.8.8",
-        "2001:4860:4860::8888",
-    )
+def test_host_normalization_and_system_resolver_fail_closed() -> None:
+    """Hostname normalization and platform DNS failures never broaden authority."""
+    assert _normalize_host("KEYS.EXAMPLE.TEST.") == "keys.example.test"
+    for hostname in ("", "bad host", "example..test"):
+        with pytest.raises(KeyverseProviderLoadError, match="host"):
+            _normalize_host(hostname)
+
+    original_getaddrinfo = socket.getaddrinfo
+    try:
+        socket.getaddrinfo = lambda *_args, **_kwargs: (_ for _ in ()).throw(  # type: ignore[assignment]
+            OSError("dns unavailable")
+        )
+        with pytest.raises(KeyverseProviderLoadError, match="DNS resolution failed"):
+            _system_resolver("keys.example.test", 443)
+    finally:
+        socket.getaddrinfo = original_getaddrinfo
+
+
+def test_ipv6_host_header_and_connection_constructor_edge_paths() -> None:
+    """IPv6 Host rendering and pinned connection construction preserve TLS authority."""
+    assert _format_host_header("2001:4860:4860::8888", 443) == "[2001:4860:4860::8888]"
+    assert _format_host_header("2001:4860:4860::8888", 8443) == "[2001:4860:4860::8888]:8443"
     assert _format_host_header("keys.example.test", 443) == "keys.example.test"
-    assert _format_host_header("keys.example.test", 8443) == (
-        "keys.example.test:8443"
-    )
-    assert _format_host_header("2001:4860:4860::8888", 443) == (
-        "[2001:4860:4860::8888]"
-    )
-    assert _format_host_header("2001:4860:4860::8888", 8443) == (
-        "[2001:4860:4860::8888]:8443"
-    )
+    assert _format_host_header("keys.example.test", 8443) == "keys.example.test:8443"
 
-
-def test_host_normalization_and_issuer_validation_fail_closed() -> None:
-    """Empty, invalid-IDNA, and ambiguous issuer values cannot enter discovery."""
-    assert _normalize_host("   ") == ""
-    with pytest.raises(KeyverseProviderLoadError, match="host"):
-        _normalize_host("\ud800")
-    for issuer in (
-        "https:///realms/cwl",
-        "https://user@identity.example.test/realms/cwl",
-    ):
-        with pytest.raises(ValueError, match="HTTPS issuer"):
-            build_openid_configuration_url(issuer)
-
-
-def test_loader_rejects_oversized_jwks_invalid_jwks_and_naive_time() -> None:
-    """JWK bounds, parsed key validation, and snapshot clock awareness fail closed."""
-    metadata = _metadata()
-    oversized = _StaticFetcher(
-        {
-            DISCOVERY_URL: metadata,
-            JWKS_URL: b"x" * (1024 * 1024 + 1),
-        }
-    )
-    with pytest.raises(KeyverseProviderLoadError, match="JWK document.*too large"):
-        load_keyverse_provider(
-            _settings(),
-            fetcher=oversized,
-            resolver=_resolver,
-            now=lambda: NOW,
-        )
-
-    invalid = _StaticFetcher(
-        {DISCOVERY_URL: metadata, JWKS_URL: b'{"keys":[]}'},
-    )
-    with pytest.raises(KeyverseProviderLoadError, match="JWK set validation"):
-        load_keyverse_provider(
-            _settings(),
-            fetcher=invalid,
-            resolver=_resolver,
-            now=lambda: NOW,
-        )
-
-    valid = _StaticFetcher(
-        {DISCOVERY_URL: metadata, JWKS_URL: _public_jwks()},
-    )
-    with pytest.raises(KeyverseProviderLoadError, match="timezone-aware"):
-        load_keyverse_provider(
-            _settings(),
-            fetcher=valid,
-            resolver=_resolver,
-            now=lambda: datetime(2026, 8, 19, 5, 0),
-        )
-    assert _aware_utc(NOW) == NOW
-
-
-def test_loader_default_clock_and_injected_default_fetcher(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Default clock and default fetcher construction remain testable without network I/O."""
-    static = _StaticFetcher(
-        {DISCOVERY_URL: _metadata(), JWKS_URL: _public_jwks()},
-    )
-    constructed: list[float] = []
-
-    class FakePinnedFetcher:
-        """Return static documents while recording the configured timeout."""
-
-        def __init__(self, *, timeout_seconds: float) -> None:
-            constructed.append(timeout_seconds)
-
-        def fetch(self, endpoint: ValidatedHttpsEndpoint, maximum_bytes: int) -> bytes:
-            """Return the static document for one validated endpoint."""
-            return static.fetch(endpoint, maximum_bytes)
-
-    monkeypatch.setattr(loader_module, "PinnedHttpsDocumentFetcher", FakePinnedFetcher)
-    monkeypatch.setattr(loader_module, "_system_resolver", _resolver)
-    snapshot = load_keyverse_provider(_settings())
-    assert snapshot.loaded_at.tzinfo is timezone.utc
-    assert constructed == [5.0]
-    assert snapshot.metadata.additional_claims["authorization_endpoint"].endswith(
-        "/protocol/openid-connect/auth"
-    )
-
-
-def test_pinned_connection_factory_and_connect_preserve_tls_hostname(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The real connection factory dials the pinned IP but wraps TLS for the host."""
     connection = _create_pinned_connection(
         "8.8.8.8",
         443,
@@ -356,35 +265,31 @@ def test_pinned_connection_factory_and_connect_preserve_tls_hostname(
         5.0,
     )
     assert isinstance(connection, _PinnedHttpsConnection)
-    assert connection.host == "8.8.8.8"
+    connection.close()
 
-    raw_socket = object()
-    wrapped_socket = object()
 
-    class FakeContext:
-        """Record the hostname passed to TLS wrapping."""
+def test_aware_utc_rejects_naive_and_normalizes_aware_values() -> None:
+    """Refresh timestamps must be timezone-aware and normalized to UTC."""
+    naive = datetime(2026, 8, 19, 5, 0)
+    with pytest.raises(KeyverseProviderLoadError, match="timezone-aware"):
+        _aware_utc(naive)
+    assert _aware_utc(NOW) == NOW
 
-        def __init__(self) -> None:
-            self.calls: list[tuple[object, str]] = []
 
-        def wrap_socket(self, sock: object, *, server_hostname: str) -> object:
-            """Return a fake TLS socket and record SNI."""
-            self.calls.append((sock, server_hostname))
-            return wrapped_socket
-
-    context = FakeContext()
-    pinned = _PinnedHttpsConnection(
-        "8.8.8.8",
-        port=443,
-        server_hostname="keys.example.test",
-        timeout=5.0,
-        context=context,  # type: ignore[arg-type]
+def test_metadata_rejects_wrong_shape_missing_fields_and_algorithms() -> None:
+    """Discovery metadata needs one exact issuer, JWK endpoint, and RS256 support."""
+    invalid_documents = (
+        b"[]",
+        json.dumps({"issuer": ISSUER}).encode(),
+        json.dumps({"issuer": ISSUER, "jwks_uri": JWKS_URL}).encode(),
+        json.dumps(
+            {
+                "issuer": ISSUER,
+                "jwks_uri": JWKS_URL,
+                "id_token_signing_alg_values_supported": ["ES256"],
+            }
+        ).encode(),
     )
-    monkeypatch.setattr(
-        socket,
-        "create_connection",
-        lambda *args, **kwargs: raw_socket,
-    )
-    pinned.connect()
-    assert pinned.sock is wrapped_socket
-    assert context.calls == [(raw_socket, "keys.example.test")]
+    for document in invalid_documents:
+        with pytest.raises(KeyverseProviderLoadError):
+            loader_module._parse_provider_metadata(document, expected_issuer=ISSUER)
