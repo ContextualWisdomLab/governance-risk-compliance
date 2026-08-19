@@ -5,14 +5,24 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime, timezone
 
-from sqlalchemy import Engine, inspect, text
+from sqlalchemy import Connection, Engine, inspect, text
 
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
+TENANT_ISOLATION_MIGRATION = "0002_tenant_isolation"
+LOCAL_DEVELOPMENT_TENANT = "local_development"
+TENANT_OWNED_TABLES = (
+    "policy_document",
+    "policy_version",
+    "policy_control_mapping",
+    "evidence_record",
+    "control_evidence_binding",
+    "audit_event",
+)
 
 
 def apply_schema_migrations(engine: Engine) -> None:
-    """Upgrade an existing first-slice store before installing integrity guards."""
+    """Apply every missing schema upgrade in order and retain migration receipts."""
     with engine.begin() as connection:
         connection.execute(
             text(
@@ -24,67 +34,103 @@ def apply_schema_migrations(engine: Engine) -> None:
                 """
             )
         )
-        applied = connection.execute(
+        if not _migration_applied(connection, POLICY_INTEGRITY_MIGRATION):
+            _apply_policy_integrity_migration(connection)
+            _record_migration(connection, POLICY_INTEGRITY_MIGRATION)
+        if not _migration_applied(connection, TENANT_ISOLATION_MIGRATION):
+            _apply_tenant_isolation_migration(connection)
+            _record_migration(connection, TENANT_ISOLATION_MIGRATION)
+
+
+def _migration_applied(connection: Connection, migration_key: str) -> bool:
+    """Return whether one exact migration receipt already exists."""
+    return (
+        connection.execute(
             text(
                 "SELECT migration_key FROM schema_migration "
                 "WHERE migration_key = :migration_key"
             ),
-            {"migration_key": POLICY_INTEGRITY_MIGRATION},
+            {"migration_key": migration_key},
         ).scalar_one_or_none()
-        if applied is not None:
-            return
+        is not None
+    )
 
-        inspector = inspect(connection)
-        additions = (
-            (
-                "policy_document",
-                "current_version_number",
-                "ALTER TABLE policy_document ADD COLUMN "
-                "current_version_number INTEGER NOT NULL DEFAULT 0",
-            ),
-            (
-                "policy_version",
-                "is_finalized",
-                "ALTER TABLE policy_version ADD COLUMN "
-                "is_finalized BOOLEAN NOT NULL DEFAULT TRUE",
-            ),
+
+def _record_migration(connection: Connection, migration_key: str) -> None:
+    """Record one completed schema migration using an explicit UTC timestamp."""
+    connection.execute(
+        text(
+            "INSERT INTO schema_migration (migration_key, applied_at) "
+            "VALUES (:migration_key, :applied_at)"
+        ),
+        {
+            "migration_key": migration_key,
+            "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
+        },
+    )
+
+
+def _apply_policy_integrity_migration(connection: Connection) -> None:
+    """Upgrade legacy policy tables with revision and finalization state."""
+    inspector = inspect(connection)
+    additions = (
+        (
+            "policy_document",
+            "current_version_number",
+            "ALTER TABLE policy_document ADD COLUMN "
+            "current_version_number INTEGER NOT NULL DEFAULT 0",
+        ),
+        (
+            "policy_version",
+            "is_finalized",
+            "ALTER TABLE policy_version ADD COLUMN "
+            "is_finalized BOOLEAN NOT NULL DEFAULT TRUE",
+        ),
+    )
+    for table_name, column_name, statement in additions:
+        columns = {column["name"] for column in inspector.get_columns(table_name)}
+        if column_name not in columns:
+            connection.execute(text(statement))
+            inspector = inspect(connection)
+
+    connection.execute(
+        text(
+            """
+            UPDATE policy_document
+            SET current_version_number = COALESCE(
+                (
+                    SELECT MAX(policy_version.version_number)
+                    FROM policy_version
+                    WHERE policy_version.policy_document_id =
+                          policy_document.policy_document_id
+                ),
+                0
+            )
+            WHERE current_version_number = 0
+            """
         )
-        for table_name, column_name, statement in additions:
-            columns = {column["name"] for column in inspector.get_columns(table_name)}
-            if column_name not in columns:
-                connection.execute(text(statement))
-                inspector = inspect(connection)
+    )
+    connection.execute(
+        text("UPDATE policy_version SET is_finalized = TRUE WHERE is_finalized IS NULL")
+    )
 
+
+def _apply_tenant_isolation_migration(connection: Connection) -> None:
+    """Backfill tenant keys onto existing tenant-owned rows without inventing identities."""
+    inspector = inspect(connection)
+    for table_name in TENANT_OWNED_TABLES:
+        if not inspector.has_table(table_name):
+            continue
+        columns = {column["name"] for column in inspector.get_columns(table_name)}
+        if "tenant_id" in columns:
+            continue
         connection.execute(
             text(
-                """
-                UPDATE policy_document
-                SET current_version_number = COALESCE(
-                    (
-                        SELECT MAX(policy_version.version_number)
-                        FROM policy_version
-                        WHERE policy_version.policy_document_id =
-                              policy_document.policy_document_id
-                    ),
-                    0
-                )
-                WHERE current_version_number = 0
-                """
+                f"ALTER TABLE {table_name} ADD COLUMN tenant_id VARCHAR(128) "
+                f"NOT NULL DEFAULT '{LOCAL_DEVELOPMENT_TENANT}'"
             )
         )
-        connection.execute(
-            text("UPDATE policy_version SET is_finalized = TRUE WHERE is_finalized IS NULL")
-        )
-        connection.execute(
-            text(
-                "INSERT INTO schema_migration (migration_key, applied_at) "
-                "VALUES (:migration_key, :applied_at)"
-            ),
-            {
-                "migration_key": POLICY_INTEGRITY_MIGRATION,
-                "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
-            },
-        )
+        inspector = inspect(connection)
 
 
 def install_integrity_guards(engine: Engine) -> None:
@@ -143,6 +189,7 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
             OLD.is_finalized = 0
             AND NEW.is_finalized = 1
             AND OLD.policy_version_id = NEW.policy_version_id
+            AND OLD.tenant_id = NEW.tenant_id
             AND OLD.policy_document_id = NEW.policy_document_id
             AND OLD.version_number = NEW.version_number
             AND OLD.policy_body = NEW.policy_body
@@ -175,6 +222,7 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
                 SELECT is_finalized
                 FROM policy_version
                 WHERE policy_version_id = NEW.policy_version_id
+                  AND tenant_id = NEW.tenant_id
             ),
             1
         ) != 0
@@ -240,7 +288,8 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
             IF TG_OP = 'INSERT' THEN
                 SELECT is_finalized INTO parent_finalized
                 FROM policy_version
-                WHERE policy_version_id = NEW.policy_version_id;
+                WHERE policy_version_id = NEW.policy_version_id
+                  AND tenant_id = NEW.tenant_id;
                 IF COALESCE(parent_finalized, TRUE) THEN
                     RAISE EXCEPTION 'cannot add mapping to finalized policy_version';
                 END IF;
