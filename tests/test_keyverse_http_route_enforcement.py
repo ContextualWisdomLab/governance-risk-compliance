@@ -118,6 +118,38 @@ def test_identity_header_cannot_replace_missing_bearer_token() -> None:
     assert response.status_code == 401
 
 
+def test_malformed_authorization_header_fails_closed() -> None:
+    """A non-Bearer authorization scheme cannot reach the protected mutation."""
+    _private_key, public_jwk = _material()
+    response = _client(_verifier(public_jwk)).post(
+        "/evidence-records",
+        headers={
+            "Authorization": "Basic opaque-credential",
+            "X-Purpose": "evidence_binding",
+        },
+        json={"evidence_title": "Denied", "payload_text": "Denied"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Present one Keyverse bearer token before this action."
+
+
+def test_invalid_bearer_token_fails_closed_as_unauthenticated() -> None:
+    """A syntactically present but unverifiable bearer token is rejected as invalid."""
+    _private_key, public_jwk = _material()
+    response = _client(_verifier(public_jwk)).post(
+        "/evidence-records",
+        headers={
+            "Authorization": "Bearer not-a-jwt",
+            "X-Purpose": "evidence_binding",
+        },
+        json={"evidence_title": "Denied", "payload_text": "Denied"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "The Keyverse bearer token is invalid."
+
+
 def test_verified_bearer_requires_action_scope_before_mutation() -> None:
     """A valid Keyverse identity without the action scope cannot mutate evidence."""
     private_key, public_jwk = _material()
