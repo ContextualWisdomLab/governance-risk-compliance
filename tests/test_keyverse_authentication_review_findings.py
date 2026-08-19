@@ -106,9 +106,9 @@ def test_jwks_parser_cannot_raise_the_hard_one_mebibyte_limit() -> None:
     _private_key, jwk = _material()
     document = json.dumps({"keys": [jwk]}).encode()
     assert parse_keyverse_jwks(document, maximum_bytes=len(document)).keys_by_id
-    for invalid_limit in (0, -1, MAX_JWKS_BYTES + 1):
+    for invalid_limit in (True, 0, -1, 1.5, MAX_JWKS_BYTES + 1):
         with pytest.raises(AccessTokenValidationError, match="JWK size limit"):
-            parse_keyverse_jwks(document, maximum_bytes=invalid_limit)
+            parse_keyverse_jwks(document, maximum_bytes=invalid_limit)  # type: ignore[arg-type]
 
 
 def test_access_token_audience_is_one_exact_string_not_an_array() -> None:
