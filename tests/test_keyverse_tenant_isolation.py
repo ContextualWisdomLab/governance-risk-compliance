@@ -212,6 +212,40 @@ def test_policy_list_never_crosses_verified_tenant_boundary() -> None:
     assert policy_document_id not in response.text
 
 
+def test_policy_gap_read_is_authenticated_and_tenant_scoped() -> None:
+    """Gap reads require policy-read scope and reveal only the verified tenant's gaps."""
+    private_key, public_jwk = _material()
+    client = _client(public_jwk)
+    policy_document_id = _create_policy(client, private_key, "tenant-a")
+
+    missing = client.get("/policy-gaps")
+    cross_tenant = client.get(
+        "/policy-gaps",
+        headers=_headers(
+            private_key,
+            tenant_id="tenant-b",
+            scope="grc.policy.read",
+            purpose="coverage_review",
+        ),
+    )
+    own_tenant = client.get(
+        "/policy-gaps",
+        headers=_headers(
+            private_key,
+            tenant_id="tenant-a",
+            scope="grc.policy.read",
+            purpose="coverage_review",
+        ),
+    )
+
+    assert missing.status_code == 401
+    assert cross_tenant.status_code == 200
+    assert cross_tenant.json()["gaps"] == []
+    assert policy_document_id not in cross_tenant.text
+    assert own_tenant.status_code == 200
+    assert len(own_tenant.json()["gaps"]) == 1
+
+
 def test_policy_revision_hides_cross_tenant_object_reference() -> None:
     """A tenant B writer cannot revise a tenant A policy by guessing its identifier."""
     private_key, public_jwk = _material()
