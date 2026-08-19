@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cwl-grc"
+version = "0.1.0"
+description = "CWL GRC home: versioned policies, official controls, evidence, and coverage gaps."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "ContextualWisdomLab" }]
+dependencies = [
+    "cryptography>=44.0.0",
+    "fastapi>=0.115.0",
+    "python-multipart>=0.0.18",
+    "sqlalchemy>=2.0.36",
+    "uvicorn>=0.32.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "httpx>=0.28.0",
+    "interrogate==1.7.0",
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+    "ruff==0.16.1",
+]
+
+[project.scripts]
+cwl-grc = "cwl_grc.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cwl_grc"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-q"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D101", "D102", "D103", "D105", "D106", "D107"]
+
+[tool.coverage.run]
+source = ["cwl_grc"]
+branch = true
+omit = ["tests/*"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+
+[tool.interrogate]
+ignore-init-method = false
+ignore-init-module = false
+ignore-magic = false
+ignore-semiprivate = false
+ignore-private = false
+ignore-module = false
+fail-under = 100
+exclude = ["tests"]
