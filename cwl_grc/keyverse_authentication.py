@@ -53,6 +53,8 @@ class KeyverseAccessTokenSettings:
         if (
             parsed.scheme != "https"
             or not parsed.netloc
+            or parsed.username is not None
+            or parsed.password is not None
             or parsed.query
             or parsed.fragment
         ):
@@ -189,7 +191,9 @@ def parse_keyverse_jwks(
     keys_by_id: dict[str, jwt.PyJWK] = {}
     for raw_key in raw_keys:
         if not isinstance(raw_key, dict):
-            raise AccessTokenValidationError("Each Keyverse JWK must be an object.")
+            raise AccessTokenValidationError(
+                "The Keyverse JWK set contains a non-object key."
+            )
         key_id = raw_key.get("kid")
         if not isinstance(key_id, str) or not key_id.strip():
             raise AccessTokenValidationError("Each Keyverse JWK needs a key identifier.")
@@ -208,7 +212,7 @@ def parse_keyverse_jwks(
             )
         try:
             parsed_key = jwt.PyJWK.from_dict(raw_key, algorithm="RS256")
-        except (jwt.PyJWKError, ValueError, TypeError) as exc:
+        except (jwt.PyJWTError, ValueError, TypeError) as exc:
             raise AccessTokenValidationError("The Keyverse JWK is malformed.") from exc
         keys_by_id[key_id] = parsed_key
     return KeyverseJwkSet(MappingProxyType(keys_by_id))
@@ -301,7 +305,7 @@ def _required_text(payload: Mapping[str, Any], claim: str, label: str) -> str:
     value = payload.get(claim)
     if not isinstance(value, str) or not value.strip():
         raise AccessTokenValidationError(f"The Keyverse {label} is invalid.")
-    return value
+    return value.strip()
 
 
 def _parse_scopes(value: Any) -> frozenset[str]:
