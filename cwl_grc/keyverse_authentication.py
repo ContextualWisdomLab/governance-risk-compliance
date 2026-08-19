@@ -122,11 +122,19 @@ class KeyverseAccessTokenVerifier:
         now = _normalized_utc(self._now(), "verification clock")
         issued_at = _numeric_date(payload["iat"], "issued-at")
         expires_at = _numeric_date(payload["exp"], "expiration")
+        if expires_at <= issued_at:
+            raise AccessTokenValidationError(
+                "The Keyverse access-token time bounds are invalid."
+            )
         skew = timedelta(seconds=self._settings.clock_skew_seconds)
         if now >= expires_at + skew:
             raise AccessTokenValidationError("The Keyverse access token is expired.")
         if "nbf" in payload:
             not_before = _numeric_date(payload["nbf"], "not-before")
+            if not_before >= expires_at:
+                raise AccessTokenValidationError(
+                    "The Keyverse access-token time bounds are invalid."
+                )
             if now + skew < not_before:
                 raise AccessTokenValidationError("The Keyverse access token is not active.")
         if issued_at > now + skew:
@@ -176,6 +184,12 @@ def parse_keyverse_jwks(
     maximum_bytes: int = MAX_JWKS_BYTES,
 ) -> KeyverseJwkSet:
     """Parse a bounded public RSA signing-key set and reject ambiguity or secrets."""
+    if (
+        isinstance(maximum_bytes, bool)
+        or not isinstance(maximum_bytes, int)
+        or not 0 < maximum_bytes <= MAX_JWKS_BYTES
+    ):
+        raise AccessTokenValidationError("The Keyverse JWK size limit is invalid.")
     if len(document) > maximum_bytes:
         raise AccessTokenValidationError("The Keyverse JWK set is too large.")
     try:
@@ -278,6 +292,7 @@ def _decode_verified_payload(
                 "verify_signature": True,
                 "verify_iss": True,
                 "verify_aud": True,
+                "strict_aud": True,
                 "verify_exp": False,
                 "verify_nbf": False,
                 "verify_iat": False,
@@ -301,11 +316,11 @@ def _decode_verified_payload(
 
 
 def _required_text(payload: Mapping[str, Any], claim: str, label: str) -> str:
-    """Return one non-empty string claim without coercing attacker-controlled types."""
+    """Return one exact non-empty string claim without normalizing signed values."""
     value = payload.get(claim)
-    if not isinstance(value, str) or not value.strip():
+    if not isinstance(value, str) or not value or value != value.strip():
         raise AccessTokenValidationError(f"The Keyverse {label} is invalid.")
-    return value.strip()
+    return value
 
 
 def _parse_scopes(value: Any) -> frozenset[str]:
