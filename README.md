@@ -6,14 +6,14 @@ This repository is the ContextualWisdomLab home for policy, control, risk, evide
 
 ## Run the developer preview
 
-1. Install and start the officer tools with `python -m pip install -e ".[dev]"` and `python -m cwl_grc`, or run `cwl-grc serve`.
-2. Open `/` from the same machine, author the next policy, and map it only to official catalog identifiers.
-3. Read the policy-gap list and attach the next evidence on an uncovered mapped control.
-4. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
+1. Install with `python -m pip install -e ".[dev]"`.
+2. Generate and store a Fernet key as `CWL_GRC_EVIDENCE_KEY` before using any persistent database.
+3. Run `python -m cwl_grc` or `cwl-grc serve`; both start Uvicorn on loopback only.
+4. Open `/` from the same machine, author the next policy, and map it only to official catalog identifiers.
+5. Read the policy-gap list and attach the next evidence on an uncovered mapped control.
+6. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
 
-The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. The app therefore rejects proxy-forwarded or non-loopback traffic by default. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
-
-`CWL_GRC_ALLOW_UNAUTHENTICATED_REMOTE_PREVIEW=1` is an explicit unsafe escape hatch for an isolated test environment only. It is not authentication and must not be used for customer or Internet traffic.
+The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. The command-line server binds to `127.0.0.1`, and the app always rejects proxy-forwarded or non-loopback traffic. No runtime bypass exists. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
 
 ## Operator CLI
 
@@ -27,14 +27,14 @@ cwl-grc bind --framework csap_2026 --identifier 10.2.1 \
 cwl-grc policy list
 ```
 
-Each command prints JSON that states the next action. The CLI is also a developer-preview interface until the same identity and tenant controls are available.
+The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `bind` print JSON that states the next action. `cwl-grc serve` starts the local Uvicorn server and does not print data JSON. Running `cwl-grc policy` without `author`, `revise`, or `list` is invalid and exits with code 2. The CLI remains a developer-preview interface until the same identity and tenant controls are available.
 
 ## What this slice does
 
 | Action | Where |
 | --- | --- |
-| Author or revise a policy | `POST /policy-documents`, `POST /policy-documents/{id}/versions`, or `cwl-grc policy` |
-| List policies | `GET /policy-documents` |
+| Author or revise a policy | `POST /policy-documents`, `POST /policy-documents/{id}/versions`, `cwl-grc policy author`, or `cwl-grc policy revise` |
+| List policies | `GET /policy-documents` or `cwl-grc policy list` |
 | See policy/control gaps | `GET /policy-gaps?policy_document_id=`, `cwl-grc gaps`, or `/` |
 | List official controls | `GET /controls?framework=csap_2026` |
 | See catalog coverage gaps | `GET /controls/uncovered?framework=soc2_tsc_2017` |
@@ -45,6 +45,15 @@ Each command prints JSON that states the next action. The CLI is also a develope
 Policy authoring requires the declared purpose `policy_authoring`. Evidence create and bind require `evidence_binding`. Policies map only to seeded official identifiers: CSAP, SOC 2 TSC, ISMS-P, ISO/IEC 27001:2022, NIST SP 800-53 Rev. 5, COSO 2013, and COSO 2017.
 
 Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `nist_sp_800_53_r5`, `coso_ic_2013`, `coso_erm_2017`.
+
+## Integrity guarantees
+
+- `audit_event` rows are append-only at the database boundary.
+- A `policy_version` is created open, receives its mappings, and is finalized exactly once.
+- Finalized policy text and mappings cannot be updated, deleted, or extended through SQL.
+- `policy_document.current_version_number` serializes revision allocation; a stale writer receives `409 Conflict` and must reload.
+- Versioned schema upgrades leave `schema_migration` receipts and upgrade existing first-slice stores before integrity triggers are installed.
+- A persistent database cannot start without explicit `CWL_GRC_EVIDENCE_KEY` material. Ephemeral keys are limited to explicitly selected in-memory tests.
 
 ## Personal-data handling
 
@@ -62,6 +71,7 @@ CSAP, SOC 2, and ISMS-P are product-control catalogs here. SAST, Strix, CodeQL, 
 
 ```bash
 python -m pip install -e ".[dev]"
+export CWL_GRC_EVIDENCE_KEY="$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
 python -m cwl_grc
 ```
 
@@ -71,7 +81,7 @@ from cwl_grc import create_app
 app = create_app()
 ```
 
-Set `CWL_GRC_EVIDENCE_KEY` (Fernet) in any durable environment. Without it the process uses an ephemeral key and evidence will not survive a restart. Set `CWL_GRC_DATABASE_URL` when you are not using the local SQLite file.
+Set `CWL_GRC_EVIDENCE_KEY` for every durable store; startup fails when a persistent database has no key. Ephemeral key generation is limited to explicitly selected in-memory SQLite tests. Set `CWL_GRC_DATABASE_URL` when you are not using the local SQLite file.
 
 ## Citations
 
