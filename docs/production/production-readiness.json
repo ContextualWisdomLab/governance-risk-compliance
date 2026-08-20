@@ -21,11 +21,7 @@
         "Stacked PRs #5, #6, and #7 have not all merged into develop.",
         "Tenant persistence/isolation and complete protected-read authorization are not implemented."
       ],
-      "evidence": [
-        "PR #5 defines the closed RFC 9068 Keyverse access-token verifier.",
-        "PR #6 defines bounded OIDC Discovery and JWKS loading.",
-        "PR #7 begins verified-principal enforcement on protected mutations."
-      ]
+      "evidence": []
     },
     {
       "id": "postgresql-lifecycle",
@@ -180,10 +176,26 @@
       ],
       "blockers": [],
       "evidence": [
-        "docs/production/production-readiness.json",
-        "cwl_grc/production_readiness.py",
-        "tests/test_production_readiness.py",
-        ".github/workflows/production-readiness.yml"
+        {
+          "kind": "repository_file",
+          "path": "cwl_grc/production_readiness.py",
+          "git_blob_sha": "b0286f5ce87f4c469d8bfc97f200c7fed9357deb"
+        },
+        {
+          "kind": "repository_file",
+          "path": "tests/test_production_readiness.py",
+          "git_blob_sha": "7057272255b669f3a38f9c19184fc0393c41ccca"
+        },
+        {
+          "kind": "repository_file",
+          "path": "tests/test_production_readiness_evidence_binding.py",
+          "git_blob_sha": "a3a46b53ff28c4ce446392be87507a953aa9ba46"
+        },
+        {
+          "kind": "repository_file",
+          "path": ".github/workflows/production-readiness.yml",
+          "git_blob_sha": "4bfddd08963f782eb4b62ec3612e89f8cbad1ce8"
+        }
       ]
     }
   ]
