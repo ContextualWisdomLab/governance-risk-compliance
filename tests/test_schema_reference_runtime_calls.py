@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from cryptography.fernet import Fernet
 
-import cwl_grc.app as app_module
+import cwl_grc.database as database_module
 from cwl_grc import create_app
 from cwl_grc.database import migrate_database
 
@@ -24,8 +24,8 @@ def test_runtime_never_invokes_reference_seed_functions(
         """Fail if application startup enters migration-owned seed behavior."""
         pytest.fail("Runtime startup must not invoke reference-data seeding.")
 
-    monkeypatch.setattr(app_module, "seed_control_catalog", unexpected_seed)
-    monkeypatch.setattr(app_module, "seed_authorization_purposes", unexpected_seed)
+    monkeypatch.setattr(database_module, "seed_control_catalog", unexpected_seed)
+    monkeypatch.setattr(database_module, "seed_authorization_purposes", unexpected_seed)
 
     application = create_app(
         database_url=database_url,
