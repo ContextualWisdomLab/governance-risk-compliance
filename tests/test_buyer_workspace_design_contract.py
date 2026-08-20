@@ -23,7 +23,7 @@ def test_workspace_exposes_truthful_buyer_states_and_next_actions() -> None:
     assert 'aria-labelledby="workspace-title"' in html
     assert '<html lang="en">' in html
     assert '<table' in html
-    assert '<caption>' in html
+    assert '<caption' in html
     assert 'id="action-feedback"' in html
     assert 'href="#exact-title"' in html
 
@@ -87,3 +87,21 @@ def test_design_authority_is_traceable_to_figma_and_decision_records() -> None:
     assert "WCAG 2.2 AA" in adr
     assert "projection" in adr.lower()
     assert "not production evidence" in trd.lower()
+
+
+def test_i18n_contract_keeps_english_and_korean_semantics_aligned() -> None:
+    """Require one dependency-free locale catalog for the real page and stories."""
+
+    html = read("apps/grc-workspace/index.html")
+    i18n = read("apps/grc-workspace/i18n.mjs")
+    bootstrap = read("apps/grc-workspace/i18n-bootstrap.mjs")
+    stories = read("apps/grc-workspace/workspace.stories.mjs")
+    assert 'lang="en"' in html
+    assert 'id="locale-select"' in html
+    assert 'src="./i18n-bootstrap.mjs"' in html
+    assert "export const LOCALES" in i18n
+    assert "'ko'" in i18n
+    for key in ("header.title", "metric.applicable", "status.unknown3", "feedback.limitation"):
+        assert f"'{key}'" in i18n
+    assert "applyLocale(document, locale)" in bootstrap
+    assert "KoreanLocale" in stories
