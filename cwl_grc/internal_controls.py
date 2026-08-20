@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import and_, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from cwl_grc.audit import record_audit_event
@@ -283,8 +284,12 @@ def approve_control_requirement_mapping(
         valid_to=end,
         created_at=start,
     )
-    session.add(mapping)
-    session.flush()
+    try:
+        with session.begin_nested():
+            session.add(mapping)
+            session.flush()
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="That control mapping already exists.") from exc
     record_audit_event(
         session,
         decision,
@@ -431,28 +436,32 @@ def record_control_test_result(
         reviewed_at=datetime.now(timezone.utc).replace(tzinfo=None),
         created_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
-    session.add(result)
-    if result.result_code == ControlTestResultCode.INEFFECTIVE.value:
-        session.add(
-            ControlDeficiency(
-                deficiency_id=uuid4().hex,
-                tenant_id=decision.tenant_id,
-                control_implementation_id=execution.control_implementation_id,
-                test_execution_id=execution.test_execution_id,
-                deficiency_code=f"test_{execution.test_execution_id}",
-                severity=_controlled_text(
-                    deficiency_severity,
-                    {"low", "medium", "high", "critical"},
-                    "deficiency severity",
-                ),
-                deficiency_description=result.result_rationale,
-                deficiency_status="open",
-                identified_at=result.determined_at,
-                due_at=_normalize_utc(deficiency_due_at) if deficiency_due_at else None,
-                created_at=result.created_at,
-            )
-        )
-    session.flush()
+    try:
+        with session.begin_nested():
+            session.add(result)
+            if result.result_code == ControlTestResultCode.INEFFECTIVE.value:
+                session.add(
+                    ControlDeficiency(
+                        deficiency_id=uuid4().hex,
+                        tenant_id=decision.tenant_id,
+                        control_implementation_id=execution.control_implementation_id,
+                        test_execution_id=execution.test_execution_id,
+                        deficiency_code=f"test_{execution.test_execution_id}",
+                        severity=_controlled_text(
+                            deficiency_severity,
+                            {"low", "medium", "high", "critical"},
+                            "deficiency severity",
+                        ),
+                        deficiency_description=result.result_rationale,
+                        deficiency_status="open",
+                        identified_at=result.determined_at,
+                        due_at=_normalize_utc(deficiency_due_at) if deficiency_due_at else None,
+                        created_at=result.created_at,
+                    )
+                )
+            session.flush()
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="That test execution already has a result.") from exc
     record_audit_event(
         session,
         decision,
@@ -610,10 +619,16 @@ def control_coverage_status(
         return ControlCoverageStatus.UNASSESSED if legacy else ControlCoverageStatus.UNKNOWN
     implementations = (
         session.query(ControlImplementation)
+        .join(
+            InternalControlDefinition,
+            InternalControlDefinition.internal_control_definition_id
+            == ControlImplementation.internal_control_definition_id,
+        )
         .filter(
             ControlImplementation.tenant_id == tenant_id,
             ControlImplementation.internal_control_definition_id.in_(definition_ids),
             ControlImplementation.implementation_status != "retired",
+            InternalControlDefinition.lifecycle_status != "retired",
         )
         .all()
     )
@@ -652,6 +667,7 @@ def control_coverage_status(
         .filter(
             ControlTestPlan.tenant_id == tenant_id,
             ControlTestPlan.control_implementation_id.in_(implementation_ids),
+            ControlTestPlan.active.is_(True),
         )
         .order_by(ControlTestResult.determined_at.desc())
         .all()

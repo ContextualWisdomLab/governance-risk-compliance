@@ -39,7 +39,7 @@ The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `
 | List policies | `GET /policy-documents` or `cwl-grc policy list` |
 | See policy/control gaps | `GET /policy-gaps?policy_document_id=`, `cwl-grc gaps`, or `/` |
 | List official controls | `GET /controls?framework=csap_2026` |
-| See explicit catalog coverage statuses | `GET /controls?framework=soc2_tsc_2017` or `GET /controls/uncovered?framework=soc2_tsc_2017` |
+| See explicit catalog coverage statuses | `GET /controls?framework=soc2_tsc_2017` or `GET /controls/uncovered?framework=soc2_tsc_2017`; Keyverse mode requires `grc.control.read` and `X-Purpose: coverage_review` |
 | Store evidence | `POST /evidence-records` with `X-Actor-Id` and `X-Purpose: evidence_binding` |
 | Store compatibility evidence binding | `POST /control-evidence-bindings` or `cwl-grc bind`; direct bindings remain `unassessed` until a scoped control test uses the evidence |
 | Liveness probe | `GET /healthz` (dependency-free) |
@@ -59,6 +59,7 @@ Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `n
 - `policy_document.current_version_number` serializes revision allocation; a stale writer receives `409 Conflict` and must reload.
 - Versioned schema upgrades leave `schema_migration` receipts and upgrade existing first-slice stores before integrity triggers are installed.
 - Internal controls are separate from official catalog requirements: published definition versions, scoped implementations, reviewed mappings, design/operating tests, deficiencies, exceptions, and purpose-approved evidence usage project explicit coverage statuses.
+- Database guards reject mismatched control-definition/implementation test graphs, and coverage ignores retired definitions and inactive test plans.
 - A persistent database cannot start without explicit `CWL_GRC_EVIDENCE_KEY` material. Ephemeral keys are limited to explicitly selected in-memory tests.
 
 ## Personal-data handling

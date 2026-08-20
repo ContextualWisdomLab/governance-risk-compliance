@@ -64,7 +64,10 @@ def create_session_factory(
 ) -> sessionmaker[Session]:
     """Create guarded tables and bind optional telemetry to the product engine."""
     engine = build_engine(database_url)
-    Base.metadata.create_all(engine)
+    Base.metadata.create_all(
+        engine,
+        tables=[table for table in Base.metadata.sorted_tables if table.name != "evidence_usage"],
+    )
     apply_schema_migrations(engine)
     install_integrity_guards(engine)
     if telemetry is not None:
