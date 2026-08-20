@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         return 1
-    except (SchemaCompatibilityError, ValueError) as exc:
+    except SchemaCompatibilityError as exc:
         print(
             json.dumps(
                 {
@@ -67,6 +67,16 @@ def main(argv: list[str] | None = None) -> int:
                     "next_action": (
                         "Run the explicit database migration owner, then check compatibility."
                     ),
+                }
+            )
+        )
+        return 1
+    except ValueError as exc:
+        print(
+            json.dumps(
+                {
+                    "error": str(exc),
+                    "next_action": "Correct the command input or runtime configuration, then retry.",
                 }
             )
         )

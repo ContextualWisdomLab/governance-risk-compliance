@@ -76,11 +76,11 @@ def create_app(
     key = evidence_key if evidence_key is not None else os.environ.get(
         "CWL_GRC_EVIDENCE_KEY"
     )
-    factory = create_session_factory(url, manage_schema=mode == "development")
     cipher = EvidenceCipher(
         key,
         allow_ephemeral=url in {"sqlite://", "sqlite:///:memory:"},
     )
+    factory = create_session_factory(url, manage_schema=mode == "development")
 
     def get_session() -> Iterator[Session]:
         """Yield the request session."""

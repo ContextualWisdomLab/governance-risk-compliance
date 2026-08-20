@@ -56,7 +56,7 @@ def test_database_cli_reports_unsupported_dialect(
     assert main(["database", "check", "--database-url", "mysql://db.example/grc"]) == 1
     payload = capsys.readouterr().out
     assert "Unsupported GRC database dialect" in payload
-    assert "migration owner" in payload
+    assert "Correct the command input or runtime configuration" in payload
 
 
 def test_database_command_rejects_unexpected_parser_state() -> None:
