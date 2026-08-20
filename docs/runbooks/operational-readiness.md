@@ -36,8 +36,9 @@ status, database system, outcome, and environment-scoped resource attributes.
 If no endpoint is configured, the local bounded reader supports tests and
 developer diagnostics but is not an external monitoring path.
 
-Next action: verify collector delivery, dashboards, SLO/error-budget policy,
-burn-rate alerts, and paging before treating telemetry as production evidence.
+Next action: verify collector delivery, then approve and implement the proposed
+[`slo-policy.md`](slo-policy.md) with dashboards, burn-rate alerts, and paging
+before treating telemetry as production evidence.
 
 ## Current boundary
 

@@ -25,6 +25,7 @@
 - Truthful `/readyz` and `/startupz` contracts, bounded PostgreSQL connection setup, drain rejection, W3C correlation, and redaction-safe JSON request logs.
 - OpenTelemetry request traces, request rate/duration metrics, authorization-denial metrics, and route-template cardinality protection with standard OTLP export configuration.
 - Database session transaction outcome/duration metrics with rollback-safe request dependency instrumentation.
+- Proposed availability, mutation-success, audit-write, and recovery SLO/error-budget policy with bounded-label burn-rate alert thresholds.
 
 ### Security
 
@@ -58,3 +59,4 @@
 - `docs/adr/0007-evidence-retention-and-legal-hold.md` — retention metadata and tenant-scoped legal holds without destructive evidence mutation.
 - `docs/adr/0008-operational-readiness-and-correlation.md` — liveness/readiness/startup separation, drain state, correlation, and safe structured logging.
 - `docs/adr/0009-opentelemetry-request-telemetry.md` — isolated OpenTelemetry request spans/metrics, standard OTLP export, and bounded route attributes.
+- `docs/adr/0010-slo-and-error-budget-contract.md` — proposed SLO, error-budget, and multi-window alert contract pending collector acceptance.
