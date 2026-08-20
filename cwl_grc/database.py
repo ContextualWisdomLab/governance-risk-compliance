@@ -59,8 +59,13 @@ class PostgresEngineSettings:
             self.pool_timeout_seconds,
             self.pool_recycle_seconds,
         )
-        if any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in positive_values):
-            raise ValueError("PostgreSQL connection and timeout bounds must be positive integers.")
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) or value <= 0
+            for value in positive_values
+        ):
+            raise ValueError(
+                "PostgreSQL connection and timeout bounds must be positive integers."
+            )
         if isinstance(self.max_overflow, bool) or not isinstance(self.max_overflow, int):
             raise ValueError("PostgreSQL max overflow must be a non-negative integer.")
         if self.max_overflow < 0:
@@ -101,12 +106,15 @@ def _build_postgresql_engine(
     if not isinstance(query_sslmode, (str, type(None))):
         raise ValueError("PostgreSQL sslmode must be one exact value.")
     if query_sslmode is not None and query_sslmode != settings.sslmode:
-        raise ValueError("PostgreSQL URL sslmode must match the engine policy.")
+        raise ValueError(
+            "PostgreSQL URL sslmode must match the engine policy; remote use requires "
+            "verify-full."
+        )
     if settings.sslmode != "verify-full":
         if not settings.allow_insecure_loopback or not _host_is_loopback(host):
-            raise ValueError("PostgreSQL TLS may be disabled only for an explicit loopback test.")
-    elif query_sslmode not in {None, "verify-full"}:
-        raise ValueError("Remote PostgreSQL requires sslmode=verify-full.")
+            raise ValueError(
+                "PostgreSQL TLS may be disabled only for an explicit loopback test."
+            )
 
     options = " ".join(
         (
