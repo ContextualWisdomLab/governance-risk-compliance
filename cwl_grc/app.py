@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Awaitable, Callable, Iterator
+from datetime import datetime
 from typing import Any
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Response
@@ -23,7 +24,9 @@ from cwl_grc.encryption import EvidenceCipher, EvidenceKeyring, make_evidence_co
 from cwl_grc.evidence import (
     bind_control_evidence,
     create_evidence_record,
+    place_evidence_legal_hold,
     record_encryption_envelope,
+    release_evidence_legal_hold,
 )
 from cwl_grc.health import health_payload
 from cwl_grc.keyverse_authentication import (
@@ -54,6 +57,18 @@ def parse_framework(value: str | None) -> FrameworkCode | None:
         return FrameworkCode(value)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Unknown control framework.") from exc
+
+
+def parse_optional_timestamp(value: Any) -> datetime | None:
+    """Parse one optional ISO-8601 timestamp supplied by an officer workflow."""
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str):
+        raise HTTPException(status_code=400, detail="A disposition date must be text.")
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Use an ISO-8601 disposition date.") from exc
 
 
 def serialize_control(item: ControlItem, *, covered: bool | None = None) -> dict[str, Any]:
@@ -305,7 +320,7 @@ def create_app(
 
     @app.post("/evidence-records", status_code=201)
     def post_evidence(
-        body: dict[str, str],
+        body: dict[str, Any],
         session: Session = Depends(get_session),
         authorization: str | None = Header(default=None),
         x_actor_id: str | None = Header(default=None),
@@ -325,8 +340,55 @@ def create_app(
             decision,
             body.get("evidence_title", ""),
             body.get("payload_text", ""),
+            retention_class=body.get("retention_class", "standard"),
+            disposition_due_at=parse_optional_timestamp(body.get("disposition_due_at")),
         )
         return _serialize_evidence(record, cipher)
+
+    @app.post("/evidence-records/{evidence_record_id}/legal-hold")
+    def post_evidence_legal_hold(
+        evidence_record_id: str,
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Place a verified legal hold without deleting or masking evidence."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.EVIDENCE_RETENTION,
+            "grc.evidence.retention",
+        )
+        record = place_evidence_legal_hold(
+            session,
+            decision,
+            evidence_record_id,
+            body.get("hold_reason", ""),
+            body.get("hold_authority", ""),
+        )
+        return _serialize_evidence_retention(record)
+
+    @app.post("/evidence-records/{evidence_record_id}/legal-hold/release")
+    def post_evidence_legal_hold_release(
+        evidence_record_id: str,
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Release a verified legal hold and leave disposition to a later workflow."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.EVIDENCE_RETENTION,
+            "grc.evidence.retention",
+        )
+        record = release_evidence_legal_hold(session, decision, evidence_record_id)
+        return _serialize_evidence_retention(record)
 
     @app.post("/control-evidence-bindings", status_code=201)
     def post_binding(
@@ -466,5 +528,23 @@ def _serialize_evidence(record: EvidenceRecord, cipher: EvidenceCipher) -> dict[
         "evidence_title": record.evidence_title,
         "collector_actor": record.collector_actor,
         "payload_text": payload_text,
+        **_serialize_evidence_retention(record),
         "next_action": "Bind this evidence to the uncovered control.",
+    }
+
+
+def _serialize_evidence_retention(record: EvidenceRecord) -> dict[str, Any]:
+    """Serialize retention state without exposing encryption material."""
+    return {
+        "retention_class": record.retention_class,
+        "retention_started_at": record.retention_started_at.isoformat(),
+        "disposition_due_at": (
+            record.disposition_due_at.isoformat()
+            if record.disposition_due_at is not None
+            else None
+        ),
+        "legal_hold_active": record.legal_hold_active,
+        "legal_hold_reason": record.legal_hold_reason,
+        "legal_hold_authority": record.legal_hold_authority,
+        "disposition_outcome": record.disposition_outcome,
     }

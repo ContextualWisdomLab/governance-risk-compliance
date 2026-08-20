@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -20,6 +20,11 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 LOCAL_DEVELOPMENT_TENANT = "local_development"
+
+
+def _utc_now() -> datetime:
+    """Return a naive UTC timestamp for existing database timestamp columns."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Base(DeclarativeBase):
@@ -134,6 +139,28 @@ class EvidenceRecord(Base):
         default="",
         server_default="",
     )
+    retention_class: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default="standard",
+        server_default="standard",
+    )
+    retention_started_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=_utc_now,
+        server_default="1970-01-01 00:00:00",
+    )
+    disposition_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    legal_hold_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=false(),
+    )
+    legal_hold_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    legal_hold_authority: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    disposition_outcome: Mapped[str | None] = mapped_column(String(64), nullable=True)
     collected_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     evidence_bindings: Mapped[list[ControlEvidenceBinding]] = relationship(
         back_populates="evidence_record"
