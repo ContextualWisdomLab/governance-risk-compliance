@@ -1,0 +1,156 @@
+name: Repair readiness evidence digest once
+
+on:
+  push:
+    paths:
+      - .github/workflows/repair-readiness-sha256-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-grc-readiness-sha256-once
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+      - name: Checkout readiness branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/production-readiness-gate
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          prune-cache: true
+      - name: Replace Git SHA-1 evidence with SHA-256
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import re
+          from pathlib import Path
+
+          root = Path.cwd()
+          paths = [
+              root / "cwl_grc/production_readiness.py",
+              root / "tests/test_production_readiness.py",
+              root / "tests/test_production_readiness_evidence_binding.py",
+              root / "docs/production/README.md",
+              root / "docs/production/production-readiness.json",
+          ]
+
+          replacements = (
+              ("git_blob_sha", "sha256"),
+              ("GIT_BLOB_SHA_PATTERN", "SHA256_PATTERN"),
+              ("_git_blob_sha", "_sha256"),
+              ("Git blob identities", "SHA-256 digests"),
+              ("Git blob identity", "SHA-256 digest"),
+              ("Git object identities", "SHA-256 digests"),
+              ("Git object identity", "SHA-256 digest"),
+              ("Git-bound", "SHA-256-bound"),
+              ("Git blob IDs", "SHA-256 digests"),
+              ("Git blobs", "SHA-256 digests"),
+              ("40 lowercase hexadecimal", "64 lowercase hexadecimal"),
+              ('"0" * 40', '"0" * 64'),
+          )
+
+          for path in paths:
+              text = path.read_text(encoding="utf-8")
+              for old, new in replacements:
+                  text = text.replace(old, new)
+              text = re.sub(
+                  r'def _sha256\(contents: bytes\) -> str:\n'
+                  r'    """Return the [^\n]+ for exact (?:file )?``?contents``?\."""\n'
+                  r'    header = f"blob \{len\(contents\)\}\\0"\.encode\("ascii"\)\n'
+                  r'    return hashlib\.sha1\(header \+ contents, usedforsecurity=False\)\.hexdigest\(\)',
+                  'def _sha256(contents: bytes) -> str:\n'
+                  '    """Return the SHA-256 digest for exact ``contents``."""\n'
+                  '    return hashlib.sha256(contents).hexdigest()',
+                  text,
+              )
+              text = text.replace(
+                  'sha1("blob <length>\\0" + contents)',
+                  'sha256(contents)',
+              )
+              text = text.replace(
+                  "repository-native identity",
+                  "cryptographic content digest",
+              )
+              text = text.replace(
+                  "repository-native Git object identity",
+                  "SHA-256 content digest",
+              )
+              path.write_text(text, encoding="utf-8")
+
+          source = root / "cwl_grc/production_readiness.py"
+          source_text = source.read_text(encoding="utf-8")
+          source_text = source_text.replace(
+              'SHA256_PATTERN = re.compile(r"[0-9a-f]{40}")',
+              'SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")',
+          )
+          source_text = source_text.replace(
+              "Verify every evidence path and SHA-256 digest in one reviewed tree.",
+              "Verify every evidence path and SHA-256 digest in one reviewed tree.",
+          )
+          source_text = source_text.replace(
+              "path cannot be read for SHA-256 digest verification.",
+              "path cannot be read for SHA-256 verification.",
+          )
+          source.write_text(source_text, encoding="utf-8")
+
+          manifest_path = root / "docs/production/production-readiness.json"
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          for gate in manifest["gates"]:
+              for evidence in gate["evidence"]:
+                  evidence_file = root / evidence["path"]
+                  evidence["sha256"] = hashlib.sha256(evidence_file.read_bytes()).hexdigest()
+          manifest_path.write_text(
+              json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - name: Verify focused contract
+        run: |
+          set -euo pipefail
+          ! rg -n 'hashlib\.sha1|git_blob_sha|GIT_BLOB_SHA|sha1\("blob' \
+            cwl_grc tests docs/production
+          uv sync --locked --extra dev
+          uv run ruff check cwl_grc tests
+          uv run pytest -q \
+            tests/test_production_readiness.py \
+            tests/test_production_readiness_evidence_binding.py
+          uv run python -c \
+            'from cwl_grc.production_readiness import main; raise SystemExit(main())' \
+            docs/production/production-readiness.json \
+            --repository-root .
+      - name: Publish verified repair
+        env:
+          BRANCH_NAME: agent/production-readiness-gate
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/repair-readiness-sha256-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            cwl_grc/production_readiness.py \
+            tests/test_production_readiness.py \
+            tests/test_production_readiness_evidence_binding.py \
+            docs/production/README.md \
+            docs/production/production-readiness.json
+          git commit -m "fix: bind readiness evidence with SHA-256"
+          git push origin "HEAD:${BRANCH_NAME}"
