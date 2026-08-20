@@ -115,7 +115,7 @@ def test_application_runtime_mode_refuses_missing_schema(tmp_path: Path) -> None
 
 def test_postgresql_requires_psycopg_and_verified_tls() -> None:
     """Production PostgreSQL URLs use the reviewed driver and verify-full TLS."""
-    with pytest.raises(ValueError, match="postgresql\+psycopg"):
+    with pytest.raises(ValueError, match=r"postgresql\+psycopg"):
         build_engine("postgresql://grc@example.test/grc")
     with pytest.raises(ValueError, match="verify-full"):
         build_engine("postgresql+psycopg://grc@example.test/grc?sslmode=require")
