@@ -15,7 +15,6 @@ from cwl_grc.database import (
     SchemaCompatibilityError,
     assert_schema_compatible,
     build_engine,
-    create_session_factory,
     migrate_database,
 )
 
