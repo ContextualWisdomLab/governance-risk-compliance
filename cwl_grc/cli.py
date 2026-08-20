@@ -12,13 +12,8 @@ import uvicorn
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from cwl_grc.app import create_app, parse_framework, serialize_control
-from cwl_grc.authorization import (
-    AuthorizationDecision,
-    PurposeCode,
-    seed_authorization_purposes,
-)
-from cwl_grc.catalog import seed_control_catalog
+from cwl_grc.app import SCHEMA_MODES, create_app, parse_framework, serialize_control
+from cwl_grc.authorization import AuthorizationDecision, PurposeCode
 from cwl_grc.database import (
     SchemaCompatibilityError,
     assert_schema_compatible,
@@ -303,14 +298,17 @@ def _bind_command(namespace: argparse.Namespace) -> int:
 
 
 def _open_session() -> Session:
-    """Open a seeded development-profile session for a one-shot officer command."""
+    """Open one officer session under the configured schema-ownership profile."""
     url = os.environ.get(
         "CWL_GRC_DATABASE_URL",
         "sqlite:///grc_product.sqlite",
     )
-    factory = create_session_factory(url)
-    session = factory()
-    seed_control_catalog(session)
-    seed_authorization_purposes(session)
-    session.commit()
-    return session
+    mode = os.environ.get("CWL_GRC_SCHEMA_MODE", "development")
+    if mode not in SCHEMA_MODES:
+        allowed = ", ".join(sorted(SCHEMA_MODES))
+        raise ValueError(f"CWL GRC schema mode must be one of: {allowed}.")
+    factory = create_session_factory(
+        url,
+        manage_schema=mode == "development",
+    )
+    return factory()
