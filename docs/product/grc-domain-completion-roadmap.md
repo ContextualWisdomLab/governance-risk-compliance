@@ -280,6 +280,22 @@ Implement #27 before risk or audit domain logic:
    `operating_effective`, `ineffective`, `exception`, `stale`, and
    `not_applicable` where authorized.
 
+The status projection is not a mutually exclusive source-of-truth enum.
+Implementation state, effectiveness result, evidence freshness, exception or
+deficiency state, and applicability decision remain separate versioned facts.
+The compatibility projection reads the latest authorized facts for the same
+tenant, requirement mapping, and as-of time, and recalculates when one of those
+facts changes. If one display token is required, precedence is:
+`not_applicable` for an authorized applicability decision; `exception` for an
+active accepted exception; `stale` for expired evidence; `ineffective` for a
+current failed effectiveness result; `operating_effective` for a current passed
+operating test; `design_effective` for a current passed design test;
+`implemented_not_tested` for an implementation without a current test;
+`unassessed` for a legacy or present evidence link without an assessment; and
+`unknown` when no authoritative applicability, implementation, or evidence
+fact exists. The projection records its source fact identifiers, as-of time,
+and recalculation event so history is reproducible.
+
 ### Wave 2 — Obligation and catalog intelligence
 
 1. Implement #28 obligation register, applicability decisions, commitments, and
@@ -365,7 +381,7 @@ current on the exact artifact:
 
 - The complete buyer loop works end to end.
 - Evidence presence and control effectiveness remain distinguishable.
-- Applicability, `not_applicable`, `unknown`, `stale`, and `not_assessed` remain
+- Applicability, `not_applicable`, `unknown`, `stale`, and `unassessed` remain
   distinguishable.
 - Risk, finding, deficiency, exception, remediation, retest, and acceptance
   state transitions are deterministic and historically reproducible.

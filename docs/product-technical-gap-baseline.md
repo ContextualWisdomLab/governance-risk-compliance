@@ -1,8 +1,10 @@
 # Product and technical gap baseline
 
-Snapshot: 2026-08-21, Asia/Seoul
+Snapshot (document generation date): 2026-08-21, Asia/Seoul
 Repository: `ContextualWisdomLab/governance-risk-compliance`  
-Baseline source head: `17400a947fe2d51e61022031c7dc28f93152e18b`
+Documentation checkout head: `632dd513322a300a99ea58c618a2c6bac08a35d1` (PR #19)
+Baseline source head: `17400a947fe2d51e61022031c7dc28f93152e18b` (PR #33 exact head)
+Observation reference date: 2026-08-20
 
 This document is the current product and technical truth baseline. It separates
 observed runtime or GitHub evidence from inferred gaps and proposed acceptance
@@ -253,7 +255,8 @@ i18n consistency, and ownership boundaries.
 2. Fix valid findings at the shared root and add a realistic regression test for
    every non-trivial security, parser, concurrency, data-integrity, temporal,
    authorization, or workflow rule.
-3. Run `git diff --check` against the entire exact-head PR diff, then run locked
+3. Run `git diff --check` against the entire exact-head PR diff and review every
+   changed-document link and referenced Markdown anchor, then run locked
    Product, docstring, compile, PostgreSQL, contract, SAST, Security,
    semantic-review, accessibility, and applicable end-to-end gates on that same
    unchanged head.
