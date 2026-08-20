@@ -32,6 +32,8 @@ Kubernetes Authors. (n.d.). *Liveness, readiness, and startup probes*. Kubernete
 
 OpenTelemetry Authors. (n.d.). *Specifications*. OpenTelemetry. https://opentelemetry.io/docs/specs/
 
+OpenTelemetry Authors. (n.d.). *Instrumentation*. OpenTelemetry. https://opentelemetry.io/docs/languages/python/instrumentation/
+
 World Wide Web Consortium. (n.d.). *Trace context*. https://www.w3.org/TR/trace-context/
 
 Policy authoring in this slice follows ISO/IEC 27001:2022 clause 5.2 (information security policy as documented information) and Annex A control A.5.1 (policies for information security); COSO (2013) Principle 12 and AICPA (2022) SOC 2 CC5.3 (deploy control activities through policies and procedures); KISA (2023) ISMS-P 1.1.5; and KISA (2026) CSAP 1.1.1. Open Policy Agent Rego was reviewed and not adopted: it is an authorization PDP language, not a policy-document or evidence-binding store.
@@ -42,4 +44,4 @@ The first Keyverse authentication prerequisite follows RFC 9068 for explicit JWT
 
 The first evidence key-lifecycle slice follows NIST SP 800-57 Part 1 Revision 5 key-inventory, key-lifecycle, metadata-protection, and recovery principles. KMS/HSM integration, legal hold, retention disposition, backup, and restore rehearsal remain explicit follow-up work rather than unverified production claims.
 
-The operational readiness slice follows Kubernetes liveness/readiness/startup separation, the OpenTelemetry specification boundary, and W3C Trace Context propagation. The current implementation provides dependency-separated probes, bounded PostgreSQL connection setup, drain state, correlation IDs, and redaction-safe structured logs; exporters, metrics, SLO dashboards, burn-rate alerts, and paging remain explicit platform-integration work.
+The operational readiness slice follows Kubernetes liveness/readiness/startup separation, OpenTelemetry Python instrumentation, and W3C Trace Context propagation. The current implementation provides dependency-separated probes, bounded PostgreSQL connection setup, drain state, correlation IDs, redaction-safe structured logs, and low-cardinality request traces/metrics with standard OTLP export configuration; database instrumentation, SLO dashboards, burn-rate alerts, and paging remain explicit platform-integration work.

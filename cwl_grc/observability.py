@@ -10,7 +10,7 @@ import re
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Mapping
 from uuid import uuid4
 
 
@@ -88,6 +88,14 @@ def emit_request_log(
         "error_class": error_class,
     }
     request_logger.info(json.dumps(payload, sort_keys=True))
+
+
+def route_template(scope: Mapping[str, Any]) -> str:
+    """Return a registered route template without exposing raw path identifiers."""
+    route_path = getattr(scope.get("route"), "path", None)
+    if isinstance(route_path, str) and route_path.startswith("/"):
+        return route_path
+    return "unmatched"
 
 
 def _valid_request_id(value: str | None) -> bool:
