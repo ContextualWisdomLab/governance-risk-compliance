@@ -184,7 +184,7 @@ class _FakeEngine:
 def test_postgresql_migration_acquires_lock_before_schema_changes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The single migration writer holds an advisory transaction lock before DDL."""
+    """The single migration writer holds one lock through schema and seed writes."""
     calls: list[str] = []
     engine = _FakeEngine(acquired=True)
     monkeypatch.setattr(
@@ -202,13 +202,18 @@ def test_postgresql_migration_acquires_lock_before_schema_changes(
         "install_integrity_guards",
         lambda _connection: calls.append("guards"),
     )
+    monkeypatch.setattr(
+        database_module,
+        "_seed_reference_data",
+        lambda _connection: calls.append("seed"),
+    )
 
     database_module._migrate_engine(engine)  # type: ignore[arg-type]
 
     assert engine.connection.parameters == {
         "lock_key": database_module.POSTGRESQL_MIGRATION_LOCK_KEY
     }
-    assert calls == ["create_all", "migrations", "guards"]
+    assert calls == ["create_all", "migrations", "guards", "seed"]
 
 
 def test_postgresql_migration_fails_when_lock_is_owned_elsewhere(
