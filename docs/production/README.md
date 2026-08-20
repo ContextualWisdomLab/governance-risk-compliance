@@ -2,7 +2,7 @@
 
 `production-readiness.json` is the repository-owned, machine-readable register for the production target. It is deliberately separate from ordinary Product CI: green tests cannot prove that identity, tenant isolation, data lifecycle, recovery, release, operations, API, risk, and audit-product obligations are complete.
 
-The register is **not self-certification**. Ordinary validation may succeed while `production_ready` is `false`. Release mode remains non-zero until every required gate is `ready`, has no blockers, and cites repository evidence whose exact Git blob identity matches the checked-out tree.
+The register is **not self-certification**. Ordinary validation may succeed while `production_ready` is `false`. Release mode remains non-zero until every required gate is `ready`, has no blockers, and cites repository evidence whose exact SHA-256 digest matches the checked-out file.
 
 ## Gate contract
 
@@ -37,8 +37,8 @@ Schema version 1 accepts only repository-file evidence:
 ```json
 {
   "kind": "repository_file",
-  "path": "cwl_grc/production_readiness.py",
-  "git_blob_sha": "40-lowercase-hexadecimal-characters"
+  "path": "docs/production/readiness-evidence-index.json",
+  "sha256": "64-lowercase-hexadecimal-characters"
 }
 ```
 
@@ -46,7 +46,9 @@ The validator requires exactly those three fields.
 
 - `path` is an unambiguous POSIX-style repository-relative path: no absolute path, `.` or `..`, backslashes, `.git` authority, or path escape.
 - The target must exist inside the supplied repository root, resolve to a regular readable file, and may not escape through a symlink.
-- `git_blob_sha` must equal the repository-native identity of the current file: `sha1("blob <length>\0" + contents)`.
+- `sha256` must equal the lowercase hexadecimal result of SHA-256 over the exact current file bytes.
+
+The readiness-contract gate cites `docs/production/readiness-evidence-index.json`. That index records the reviewed component paths and their Git blob object IDs as repository coordinates, while the manifest binds the exact index bytes with SHA-256. Git object IDs are not accepted as the cryptographic evidence field.
 
 This binds the claim to exact reviewed file content in the exact checked-out tree. It does **not** replace release-artifact digests, SBOMs, provenance attestations, or signatures; those remain separate issue #10 controls.
 
@@ -54,7 +56,7 @@ Opaque strings such as `verified`, PR prose, model judgments, status names, stal
 
 ## Commands
 
-Validate the manifest, evidence schema, repository paths, and Git blob identities:
+Validate the manifest, evidence schema, repository paths, and SHA-256 bindings:
 
 ```bash
 uv run python -c \
@@ -75,9 +77,9 @@ uv run python -c \
 
 | Exit code | Meaning | Next action |
 | ---: | --- | --- |
-| `0` | Manifest and evidence bindings are valid; in release mode every gate is ready. | Continue through the remaining protected release controls. |
+| `0` | Manifest and SHA-256 evidence bindings are valid; in release mode every gate is ready. | Continue through the remaining protected release controls. |
 | `1` | Manifest and evidence bindings are valid, but at least one production gate is non-ready. | Work the listed canonical issues; do not release. |
-| `2` | JSON, gate contract, evidence object, repository path, or Git blob identity is invalid. | Repair the evidence contract before using its result. |
+| `2` | JSON, gate contract, evidence object, repository path, or SHA-256 digest is invalid. | Repair the evidence contract before using its result. |
 
 The ordinary GitHub workflow intentionally omits `--require-ready`; it proves only structural and evidence-binding integrity. A manually requested or release workflow using `--require-ready` must fail until all gates genuinely satisfy their evidence obligations.
 
@@ -86,7 +88,7 @@ The ordinary GitHub workflow intentionally omits `--require-ready`; it proves on
 1. Implement the canonical issue on an exact branch head.
 2. Collect exact-current-head Product, security, review, migration, recovery, and operational evidence required by that gate.
 3. Persist the deterministic evidence file in this repository.
-4. Read the file’s Git blob SHA from the exact current tree and add a `repository_file` object.
+4. Calculate the SHA-256 digest of the exact current evidence file and add a `repository_file` object.
 5. Remove only blockers proven resolved on the integrated head.
 6. Mark the gate `ready` only when no blocker remains.
 7. Run ordinary validation and `--require-ready`; the latter must still fail if any other gate remains non-ready.
