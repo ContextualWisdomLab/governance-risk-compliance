@@ -8,13 +8,15 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import delete, update
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.orm import Session, sessionmaker
 
 from cwl_grc.authorization import AuthorizationDecision, PurposeCode
 from cwl_grc.catalog import FrameworkCode, get_control_item
 from cwl_grc.database import (
     PostgresEngineSettings,
-    create_session_factory,
+    build_engine,
     migrate_database,
 )
 from cwl_grc.models import PolicyControlMapping, PolicyVersion
@@ -42,6 +44,12 @@ def _settings() -> PostgresEngineSettings:
     )
 
 
+def _session_factory_and_engine() -> tuple[sessionmaker[Session], Engine]:
+    """Return a PostgreSQL session factory and its explicitly owned engine."""
+    engine = build_engine(_database_url(), postgres_settings=_settings())
+    return sessionmaker(bind=engine, expire_on_commit=False), engine
+
+
 @pytest.fixture(scope="module", autouse=True)
 def migrated_postgresql_schema() -> None:
     """Ensure the shared service has the exact current schema and reference truth."""
@@ -51,11 +59,7 @@ def migrated_postgresql_schema() -> None:
 
 def test_postgresql_finalized_policy_and_mapping_are_immutable() -> None:
     """PostgreSQL rejects finalized text, edition deletion, and mapping mutation."""
-    factory = create_session_factory(
-        _database_url(),
-        manage_schema=False,
-        postgres_settings=_settings(),
-    )
+    factory, engine = _session_factory_and_engine()
     try:
         with factory() as session:
             document = author_policy(
@@ -88,7 +92,6 @@ def test_postgresql_finalized_policy_and_mapping_are_immutable() -> None:
                     .where(PolicyVersion.policy_version_id == version_id)
                     .values(policy_body="tampered PostgreSQL policy text")
                 )
-                session.commit()
             session.rollback()
 
             with pytest.raises(DBAPIError, match="immutable"):
@@ -97,7 +100,6 @@ def test_postgresql_finalized_policy_and_mapping_are_immutable() -> None:
                         PolicyControlMapping.mapping_id == mapping_id
                     )
                 )
-                session.commit()
             session.rollback()
 
             with pytest.raises(DBAPIError, match="immutable"):
@@ -106,19 +108,14 @@ def test_postgresql_finalized_policy_and_mapping_are_immutable() -> None:
                         PolicyVersion.policy_version_id == version_id
                     )
                 )
-                session.commit()
             session.rollback()
     finally:
-        factory.kw["bind"].dispose()
+        engine.dispose()
 
 
 def test_postgresql_rejects_new_mapping_on_finalized_policy_version() -> None:
     """PostgreSQL blocks a new official-control mapping after finalization."""
-    factory = create_session_factory(
-        _database_url(),
-        manage_schema=False,
-        postgres_settings=_settings(),
-    )
+    factory, engine = _session_factory_and_engine()
     try:
         with factory() as session:
             document = author_policy(
@@ -154,4 +151,4 @@ def test_postgresql_rejects_new_mapping_on_finalized_policy_version() -> None:
                 session.commit()
             session.rollback()
     finally:
-        factory.kw["bind"].dispose()
+        engine.dispose()

@@ -9,7 +9,9 @@ from time import monotonic
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import text
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import DBAPIError, TimeoutError as SqlAlchemyTimeoutError
+from sqlalchemy.orm import Session, sessionmaker
 
 from cwl_grc.authorization import AuthorizationDecision, PurposeCode
 from cwl_grc.catalog import FrameworkCode
@@ -45,6 +47,12 @@ def _settings(**overrides: object) -> PostgresEngineSettings:
     }
     values.update(overrides)
     return PostgresEngineSettings(**values)  # type: ignore[arg-type]
+
+
+def _session_factory_and_engine() -> tuple[sessionmaker[Session], Engine]:
+    """Return a PostgreSQL session factory and its explicitly owned engine."""
+    engine = build_engine(_database_url(), postgres_settings=_settings())
+    return sessionmaker(bind=engine, expire_on_commit=False), engine
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -164,11 +172,7 @@ def test_postgresql_runtime_rejects_missing_required_migration() -> None:
 
 def test_postgresql_stale_policy_writer_receives_conflict() -> None:
     """Real PostgreSQL optimistic allocation rejects a stale policy writer."""
-    factory = create_session_factory(
-        _database_url(),
-        manage_schema=False,
-        postgres_settings=_settings(),
-    )
+    factory, engine = _session_factory_and_engine()
     first = factory()
     stale = factory()
     try:
@@ -220,7 +224,7 @@ def test_postgresql_stale_policy_writer_receives_conflict() -> None:
     finally:
         first.close()
         stale.close()
-        factory.kw["bind"].dispose()
+        engine.dispose()
 
 
 def test_postgresql_pool_exhaustion_fails_within_configured_bound() -> None:
@@ -302,6 +306,8 @@ def test_postgresql_lock_timeout_interrupts_blocked_mutation() -> None:
             contender.rollback()
         assert elapsed < 2.0
     finally:
+        with engine.begin() as connection:
+            connection.execute(text("DROP TABLE IF EXISTS operational_lock_probe"))
         engine.dispose()
 
 
