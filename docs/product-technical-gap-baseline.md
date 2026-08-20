@@ -3,7 +3,7 @@
 Snapshot: 2026-08-21, Asia/Seoul
 Repository: `ContextualWisdomLab/governance-risk-compliance`  
 Baseline source head: `78770c63d16a6124dbb1d647c3ac482624f1745a`
-Develop-based buyer-workspace head: `aa7ab7bcb53bae8a3a219568fbc34f5f97c71b06`
+Develop-based buyer-workspace head: `e61a2a45fd0950bc700ce7393b0d2dd97d59194c`
 Active reviewed security/model/catalog/obligation fix heads: PR #33 `161e183c97d2b52ebd32b66bb29887385121d537`, PR #36 `cb1a48395109c87c17ad287ea1fc81dc25b135e1`, PR #37 `bfb3f61767886075be32b669871cc4b21b168708`, PR #38 `0c4084705b4f86913acdefa1ada3d17aa2d1e6f7`, and PR #40 `9bff870e8b540e49745e3c48f39caa6de96ccbf2`. This baseline follow-up is PR #39.
 
 This document is the current product and technical truth baseline. It separates
@@ -41,11 +41,12 @@ current external gates and independent approval remain outstanding. It remains
 unmerged and depends on PR #32's protected independent-review gate.
 
 PR #34 stages the Issue #30 buyer-workspace design authority directly on
-`develop`. Its exact head `aa7ab7bcb53bae8a3a219568fbc34f5f97c71b06` has
-terminal Product #32417662876 and Buyer Workspace #32417663204 success,
-checked-in npm lockfile/Node pin, Storybook build, and Chromium interaction
-evidence. It remains Draft while SAST, Security, the pinned-dependencies
-finding, and independent review are outstanding; the fixture is not
+`develop`. Its exact head `e61a2a45fd0950bc700ce7393b0d2dd97d59194c` adds the
+current NIST SP 800-53 Release 5.2.0 APA 7 reference to the existing checked-in
+npm lockfile/Node pin, Storybook build, and Chromium interaction evidence. The
+new head has local Python 49-test 100% statement/branch coverage, Storybook
+10.5.10 build, and two Chromium interaction tests; refreshed external gates
+and independent review are outstanding. It remains Draft; the fixture is not
 authentication, API, export, accessibility-certification, or deployment
 evidence.
 
@@ -199,7 +200,7 @@ self-approval, admin merge, force-push, or predecessor-head evidence is valid.
 | [#31](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/31) | `2e34c86b9a0c20fade2b6b67c1e472fa599228d2` | Ready, stacked, review-required | Declared recovery-event telemetry stacked on #26. Product run #450 is terminal-success on the exact head; the PR expressly excludes a recovery coordinator, collector, dashboards, paging, rehearsal, owner approval, and production recovery evidence. |
 | [#32](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/32) | `138c8331723785d7188c4f5403cff61a1d9e9f40` | Ready, stacked, review-required | Internal-control model stacked on #31 for Issue #27. Product run #468 is terminal-success on the exact head; local and PostgreSQL evidence is recorded. PR #36 carries the current review-fix head on this branch; no independent formal approval or protected merge is observed. |
 | [#33](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/33) | `161e183c97d2b52ebd32b66bb29887385121d537` | Ready, stacked, review-required | Obligation applicability and regulatory-change model stacked on #32 for Issue #28. Current head adds the Semgrep migration fix and changelog entry; local full 100% coverage, exact Semgrep 0-findings, and PostgreSQL 18.6 migration probes pass. Predecessor Product/Devin evidence does not transfer; current external gates and independent approval remain outstanding. |
-| [#34](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/34) | `aa7ab7bcb53bae8a3a219568fbc34f5f97c71b06` | Draft, mergeable, review-required | Issue #30 buyer-workspace design authority on `develop`. Product #32417662876 and Buyer Workspace #32417663204 are terminal-success; SAST/Security remain queued, one pinned-dependencies finding is unresolved, and independent approval is unobserved. Keep Draft until the exact-head security/review gate is complete. |
+| [#34](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/34) | `e61a2a45fd0950bc700ce7393b0d2dd97d59194c` | Draft, mergeable, review-required | Issue #30 buyer-workspace design authority on `develop`. The exact current head has local Python 49-test 100% statement/branch coverage, Storybook 10.5.10 build, two Chromium interaction tests, and the current NIST SP 800-53 Release 5.2.0 APA 7 reference. Refreshed SAST/Security and independent review remain outstanding. |
 | [#35](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/35) | `2861c9c5bfd17f6ac6778e42db1b4d735a809ce9` | Draft, stacked, review-required | Buyer-gap baseline refresh for PR #33 and PR #34 on the baseline branch. PR #39 carries the current queue follow-up; neither docs PR is production, issue-completion, or merge approval evidence. |
 | [#36](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/36) | `cb1a48395109c87c17ad287ea1fc81dc25b135e1` | Draft, stacked, review-required | Review fixes for PR #32 on `feat/internal-control-model`, including owner graph guards and objective/definition race conflicts. Local 157-test 100% evidence and PostgreSQL 18.6 upgrade/graph probes pass; Product is green, while required/security gates and independent approval remain outstanding. |
 | [#37](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/37) | `bfb3f61767886075be32b669871cc4b21b168708` | Draft, mergeable, review-required | Issue #29 catalog-provenance slice on `develop`. Current head makes the HTTP source-host allowlist server-owned; local full 100% evidence and PostgreSQL 18.6 host-boundary probe pass. Scope excludes remote source retrieval and OSCAL/OLIR parsing; refreshed required/security gates and independent approval remain outstanding. |
