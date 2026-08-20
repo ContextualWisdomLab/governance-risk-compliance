@@ -1,6 +1,6 @@
 # CWL GRC
 
-Author a versioned policy, see which mapped CSAP / SOC 2 TSC / ISMS-P / ISO/IEC 27001 controls still need evidence, then attach the next artifact.
+Author a versioned policy, see each mapped CSAP / SOC 2 TSC / ISMS-P / ISO/IEC 27001 control status, then establish the next reviewed control test.
 
 This repository is the ContextualWisdomLab home for policy, control, risk, evidence, and compliance-audit truth. Other CWL services consume the control and evidence contracts only.
 
@@ -10,7 +10,7 @@ This repository is the ContextualWisdomLab home for policy, control, risk, evide
 2. Generate and store a Fernet key as `CWL_GRC_EVIDENCE_KEY` before using any persistent database.
 3. Run `python -m cwl_grc` or `cwl-grc serve`; both start Uvicorn on loopback only.
 4. Open `/` from the same machine, author the next policy, and map it only to official catalog identifiers.
-5. Read the policy-gap list and attach the next evidence on an uncovered mapped control.
+5. Read the policy-gap list, distinguish `unknown`, `unassessed`, design, operating, stale, exception, and ineffective statuses, then establish the next control test.
 6. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
 7. Confirm `/readyz` returns `200` with database, schema, seed, guard, key, identity, and lifecycle checks; use `/startupz` to inspect the checks that admitted the process.
 8. Set the standard `OTEL_EXPORTER_OTLP_ENDPOINT` only when an approved collector is available; request traces and low-cardinality request metrics are then exported asynchronously.
@@ -39,9 +39,9 @@ The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `
 | List policies | `GET /policy-documents` or `cwl-grc policy list` |
 | See policy/control gaps | `GET /policy-gaps?policy_document_id=`, `cwl-grc gaps`, or `/` |
 | List official controls | `GET /controls?framework=csap_2026` |
-| See catalog coverage gaps | `GET /controls/uncovered?framework=soc2_tsc_2017` |
+| See explicit catalog coverage statuses | `GET /controls?framework=soc2_tsc_2017` or `GET /controls/uncovered?framework=soc2_tsc_2017` |
 | Store evidence | `POST /evidence-records` with `X-Actor-Id` and `X-Purpose: evidence_binding` |
-| Bind evidence | `POST /control-evidence-bindings` or `cwl-grc bind` |
+| Store compatibility evidence binding | `POST /control-evidence-bindings` or `cwl-grc bind`; direct bindings remain `unassessed` until a scoped control test uses the evidence |
 | Liveness probe | `GET /healthz` (dependency-free) |
 | Readiness probe | `GET /readyz` (returns `503` with stable reason codes when traffic is unsafe) |
 | Startup probe | `GET /startupz` (reports the checks completed before admission) |
@@ -58,6 +58,7 @@ Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `n
 - Finalized policy text and mappings cannot be updated, deleted, or extended through SQL.
 - `policy_document.current_version_number` serializes revision allocation; a stale writer receives `409 Conflict` and must reload.
 - Versioned schema upgrades leave `schema_migration` receipts and upgrade existing first-slice stores before integrity triggers are installed.
+- Internal controls are separate from official catalog requirements: published definition versions, scoped implementations, reviewed mappings, design/operating tests, deficiencies, exceptions, and purpose-approved evidence usage project explicit coverage statuses.
 - A persistent database cannot start without explicit `CWL_GRC_EVIDENCE_KEY` material. Ephemeral keys are limited to explicitly selected in-memory tests.
 
 ## Personal-data handling

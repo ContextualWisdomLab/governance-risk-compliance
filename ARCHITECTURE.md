@@ -24,20 +24,21 @@ flowchart LR
     kernel --> policy[(tenant-owned policy records)]
     kernel --> catalog[(shared control catalog)]
     kernel --> evidence[(tenant-owned evidence records)]
-    kernel --> binding[(tenant-owned evidence bindings)]
+    kernel --> binding[(legacy evidence bindings)]
+    kernel --> controls[(internal control definitions, tests, and status projection)]
     kernel --> audit[(tenant-owned audit events)]
     consumers[Orgmetra / AIS / Billing / naruon / EA / SDP] -. future authenticated contracts .-> api
 ```
 
 ## Runtime layers
 
-1. **Local officer home**: buyer-oriented HTML that authors a policy, lists policy gaps, and attaches the next evidence under the fixed `local_development` tenant.
+1. **Local officer home**: buyer-oriented HTML that authors a policy, lists explicit control statuses and policy gaps, and stores evidence for a future control test under the fixed `local_development` tenant.
 2. **HTTP API**: policy author/revise/list, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, and dependency-separated `/healthz`, `/readyz`, and `/startupz` probes.
 3. **Keyverse security adapter**: optional closed-profile JWT verification plus bounded OIDC Discovery/JWKS loading. When configured, protected policy and evidence routes derive actor and tenant from the signed principal and enforce action-specific scopes.
 4. **Preview network boundary**: always rejects proxy-forwarded and non-loopback traffic. Keyverse authentication inside the process does not enable customer or Internet exposure by itself.
 5. **CLI tools**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and the local Uvicorn `cwl-grc serve`.
 6. **Kernel package**: `create_app()` for modular composition; `python -m cwl_grc` for standalone local HTTP.
-7. **Store**: 3NF SQLite by default, PostgreSQL-ready URL via `CWL_GRC_DATABASE_URL`, versioned schema upgrades, and database guards that protect tenant relationships, audit history, and finalized policy history.
+7. **Store**: 3NF SQLite by default, PostgreSQL-ready URL via `CWL_GRC_DATABASE_URL`, versioned schema upgrades, and database guards that protect tenant relationships, audit history, finalized policy history, and internal-control test history.
 8. **Operations boundary**: bounded PostgreSQL connection setup, startup admission checks, drain state, W3C request correlation, redaction-safe structured request logs, and low-cardinality OpenTelemetry request/session-transaction traces plus request/session-transaction/pool/recovery-event metrics. Collector configuration, dashboards, SLOs, and alert rules remain platform integration work.
 
 ## Data ownership
@@ -51,13 +52,25 @@ flowchart LR
 | `control_item` | Shared official identifier and statement; not customer-owned |
 | `authorization_purpose` | Shared declared-purpose vocabulary; not actor authentication |
 | `evidence_record` | Tenant-owned encrypted-at-rest artifact; exact values remain usable in an authorized workflow |
-| `control_evidence_binding` | Tenant-owned bind of an evidence artifact to a shared official control |
+| `control_evidence_binding` | Tenant-owned legacy compatibility bind of an evidence artifact to a shared official control; never an effectiveness conclusion |
+| `control_objective` | Tenant-owned objective grouping reusable internal controls |
+| `internal_control_definition` | Tenant-owned reusable control definition |
+| `control_definition_version` | Immutable version of the control statement and test expectations |
+| `control_implementation` | Tenant-scoped implementation and scope reference |
+| `control_owner_assignment` | Temporal accountable/operator/reviewer assignment |
+| `control_requirement_mapping` | Reviewed many-to-many relation to an official catalog requirement |
+| `control_test_plan` | Design or operating test method and cadence |
+| `control_test_execution` | Immutable historical test period and sample |
+| `control_test_result` | Immutable design/operating conclusion |
+| `control_exception` | Time-bounded approved exception |
+| `control_deficiency` | Open or resolved failure requiring remediation |
+| `evidence_usage` | Purpose-approved evidence use for one implementation and completed test; legacy rows are `unassessed` |
 | `audit_event` | Tenant-owned append-only action record protected at the database boundary |
 | `schema_migration` | Applied schema-upgrade receipt |
 
 Every tenant-owned row has a non-null `tenant_id`. In Keyverse mode it comes from the verified `org` claim. The `local_development` value is reserved for the loopback-only compatibility profile and migration of pre-tenant preview data.
 
-A policy gap is a latest finalized-edition mapping whose control has zero same-tenant `control_evidence_binding` rows. There is no second evidence-binding table. Cross-service reads use published HTTP contracts after a production-authenticated service boundary exists; peer products never query these tables directly.
+A policy gap is a latest finalized-edition mapping whose external control projects to a status other than `operating_effective` or authorized `not_applicable`. Direct `control_evidence_binding` rows remain compatibility data and project to `unassessed`; `evidence_usage` records a purpose-approved use without replacing the legacy binding model. Cross-service reads use published HTTP contracts after a production-authenticated service boundary exists; peer products never query these tables directly.
 
 ## Tenant relationship integrity
 
@@ -68,12 +81,16 @@ Application filtering is not the sole control. New schemas pair tenant and paren
 - `policy_version(tenant_id, policy_document_id)` → `policy_document(tenant_id, policy_document_id)`;
 - `policy_control_mapping(tenant_id, policy_version_id)` → `policy_version(tenant_id, policy_version_id)`;
 - `control_evidence_binding(tenant_id, evidence_record_id)` → `evidence_record(tenant_id, evidence_record_id)`.
+- `internal_control_definition(tenant_id, objective_id)` → `control_objective(tenant_id, objective_id)`;
+- `control_definition_version(tenant_id, internal_control_definition_id)` → `internal_control_definition(tenant_id, internal_control_definition_id)`;
+- `control_implementation(tenant_id, internal_control_definition_id)` → `internal_control_definition(tenant_id, internal_control_definition_id)`;
+- test plans, executions, results, deficiencies, exceptions, and evidence usage pair every tenant key with their parent identifier.
 
-Existing SQLite and PostgreSQL stores receive idempotent tenant-parent guards at startup, because adding composite constraints to an already-created SQLite table would otherwise require a destructive table rebuild. The guards fail closed on mismatched parent inserts or updates.
+Existing SQLite and PostgreSQL stores receive idempotent tenant-parent guards at startup, and SQLite foreign-key enforcement is enabled on every product connection. The guards fail closed on mismatched parent inserts or updates without destructively rewriting evidence.
 
 ## Integrity and concurrency
 
-Policy creation writes an unfinalized `policy_version`, writes its same-tenant official-control mappings, and then performs the only permitted transition to `is_finalized=true`. SQLite and PostgreSQL guards reject later policy-version mutation or deletion, mapping insertion after finalization, mapping update/delete, and any audit-event update/delete.
+Policy creation writes an unfinalized `policy_version`, writes its same-tenant official-control mappings, and then performs the only permitted transition to `is_finalized=true`. SQLite and PostgreSQL guards reject later policy-version mutation or deletion, mapping insertion after finalization, mapping update/delete, audit-event update/delete, and mutation of published internal-control versions, reviewed mappings, test executions/results, or evidence usage.
 
 `policy_document.current_version_number` is the optimistic concurrency token. A revision advances it with a tenant-bound conditional SQL update. A stale writer receives `409 Conflict` and must reload the current edition; the service never guesses a replacement version number.
 

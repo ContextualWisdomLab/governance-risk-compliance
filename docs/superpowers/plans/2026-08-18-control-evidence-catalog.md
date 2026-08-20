@@ -1,8 +1,12 @@
 # Control catalog and evidence binding implementation plan
 
+> Historical first-slice plan. The internal-control implementation plan and
+> acceptance contract are in `docs/product/internal-control-model.md` and ADR
+> 0011.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** A compliance officer can author a versioned policy, see uncovered policy/control gaps, and bind evidence.
+**Goal:** A compliance officer can author a versioned policy, see explicit control statuses, and establish a reviewed control test using purpose-approved evidence.
 
 **Architecture:** Installable `cwl_grc` FastAPI kernel with 3NF SQLite-ready tables, Fernet evidence encryption, and `/healthz`.
 

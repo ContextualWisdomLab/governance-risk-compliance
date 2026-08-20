@@ -12,6 +12,7 @@ POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
 TENANT_ISOLATION_MIGRATION = "0002_tenant_isolation"
 EVIDENCE_ENCRYPTION_MIGRATION = "0003_evidence_encryption"
 EVIDENCE_RETENTION_MIGRATION = "0004_evidence_retention"
+INTERNAL_CONTROL_MODEL_MIGRATION = "0005_internal_control_model"
 LOCAL_DEVELOPMENT_TENANT = "local_development"
 TENANT_OWNED_TABLES = (
     "policy_document",
@@ -20,6 +21,18 @@ TENANT_OWNED_TABLES = (
     "evidence_record",
     "control_evidence_binding",
     "audit_event",
+    "control_objective",
+    "internal_control_definition",
+    "control_definition_version",
+    "control_implementation",
+    "control_owner_assignment",
+    "control_requirement_mapping",
+    "control_test_plan",
+    "control_test_execution",
+    "control_test_result",
+    "control_exception",
+    "control_deficiency",
+    "evidence_usage",
 )
 
 
@@ -48,6 +61,9 @@ def apply_schema_migrations(engine: Engine) -> None:
         if not _migration_applied(connection, EVIDENCE_RETENTION_MIGRATION):
             _apply_evidence_retention_migration(connection)
             _record_migration(connection, EVIDENCE_RETENTION_MIGRATION)
+        if not _migration_applied(connection, INTERNAL_CONTROL_MODEL_MIGRATION):
+            _apply_internal_control_model_migration(connection)
+            _record_migration(connection, INTERNAL_CONTROL_MODEL_MIGRATION)
 
 
 def _migration_applied(connection: Connection, migration_key: str) -> bool:
@@ -230,6 +246,66 @@ def _apply_evidence_retention_migration(connection: Connection) -> None:
     )
 
 
+def _apply_internal_control_model_migration(connection: Connection) -> None:
+    """Create the internal-control tables and classify legacy bindings as unassessed."""
+    from cwl_grc.models import Base
+
+    inspector = inspect(connection)
+    for table_name, index_name, columns in (
+        (
+            "evidence_record",
+            "evidence_record_tenant_identity_compat",
+            "tenant_id, evidence_record_id",
+        ),
+        (
+            "control_evidence_binding",
+            "control_evidence_binding_tenant_identity_compat",
+            "tenant_id, binding_id",
+        ),
+    ):
+        if inspector.has_table(table_name):
+            connection.execute(
+                text(
+                    f"CREATE UNIQUE INDEX IF NOT EXISTS {index_name} "
+                    f"ON {table_name} ({columns})"
+                )
+            )
+    Base.metadata.create_all(connection)
+    connection.execute(
+        text(
+            """
+            INSERT INTO evidence_usage (
+                evidence_usage_id,
+                tenant_id,
+                evidence_record_id,
+                legacy_binding_id,
+                purpose_code,
+                usage_status,
+                usage_note,
+                used_by_actor,
+                used_at
+            )
+            SELECT
+                'legacy_' || binding_id,
+                tenant_id,
+                evidence_record_id,
+                binding_id,
+                purpose_code,
+                'unassessed',
+                'Legacy direct evidence binding; effectiveness not assessed.',
+                bound_by_actor,
+                bound_at
+            FROM control_evidence_binding
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM evidence_usage
+                WHERE legacy_binding_id = control_evidence_binding.binding_id
+            )
+            """
+        )
+    )
+
+
 def install_integrity_guards(engine: Engine) -> None:
     """Install idempotent database triggers for immutable and tenant-bound rows."""
     statements = integrity_guard_statements(engine.dialect.name)
@@ -366,6 +442,76 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
             SELECT RAISE(ABORT, 'control binding tenant parent mismatch');
         END
         """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_definition_version_block_update
+        BEFORE UPDATE ON control_definition_version
+        BEGIN
+            SELECT RAISE(ABORT, 'control_definition_version is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_definition_version_block_delete
+        BEFORE DELETE ON control_definition_version
+        BEGIN
+            SELECT RAISE(ABORT, 'control_definition_version is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_requirement_mapping_block_update
+        BEFORE UPDATE ON control_requirement_mapping
+        BEGIN
+            SELECT RAISE(ABORT, 'control_requirement_mapping is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_requirement_mapping_block_delete
+        BEFORE DELETE ON control_requirement_mapping
+        BEGIN
+            SELECT RAISE(ABORT, 'control_requirement_mapping is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_test_execution_block_update
+        BEFORE UPDATE ON control_test_execution
+        BEGIN
+            SELECT RAISE(ABORT, 'control_test_execution is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_test_execution_block_delete
+        BEFORE DELETE ON control_test_execution
+        BEGIN
+            SELECT RAISE(ABORT, 'control_test_execution is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_test_result_block_update
+        BEFORE UPDATE ON control_test_result
+        BEGIN
+            SELECT RAISE(ABORT, 'control_test_result is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_test_result_block_delete
+        BEFORE DELETE ON control_test_result
+        BEGIN
+            SELECT RAISE(ABORT, 'control_test_result is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS evidence_usage_block_update
+        BEFORE UPDATE ON evidence_usage
+        BEGIN
+            SELECT RAISE(ABORT, 'evidence_usage is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS evidence_usage_block_delete
+        BEFORE DELETE ON evidence_usage
+        BEGIN
+            SELECT RAISE(ABORT, 'evidence_usage is immutable');
+        END
+        """,
     )
 
 
@@ -471,5 +617,43 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
         BEFORE INSERT OR UPDATE OF tenant_id, evidence_record_id
         ON control_evidence_binding
         FOR EACH ROW EXECUTE FUNCTION enforce_control_binding_tenant_parent()
+        """,
+        """
+        CREATE OR REPLACE FUNCTION prevent_control_history_mutation()
+        RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            RAISE EXCEPTION '% is immutable', TG_TABLE_NAME;
+        END;
+        $$
+        """,
+        "DROP TRIGGER IF EXISTS control_definition_version_immutable ON control_definition_version",
+        """
+        CREATE TRIGGER control_definition_version_immutable
+        BEFORE UPDATE OR DELETE ON control_definition_version
+        FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
+        """,
+        "DROP TRIGGER IF EXISTS control_requirement_mapping_immutable ON control_requirement_mapping",
+        """
+        CREATE TRIGGER control_requirement_mapping_immutable
+        BEFORE UPDATE OR DELETE ON control_requirement_mapping
+        FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
+        """,
+        "DROP TRIGGER IF EXISTS control_test_execution_immutable ON control_test_execution",
+        """
+        CREATE TRIGGER control_test_execution_immutable
+        BEFORE UPDATE OR DELETE ON control_test_execution
+        FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
+        """,
+        "DROP TRIGGER IF EXISTS control_test_result_immutable ON control_test_result",
+        """
+        CREATE TRIGGER control_test_result_immutable
+        BEFORE UPDATE OR DELETE ON control_test_result
+        FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
+        """,
+        "DROP TRIGGER IF EXISTS evidence_usage_immutable ON evidence_usage",
+        """
+        CREATE TRIGGER evidence_usage_immutable
+        BEFORE UPDATE OR DELETE ON evidence_usage
+        FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
         """,
     )

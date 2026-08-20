@@ -28,6 +28,8 @@
 - Bounded SQLAlchemy database-pool size, checked-in, checked-out, and overflow gauges labeled only by database system.
 - Declared recovery-event count and duration metrics with bounded replacement/read-only modes and success/failure outcomes.
 - Proposed availability, mutation-success, audit-write, and recovery SLO/error-budget policy with bounded-label burn-rate alert thresholds.
+- Tenant-scoped internal-control model: immutable definition versions, scoped implementations and owners, reviewed many-to-many catalog mappings, design/operating tests, exceptions, deficiencies, evidence usage, and explicit coverage statuses.
+- Additive migration that classifies preexisting direct evidence bindings as `unassessed` without inventing effectiveness.
 
 ### Security
 
@@ -49,6 +51,7 @@
 - Require explicit evidence key IDs and authenticated tenant-record encryption context; reject unknown, revoked, mismatched, or tampered encryption metadata without falling back to another key.
 - Require retention metadata and a verified `grc.evidence.retention` purpose for legal-hold changes; leave destructive disposition and remote access disabled until their operating contracts exist.
 - Keep `/healthz` dependency-free; require database, schema receipts, seed rows, integrity guards, key round-trip, and environment checks before startup admits traffic.
+- Enable SQLite foreign-key enforcement and require PostgreSQL-compatible boolean constraints for the internal-control schema.
 
 ### ADR
 
@@ -62,3 +65,4 @@
 - `docs/adr/0008-operational-readiness-and-correlation.md` — liveness/readiness/startup separation, drain state, correlation, and safe structured logging.
 - `docs/adr/0009-opentelemetry-request-telemetry.md` — isolated OpenTelemetry request spans/metrics, standard OTLP export, and bounded route attributes.
 - `docs/adr/0010-slo-and-error-budget-contract.md` — proposed SLO, error-budget, and multi-window alert contract pending collector acceptance.
+- `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — separate external requirements, internal controls, scoped implementations, testing, evidence usage, and explicit effectiveness projection.

@@ -20,7 +20,7 @@ from cwl_grc.authorization import (
     seed_authorization_purposes,
 )
 from cwl_grc.catalog import FrameworkCode, list_control_items, seed_control_catalog
-from cwl_grc.coverage import list_uncovered_controls
+from cwl_grc.coverage import list_control_coverage
 from cwl_grc.database import create_session_factory, session_dependency
 from cwl_grc.encryption import EvidenceCipher, EvidenceKeyring, make_evidence_context
 from cwl_grc.evidence import (
@@ -37,6 +37,7 @@ from cwl_grc.health import (
     health_payload,
     readiness_payload,
 )
+from cwl_grc.internal_controls import ControlCoverageStatus, next_action_for_coverage
 from cwl_grc.keyverse_authentication import (
     AccessTokenValidationError,
     KeyverseAccessTokenVerifier,
@@ -90,7 +91,12 @@ def parse_optional_timestamp(value: Any) -> datetime | None:
         raise HTTPException(status_code=400, detail="Use an ISO-8601 disposition date.") from exc
 
 
-def serialize_control(item: ControlItem, *, covered: bool | None = None) -> dict[str, Any]:
+def serialize_control(
+    item: ControlItem,
+    *,
+    covered: bool | None = None,
+    coverage_status: ControlCoverageStatus | str | None = None,
+) -> dict[str, Any]:
     """Serialize one official control for officers and consuming services."""
     payload: dict[str, Any] = {
         "framework": item.framework_key,
@@ -100,6 +106,10 @@ def serialize_control(item: ControlItem, *, covered: bool | None = None) -> dict
     }
     if covered is not None:
         payload["covered"] = covered
+    if coverage_status is not None:
+        status = coverage_status.value if isinstance(coverage_status, ControlCoverageStatus) else str(coverage_status)
+        payload["coverage_status"] = status
+        payload["next_action"] = next_action_for_coverage(status)
     return payload
 
 
@@ -362,8 +372,17 @@ def create_app(
         framework: str | None = None,
     ) -> dict[str, Any]:
         """List official controls, optionally limited to one catalog."""
-        items = list_control_items(session, parse_framework(framework))
-        return {"controls": [serialize_control(item) for item in items]}
+        coverage = list_control_coverage(
+            session,
+            parse_framework(framework),
+            tenant_id=LOCAL_DEVELOPMENT_TENANT,
+        )
+        return {
+            "controls": [
+                serialize_control(item.control_item, coverage_status=item.status)
+                for item in coverage
+            ]
+        }
 
     @app.get("/controls/uncovered")
     def uncovered_controls(
@@ -371,10 +390,22 @@ def create_app(
         framework: str | None = None,
     ) -> dict[str, Any]:
         """List official controls that still need evidence."""
-        items = list_uncovered_controls(session, parse_framework(framework))
+        coverage = [
+            item
+            for item in list_control_coverage(
+                session,
+                parse_framework(framework),
+                tenant_id=LOCAL_DEVELOPMENT_TENANT,
+            )
+            if item.status
+            not in {ControlCoverageStatus.OPERATING_EFFECTIVE, ControlCoverageStatus.NOT_APPLICABLE}
+        ]
         return {
-            "next_action": "Attach the next evidence on an uncovered control.",
-            "controls": [serialize_control(item, covered=False) for item in items],
+            "next_action": "Review explicit control statuses and establish the next control test.",
+            "controls": [
+                serialize_control(item.control_item, coverage_status=item.status)
+                for item in coverage
+            ],
         }
 
     @app.post("/policy-documents", status_code=201)
@@ -437,7 +468,7 @@ def create_app(
         """List only policies visible to the verified tenant."""
         tenant_id = tenant_for_policy_read(authorization, x_purpose)
         return {
-            "next_action": "Review policy gaps and attach the next evidence.",
+            "next_action": "Review explicit control statuses and establish the next control test.",
             "policies": [
                 serialize_policy(session, document)
                 for document in list_policy_documents(session, tenant_id)
@@ -454,7 +485,7 @@ def create_app(
         """List only uncovered policy mappings visible to the verified tenant."""
         tenant_id = tenant_for_policy_read(authorization, x_purpose)
         return {
-            "next_action": "Attach the next evidence on an uncovered policy control.",
+            "next_action": "Review explicit control statuses and establish the next control test.",
             "gaps": [
                 serialize_gap(gap)
                 for gap in list_policy_gaps(
@@ -568,7 +599,7 @@ def create_app(
             "control_item_id": binding.control_item_id,
             "evidence_record_id": binding.evidence_record_id,
             "next_action": (
-                "Review remaining uncovered controls and attach the next evidence."
+                "Direct evidence binding is compatibility-only and remains unassessed; establish the next control test."
             ),
         }
 
@@ -576,7 +607,19 @@ def create_app(
     def officer_home(session: Session = Depends(get_session)) -> str:
         """Show local policy authoring, policy gaps, and the next evidence action."""
         return render_officer_home(
-            list_uncovered_controls(session, None),
+            [
+                item
+                for item in list_control_coverage(
+                    session,
+                    None,
+                    tenant_id=LOCAL_DEVELOPMENT_TENANT,
+                )
+                if item.status
+                not in {
+                    ControlCoverageStatus.OPERATING_EFFECTIVE,
+                    ControlCoverageStatus.NOT_APPLICABLE,
+                }
+            ],
             policy_gaps=list_policy_gaps(session, None),
             catalog_items=list_control_items(session, None),
         )
@@ -676,7 +719,7 @@ def _serialize_evidence(record: EvidenceRecord, cipher: EvidenceCipher) -> dict[
         "collector_actor": record.collector_actor,
         "payload_text": payload_text,
         **_serialize_evidence_retention(record),
-        "next_action": "Bind this evidence to the uncovered control.",
+        "next_action": "Record a scoped control test before treating this evidence as effective.",
     }
 
 

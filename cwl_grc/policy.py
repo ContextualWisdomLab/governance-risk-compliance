@@ -14,8 +14,12 @@ from sqlalchemy.orm import Session
 from cwl_grc.audit import record_audit_event
 from cwl_grc.authorization import AuthorizationDecision, LOCAL_DEVELOPMENT_TENANT
 from cwl_grc.catalog import FrameworkCode, get_control_item
+from cwl_grc.internal_controls import (
+    ControlCoverageStatus,
+    control_coverage_status,
+    next_action_for_coverage,
+)
 from cwl_grc.models import (
-    ControlEvidenceBinding,
     ControlItem,
     PolicyControlMapping,
     PolicyDocument,
@@ -33,7 +37,7 @@ class ControlRef:
 
 @dataclass(frozen=True)
 class PolicyGap:
-    """A latest-version policy mapping that still lacks same-tenant evidence."""
+    """A latest-version policy mapping without an operating-effective conclusion."""
 
     policy_document_id: str
     policy_title: str
@@ -41,6 +45,7 @@ class PolicyGap:
     framework: str
     catalog_identifier: str
     control_title: str
+    coverage_status: str
 
 
 def parse_control_refs(raw_refs: Any) -> list[ControlRef]:
@@ -208,12 +213,6 @@ def list_policy_gaps(
         documents = [document]
     else:
         documents = list_policy_documents(session, tenant_id)
-    bound_ids = {
-        row[0]
-        for row in session.query(ControlEvidenceBinding.control_item_id)
-        .filter_by(tenant_id=tenant_id)
-        .all()
-    }
     gaps: list[PolicyGap] = []
     for document in documents:
         version = current_version(session, document)
@@ -226,7 +225,11 @@ def list_policy_gaps(
             .all()
         )
         for mapping in mappings:
-            if mapping.control_item_id in bound_ids:
+            status = control_coverage_status(session, mapping.control_item_id, tenant_id)
+            if status in {
+                ControlCoverageStatus.OPERATING_EFFECTIVE,
+                ControlCoverageStatus.NOT_APPLICABLE,
+            }:
                 continue
             item = session.get(ControlItem, mapping.control_item_id)
             if item is None:  # pragma: no cover
@@ -239,6 +242,7 @@ def list_policy_gaps(
                     framework=item.framework_key,
                     catalog_identifier=item.catalog_identifier,
                     control_title=item.control_title,
+                    coverage_status=status.value,
                 )
             )
     return gaps
@@ -276,7 +280,7 @@ def serialize_policy(session: Session, document: PolicyDocument) -> dict[str, An
             "policy_body": version.policy_body,
             "mapped_controls": mapped,
         },
-        "next_action": "Review policy gaps and attach the next evidence.",
+        "next_action": "Review explicit control statuses and establish the next control test.",
     }
 
 
@@ -289,6 +293,8 @@ def serialize_gap(gap: PolicyGap) -> dict[str, Any]:
         "framework": gap.framework,
         "catalog_identifier": gap.catalog_identifier,
         "control_title": gap.control_title,
+        "coverage_status": gap.coverage_status,
+        "next_action": next_action_for_coverage(gap.coverage_status),
     }
 
 

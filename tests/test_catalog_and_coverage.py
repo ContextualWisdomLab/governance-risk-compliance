@@ -57,7 +57,7 @@ def test_unknown_framework_is_rejected() -> None:
     assert response.status_code == 400
 
 
-def test_uncovered_csap_control_until_officer_binds_evidence() -> None:
+def test_legacy_binding_remains_unassessed_until_control_test() -> None:
     client = _client()
     headers = {
         "X-Actor-Id": "officer-ahn",
@@ -89,7 +89,11 @@ def test_uncovered_csap_control_until_officer_binds_evidence() -> None:
     )
     assert bind.status_code == 201
     after = client.get("/controls/uncovered", params={"framework": FrameworkCode.CSAP_2026.value})
-    assert "10.2.1" not in {item["catalog_identifier"] for item in after.json()["controls"]}
+    legacy = next(
+        item for item in after.json()["controls"] if item["catalog_identifier"] == "10.2.1"
+    )
+    assert legacy["coverage_status"] == "unassessed"
+    assert legacy["next_action"] == "Treat legacy evidence as unassessed and create a control test."
     assert "10.3.1" in {item["catalog_identifier"] for item in after.json()["controls"]}
 
 
@@ -138,9 +142,9 @@ def test_soc2_cc6_1_and_isms_p_2_5_1_bind_independently() -> None:
             params={"framework": FrameworkCode.ISMS_P_2023.value},
         ).json()["controls"]
     }
-    assert "CC6.1" not in soc2_gaps
+    assert "CC6.1" in soc2_gaps
     assert "CC6.2" in soc2_gaps
-    assert "2.5.1" not in isms_gaps
+    assert "2.5.1" in isms_gaps
     assert "2.5.3" in isms_gaps
 
 
@@ -220,7 +224,7 @@ def test_officer_home_states_next_action_for_uncovered_control() -> None:
     assert "10.2.1" in text
     assert "CC6.1" in text
     assert "2.5.1" in text
-    assert "Attach the next evidence" in text
+    assert "establish the next control test" in text
 
 
 def test_lists_every_seeded_framework_when_unfiltered() -> None:
@@ -304,4 +308,7 @@ def test_officer_can_bind_evidence_from_home_form() -> None:
     )
     assert posted.status_code == 303
     gaps = client.get("/controls/uncovered", params={"framework": FrameworkCode.CSAP_2026.value})
-    assert "12.3.1" not in {item["catalog_identifier"] for item in gaps.json()["controls"]}
+    stored = next(
+        item for item in gaps.json()["controls"] if item["catalog_identifier"] == "12.3.1"
+    )
+    assert stored["coverage_status"] == "unassessed"
