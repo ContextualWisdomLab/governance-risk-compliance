@@ -22,6 +22,14 @@ Build ContextualWisdomLab GRC as the system of record for policy, control, risk,
 - 3NF is the default.
 - Catalog identifiers must be official CSAP, SOC 2 TSC, ISMS-P, ISO/IEC 27001:2022, NIST SP 800-53 Rev. 5, COSO 2013, or COSO 2017 identifiers.
 
+## Design rules
+
+- Issue #30 buyer-workspace work uses Figma file `ta1jjWSjmADz2BFxka9UPs` and repository Storybook together; do not let either become a stale duplicate authority.
+- Reuse semantic tokens and components for repeated states/actions. Keep `unknown`, `not assessed`, `stale`, `blocked`, and `access denied` distinct in text, not color alone.
+- Every projected metric must expose an exact-value alternative with source version, period/unit where applicable, limitations, provenance, and the next action.
+- Supported journeys target WCAG 2.2 AA: keyboard operation, visible focus, screen-reader names/states, touch alternatives, reduced motion, responsive layouts, error recovery, and print/PDF preservation are review gates.
+- Customer-facing explanatory copy must tell the buyer what to do next. A chart, badge, or percentage is a projection, never a second source of truth.
+
 ## Documentation rules
 
 Keep README, AGENTS, CLAUDE, ARCHITECTURE, CHANGELOG, ADRs, and doctoring references current with code. Customer-facing copy states the next action and accurately distinguishes a local developer preview from a production deployment.
@@ -32,3 +40,4 @@ Keep README, AGENTS, CLAUDE, ARCHITECTURE, CHANGELOG, ADRs, and doctoring refere
 - Production statement and branch coverage must remain 100% where tooling exposes it.
 - Tests use real catalog identifiers and realistic officer workflows.
 - Product CI lives in `.github/workflows/product.yml`; organization-wide review and security lanes remain centrally owned.
+- Storybook design evidence must build from the exact pull-request head before the buyer-workspace design runtime can become merge evidence.
