@@ -10,8 +10,8 @@ from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Resp
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from cwl_grc.authorization import PurposeCode, require_purpose, seed_authorization_purposes
-from cwl_grc.catalog import FrameworkCode, list_control_items, seed_control_catalog
+from cwl_grc.authorization import PurposeCode, require_purpose
+from cwl_grc.catalog import FrameworkCode, list_control_items
 from cwl_grc.coverage import list_uncovered_controls
 from cwl_grc.database import create_session_factory, session_dependency
 from cwl_grc.encryption import EvidenceCipher
@@ -81,10 +81,6 @@ def create_app(
         key,
         allow_ephemeral=url in {"sqlite://", "sqlite:///:memory:"},
     )
-    with factory() as session:
-        seed_control_catalog(session)
-        seed_authorization_purposes(session)
-        session.commit()
 
     def get_session() -> Iterator[Session]:
         """Yield the request session."""
