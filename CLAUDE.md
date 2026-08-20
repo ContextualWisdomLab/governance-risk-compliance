@@ -9,6 +9,9 @@ CWL GRC is the ContextualWisdomLab system of record for policy, control, risk, e
 - CWL Security owns SAST/Strix/CodeQL/Semgrep.
 - The current HTTP surface is a local developer preview. Purpose headers are declarations for audit context, not authentication. Remote deployment is forbidden until Keyverse-backed identity and tenant authorization exist.
 - Operational PII remains exact for authorized workflows. Do not destructively mask it; omit unrelated fields from purpose-specific views and exports, and enforce encryption, retention, and audit.
+- The issue #30 buyer-workspace design authority is Figma file `ta1jjWSjmADz2BFxka9UPs` plus repository Storybook. Keep shared semantic tokens and repeated state/action components aligned across both.
+- Buyer summaries are projections. Keep `unknown`, `not assessed`, `stale`, `blocked`, and `access denied` explicit, and expose an exact-value alternative for every aggregate visual.
+- Supported buyer-workspace journeys target WCAG 2.2 AA and must preserve keyboard/focus, screen-reader semantics, touch alternatives, reduced motion, responsive behavior, and print/PDF content.
 
 ## Writing guidance
 
