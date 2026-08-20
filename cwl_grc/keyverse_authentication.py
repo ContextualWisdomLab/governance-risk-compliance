@@ -51,7 +51,8 @@ class KeyverseAccessTokenSettings:
         """Reject ambiguous issuer, audience, client, role, and clock policy."""
         parsed = urlsplit(self.issuer)
         if (
-            parsed.scheme != "https"
+            self.issuer != self.issuer.strip()
+            or parsed.scheme != "https"
             or not parsed.netloc
             or parsed.username is not None
             or parsed.password is not None
@@ -59,16 +60,17 @@ class KeyverseAccessTokenSettings:
             or parsed.fragment
         ):
             raise ValueError("Keyverse requires one exact HTTPS issuer URL.")
-        if not self.audience.strip():
-            raise ValueError("Keyverse requires one non-empty resource audience.")
+        if not self.audience or self.audience != self.audience.strip():
+            raise ValueError("Keyverse requires one exact non-empty resource audience.")
         if not self.allowed_client_ids or any(
-            not client_id.strip() for client_id in self.allowed_client_ids
+            not client_id or client_id != client_id.strip()
+            for client_id in self.allowed_client_ids
         ):
-            raise ValueError("Keyverse requires a non-empty allowed client set.")
+            raise ValueError("Keyverse requires an exact non-empty allowed client set.")
         if not self.allowed_roles or any(
-            not role.strip() for role in self.allowed_roles
+            not role or role != role.strip() for role in self.allowed_roles
         ):
-            raise ValueError("Keyverse requires a non-empty allowed role set.")
+            raise ValueError("Keyverse requires an exact non-empty allowed role set.")
         if not 0 <= self.clock_skew_seconds <= MAX_CLOCK_SKEW_SECONDS:
             raise ValueError("Keyverse clock skew must be between 0 and 300 seconds.")
 
@@ -215,8 +217,14 @@ def parse_keyverse_jwks(
                 "The Keyverse JWK set contains a non-object key."
             )
         key_id = raw_key.get("kid")
-        if not isinstance(key_id, str) or not key_id.strip():
-            raise AccessTokenValidationError("Each Keyverse JWK needs a key identifier.")
+        if (
+            not isinstance(key_id, str)
+            or not key_id
+            or key_id != key_id.strip()
+        ):
+            raise AccessTokenValidationError(
+                "Each Keyverse JWK needs one exact key identifier."
+            )
         if key_id in keys_by_id:
             raise AccessTokenValidationError(
                 "The Keyverse JWK set has a duplicate key identifier."
@@ -271,11 +279,15 @@ def _read_untrusted_header(token: str) -> dict[str, Any]:
 
 
 def _validated_header_key_id(header: Mapping[str, Any]) -> str:
-    """Return one non-empty signing-key identifier from the verified header policy."""
+    """Return one exact non-empty signing-key identifier from the header policy."""
     key_id = header.get("kid")
-    if not isinstance(key_id, str) or not key_id.strip():
+    if (
+        not isinstance(key_id, str)
+        or not key_id
+        or key_id != key_id.strip()
+    ):
         raise AccessTokenValidationError(
-            "The Keyverse token needs a signing key identifier."
+            "The Keyverse token needs one exact signing key identifier."
         )
     return key_id
 
