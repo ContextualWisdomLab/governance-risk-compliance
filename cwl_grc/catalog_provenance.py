@@ -28,6 +28,20 @@ from cwl_grc.models import (
 MAX_SOURCE_ARTIFACT_BYTES = 50 * 1024 * 1024
 """Maximum registered source size; raw source bytes are not stored by this slice."""
 
+DEFAULT_CATALOG_SOURCE_HOSTS = frozenset(
+    {
+        "aicpa-cima.com",
+        "csrc.nist.gov",
+        "doi.org",
+        "isms-p.or.kr",
+        "isms.kisa.or.kr",
+        "iso.org",
+        "pages.nist.gov",
+        "www.coso.org",
+    }
+)
+"""Reviewed official hosts accepted by the HTTP catalog-provenance boundary."""
+
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _ALLOWED_MEDIA_TYPES = frozenset(
     {"application/json", "application/xml", "application/yaml", "text/plain"}

@@ -919,13 +919,13 @@ def test_catalog_routes_execute_the_local_governance_workflow() -> None:
         headers=_HEADERS,
         json={
             "publisher_name": "NIST",
-            "source_reference": "bad-host-list",
-            "source_url": "https://pages.nist.gov/OSCAL/",
+            "source_reference": "caller-controlled-host-list",
+            "source_url": "https://evil.example/OSCAL/",
             "artifact_content_class": "identifier_only",
             "license_policy_code": "identifier_only",
-            "allowed_source_hosts": "pages.nist.gov",
+            "allowed_source_hosts": ["evil.example"],
         },
-    ).status_code == 400
+    ).status_code == 422
     assert client.post(
         "/catalog/source-artifacts",
         headers=_HEADERS,

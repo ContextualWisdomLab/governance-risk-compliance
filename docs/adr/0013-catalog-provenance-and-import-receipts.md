@@ -16,7 +16,7 @@ Add a global, tenant-neutral provenance chain:
 
 `source_license_policy` → `source_artifact` → `source_artifact_version` → `catalog_import_run` + `catalog_import_receipt` → `catalog_release`
 
-- Register only explicit HTTPS pointers whose host is in the caller-supplied exact allowlist. The service does not follow redirects or fetch bytes.
+- Register only explicit HTTPS pointers whose host is in the reviewed server-owned exact allowlist. The HTTP caller cannot expand that list; the service does not follow redirects or fetch bytes.
 - Require an externally computed lowercase SHA-256 digest, edition metadata, inert JSON/XML/YAML/plain media type, and bounded byte length. Raw source bytes are not stored.
 - Make source versions, parser runs/receipts, and releases append-only at the SQLite and PostgreSQL database boundary.
 - Make import identity idempotent by source version plus parser version; release publication requires a successful receipt.

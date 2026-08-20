@@ -6,7 +6,7 @@ Issue #29 starts with provenance because catalog truth must be reproducible befo
 
 The loopback-only API accepts `X-Purpose: catalog_governance` and records:
 
-- an exact HTTPS source pointer with an explicit host allowlist and source-license policy;
+- an exact HTTPS source pointer against a reviewed server-owned host allowlist and source-license policy; request fields cannot expand the allowlist;
 - an edition, publication/effective/withdrawal dates, lowercase SHA-256 digest, media type, and bounded byte length;
 - an idempotent parser run and deterministic receipt digest with requirement/change/warning counts;
 - a release only when a successful import receipt exists.

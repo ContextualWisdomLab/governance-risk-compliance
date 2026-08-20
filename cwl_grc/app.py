@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from cwl_grc.authorization import PurposeCode, require_purpose, seed_authorization_purposes
 from cwl_grc.catalog import FrameworkCode, list_control_items, seed_control_catalog
 from cwl_grc.catalog_provenance import (
+    DEFAULT_CATALOG_SOURCE_HOSTS,
     publish_catalog_release,
     record_catalog_import,
     register_source_artifact,
@@ -173,9 +174,6 @@ def create_app(
     ) -> dict[str, Any]:
         """Register an allowlisted catalog source pointer for governed acquisition."""
         decision = require_purpose(x_actor_id, x_purpose, PurposeCode.CATALOG_GOVERNANCE)
-        hosts = body.get("allowed_source_hosts")
-        if not isinstance(hosts, list) or not all(isinstance(item, str) for item in hosts):
-            raise HTTPException(status_code=400, detail="Name the exact allowlisted source hosts.")
         try:
             artifact = register_source_artifact(
                 session,
@@ -185,7 +183,7 @@ def create_app(
                 source_url=body.get("source_url", ""),
                 artifact_content_class=body.get("artifact_content_class", ""),
                 license_policy_code=body.get("license_policy_code", ""),
-                allowed_source_hosts=set(hosts),
+                allowed_source_hosts=DEFAULT_CATALOG_SOURCE_HOSTS,
             )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
