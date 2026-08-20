@@ -141,15 +141,16 @@ class KeyverseAccessTokenVerifier:
             ) from exc
         if now >= expiration_boundary:
             raise AccessTokenValidationError("The Keyverse access token is expired.")
+        clock_skew_boundary = _clock_skew_boundary(now, skew)
         if "nbf" in payload:
             not_before = _numeric_date(payload["nbf"], "not-before")
             if not_before >= expires_at:
                 raise AccessTokenValidationError(
                     "The Keyverse access-token time bounds are invalid."
                 )
-            if now + skew < not_before:
+            if clock_skew_boundary < not_before:
                 raise AccessTokenValidationError("The Keyverse access token is not active.")
-        if issued_at > now + skew:
+        if issued_at > clock_skew_boundary:
             raise AccessTokenValidationError("The Keyverse issued-at time is in the future.")
 
         actor_id = _required_text(payload, "sub", "subject")
@@ -364,6 +365,16 @@ def _numeric_date(value: Any, label: str) -> datetime:
     except (OverflowError, OSError, ValueError) as exc:
         raise AccessTokenValidationError(
             f"The Keyverse {label} claim is invalid."
+        ) from exc
+
+
+def _clock_skew_boundary(now: datetime, skew: timedelta) -> datetime:
+    """Add configured clock skew without leaking a datetime overflow."""
+    try:
+        return now + skew
+    except OverflowError as exc:
+        raise AccessTokenValidationError(
+            "The Keyverse clock-skew boundary is invalid."
         ) from exc
 
 
