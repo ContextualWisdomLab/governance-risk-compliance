@@ -17,10 +17,13 @@
 - Hash-locked `uv.lock` dependency graph for runtime and development dependencies.
 - Versioned schema-upgrade receipts for existing first-slice stores.
 - Provider-neutral Keyverse JWT access-token verification kernel and typed authenticated-principal contract.
+- Bounded Keyverse OIDC Discovery and JWKS loading with exact issuer, host, address, TLS identity, response-size, and key-rotation provenance controls.
+- Verified-principal HTTP authorization for protected policy and evidence mutations.
+- Non-null tenant ownership on policy, evidence, binding, and audit records, including a migration backfill for pre-tenant local-preview data.
 
 ### Security
 
-- Always deny proxy-forwarded and non-loopback HTTP traffic while the runtime lacks Keyverse-backed identity and tenant authorization; remove the unauthenticated remote-preview bypass entirely.
+- Always deny proxy-forwarded and non-loopback HTTP traffic while the runtime lacks complete Keyverse-backed identity and tenant authorization; remove the unauthenticated remote-preview bypass entirely.
 - Bind both standalone server entry points to `127.0.0.1`.
 - Require durable Fernet key material for every persistent evidence store; limit ephemeral keys to explicitly selected in-memory tests.
 - Enforce append-only `audit_event` history and finalized `policy_version` / `policy_control_mapping` immutability with SQLite and PostgreSQL database triggers.
@@ -31,10 +34,15 @@
 - Replace mutable `pip install` resolution with `uv sync --locked`, verify lock freshness, and reject any tracked or untracked dirty tree on every Product run.
 - Accept only explicitly typed, signed RS256 Keyverse access tokens with exact issuer, audience, client, role, tenant, workspace, principal-kind, time, token-ID, and action-scope validation.
 - Reject ID-token/access-token confusion, unsigned or alternate-algorithm tokens, unsupported critical headers, unknown or duplicate keys, private/symmetric/encryption JWKs, stale/future tokens, and client/subject confusion.
-- Bound offline Keyverse JWK input to 1 MiB and support reviewed old/new public-key overlap without enabling network discovery or remote GRC traffic.
+- Bound offline Keyverse JWK input to 1 MiB and support reviewed old/new public-key overlap without enabling remote GRC traffic.
+- Require `grc.policy.read` for policy and policy-gap reads in Keyverse mode, and derive every protected mutation actor and tenant from the verified bearer rather than caller identity headers.
+- Hide cross-tenant policy and evidence identifiers behind tenant-filtered reads and `404 Not Found` mutation responses.
+- Pair tenant and parent identifiers with named composite foreign-key constraints for new schemas and idempotent tenant-parent guards for existing SQLite and PostgreSQL stores.
 
 ### ADR
 
 - `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
 - `docs/adr/0003-keyverse-jwt-access-token-profile.md` — closed RFC 9068-style Keyverse access-token profile before route and tenant integration.
+- `docs/adr/0004-keyverse-oidc-provider-loading.md` — bounded issuer metadata and public-key loading without arbitrary discovery or ambient network authority.
+- `docs/adr/0005-verified-tenant-record-isolation.md` — verified tenant ownership, protected reads, cross-tenant non-disclosure, and database-enforced tenant-parent relationships.
