@@ -1,0 +1,40 @@
+name: Buyer Workspace
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'apps/grc-workspace/**'
+      - '.storybook/**'
+      - 'package.json'
+      - 'tests/test_buyer_workspace_design_contract.py'
+      - 'docs/adr/0012-grc-buyer-workspace-design-authority.md'
+      - 'docs/product/grc-buyer-workspace-*.md'
+      - '.github/workflows/buyer-workspace.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  storybook:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Verify exact head
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Install pinned Storybook roots without mutating the tree
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Build Storybook
+        run: npm run build-storybook
+      - name: Verify repository remains clean
+        run: git diff --exit-code
