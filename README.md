@@ -11,9 +11,10 @@ This repository is the ContextualWisdomLab home for policy, control, risk, evide
 3. Run `python -m cwl_grc` or `cwl-grc serve`; both start Uvicorn on loopback only.
 4. Open `/` from the same machine, author the next policy, and map it only to official catalog identifiers.
 5. Read the policy-gap list, distinguish `unknown`, `unassessed`, design, operating, stale, exception, and ineffective statuses, then establish the next control test.
-6. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
-7. Confirm `/readyz` returns `200` with database, schema, seed, guard, key, identity, and lifecycle checks; use `/startupz` to inspect the checks that admitted the process.
-8. Set the standard `OTEL_EXPORTER_OTLP_ENDPOINT` only when an approved collector is available; request traces and low-cardinality request metrics are then exported asynchronously.
+6. Register an authoritative obligation source and exact revision, record an evidenced applicability decision, and review overdue/upcoming obligations from `/obligations`.
+7. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
+8. Confirm `/readyz` returns `200` with database, schema, seed, guard, key, identity, and lifecycle checks; use `/startupz` to inspect the checks that admitted the process.
+9. Set the standard `OTEL_EXPORTER_OTLP_ENDPOINT` only when an approved collector is available; request traces and low-cardinality request metrics are then exported asynchronously.
 
 The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. The command-line server binds to `127.0.0.1`, and the app always rejects proxy-forwarded or non-loopback traffic. No runtime bypass exists. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
 
@@ -42,12 +43,16 @@ The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `
 | See explicit catalog coverage statuses | `GET /controls?framework=soc2_tsc_2017` or `GET /controls/uncovered?framework=soc2_tsc_2017` |
 | Store evidence | `POST /evidence-records` with `X-Actor-Id` and `X-Purpose: evidence_binding` |
 | Store compatibility evidence binding | `POST /control-evidence-bindings` or `cwl-grc bind`; direct bindings remain `unassessed` until a scoped control test uses the evidence |
+| Register source and exact revision | `POST /obligations/sources`, `POST /obligations/sources/{id}/revisions` with `X-Purpose: compliance_governance` |
+| Register and decide an obligation | `POST /obligations`, `POST /obligations/{id}/applicability-decisions`; decisions require rationale, evidence reference, period, and next review |
+| Link obligation truth | `POST /obligations/{id}/requirements` to a finalized policy or reviewed internal control |
+| Review obligations and source changes | `GET /obligations`, `POST /obligations/changes`, and `POST /obligations/changes/{id}/impact-assessments` |
 | Liveness probe | `GET /healthz` (dependency-free) |
 | Readiness probe | `GET /readyz` (returns `503` with stable reason codes when traffic is unsafe) |
 | Startup probe | `GET /startupz` (reports the checks completed before admission) |
 | OpenTelemetry telemetry | Standard OTLP endpoint from `OTEL_EXPORTER_OTLP_ENDPOINT`; request, session-transaction, database-pool, and declared-recovery metrics use bounded attributes; no endpoint means bounded local collection for tests/developer diagnostics |
 
-Policy authoring requires the declared purpose `policy_authoring`. Evidence create and bind require `evidence_binding`. Policies map only to seeded official identifiers: CSAP, SOC 2 TSC, ISMS-P, ISO/IEC 27001:2022, NIST SP 800-53 Rev. 5, COSO 2013, and COSO 2017.
+Policy authoring requires the declared purpose `policy_authoring`. Evidence create and bind require `evidence_binding`. Obligation source, decision, mapping, and change workflows require `compliance_governance`. Policies map only to seeded official identifiers: CSAP, SOC 2 TSC, ISMS-P, ISO/IEC 27001:2022, NIST SP 800-53 Rev. 5, COSO 2013, and COSO 2017.
 
 Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `nist_sp_800_53_r5`, `coso_ic_2013`, `coso_erm_2017`.
 
@@ -59,6 +64,7 @@ Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `n
 - `policy_document.current_version_number` serializes revision allocation; a stale writer receives `409 Conflict` and must reload.
 - Versioned schema upgrades leave `schema_migration` receipts and upgrade existing first-slice stores before integrity triggers are installed.
 - Internal controls are separate from official catalog requirements: published definition versions, scoped implementations, reviewed mappings, design/operating tests, deficiencies, exceptions, and purpose-approved evidence usage project explicit coverage statuses.
+- Obligations are separate from framework controls: exact source revisions, jurisdiction/scope, evidenced applicability decisions, commitments, reviewed policy/control links, immutable change intake, and impact/re-approval worklists preserve legal and operational truth without copying source text.
 - A persistent database cannot start without explicit `CWL_GRC_EVIDENCE_KEY` material. Ephemeral keys are limited to explicitly selected in-memory tests.
 
 ## Personal-data handling

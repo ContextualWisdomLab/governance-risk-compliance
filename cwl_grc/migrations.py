@@ -13,6 +13,7 @@ TENANT_ISOLATION_MIGRATION = "0002_tenant_isolation"
 EVIDENCE_ENCRYPTION_MIGRATION = "0003_evidence_encryption"
 EVIDENCE_RETENTION_MIGRATION = "0004_evidence_retention"
 INTERNAL_CONTROL_MODEL_MIGRATION = "0005_internal_control_model"
+OBLIGATION_MODEL_MIGRATION = "0006_obligation_applicability"
 LOCAL_DEVELOPMENT_TENANT = "local_development"
 TENANT_OWNED_TABLES = (
     "policy_document",
@@ -33,6 +34,27 @@ TENANT_OWNED_TABLES = (
     "control_exception",
     "control_deficiency",
     "evidence_usage",
+    "jurisdiction_record",
+    "regulatory_source",
+    "source_revision",
+    "compliance_obligation",
+    "obligation_requirement",
+    "applicability_rule",
+    "applicability_decision",
+    "legal_interpretation",
+    "compliance_commitment",
+    "obligation_owner_assignment",
+    "regulatory_change",
+    "change_impact_assessment",
+)
+OBLIGATION_HISTORY_TABLES = (
+    "source_revision",
+    "compliance_obligation",
+    "obligation_requirement",
+    "applicability_decision",
+    "legal_interpretation",
+    "regulatory_change",
+    "change_impact_assessment",
 )
 
 
@@ -64,6 +86,9 @@ def apply_schema_migrations(engine: Engine) -> None:
         if not _migration_applied(connection, INTERNAL_CONTROL_MODEL_MIGRATION):
             _apply_internal_control_model_migration(connection)
             _record_migration(connection, INTERNAL_CONTROL_MODEL_MIGRATION)
+        if not _migration_applied(connection, OBLIGATION_MODEL_MIGRATION):
+            _apply_obligation_model_migration(connection)
+            _record_migration(connection, OBLIGATION_MODEL_MIGRATION)
 
 
 def _migration_applied(connection: Connection, migration_key: str) -> bool:
@@ -306,6 +331,13 @@ def _apply_internal_control_model_migration(connection: Connection) -> None:
     )
 
 
+def _apply_obligation_model_migration(connection: Connection) -> None:
+    """Create obligation and applicability tables without rewriting prior decisions."""
+    from cwl_grc.models import Base
+
+    Base.metadata.create_all(connection)
+
+
 def install_integrity_guards(engine: Engine) -> None:
     """Install idempotent database triggers for immutable and tenant-bound rows."""
     statements = integrity_guard_statements(engine.dialect.name)
@@ -512,6 +544,24 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
             SELECT RAISE(ABORT, 'evidence_usage is immutable');
         END
         """,
+    ) + tuple(
+        f"""
+        CREATE TRIGGER IF NOT EXISTS {table_name}_block_update
+        BEFORE UPDATE ON {table_name}
+        BEGIN
+            SELECT RAISE(ABORT, '{table_name} is immutable');
+        END
+        """
+        for table_name in OBLIGATION_HISTORY_TABLES
+    ) + tuple(
+        f"""
+        CREATE TRIGGER IF NOT EXISTS {table_name}_block_delete
+        BEFORE DELETE ON {table_name}
+        BEGIN
+            SELECT RAISE(ABORT, '{table_name} is immutable');
+        END
+        """
+        for table_name in OBLIGATION_HISTORY_TABLES
     )
 
 
@@ -656,4 +706,15 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
         BEFORE UPDATE OR DELETE ON evidence_usage
         FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
         """,
+    ) + tuple(
+        item
+        for table_name in OBLIGATION_HISTORY_TABLES
+        for item in (
+            f"DROP TRIGGER IF EXISTS {table_name}_immutable ON {table_name}",
+            f"""
+            CREATE TRIGGER {table_name}_immutable
+            BEFORE UPDATE OR DELETE ON {table_name}
+            FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
+            """,
+        )
     )

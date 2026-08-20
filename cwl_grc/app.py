@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from cwl_grc.authorization import (
+    AuthorizationDecision,
     LOCAL_DEVELOPMENT_TENANT,
     PurposeCode,
     require_purpose,
@@ -44,6 +45,17 @@ from cwl_grc.keyverse_authentication import (
     require_access_scopes,
 )
 from cwl_grc.models import ControlItem, EvidenceRecord
+from cwl_grc.obligations import (
+    ObligationWorkItem,
+    assess_change_impact,
+    create_compliance_obligation,
+    create_regulatory_source,
+    create_source_revision,
+    decide_applicability,
+    link_obligation_requirement,
+    list_obligation_worklist,
+    record_regulatory_change,
+)
 from cwl_grc.observability import (
     build_request_context,
     emit_request_log,
@@ -89,6 +101,14 @@ def parse_optional_timestamp(value: Any) -> datetime | None:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Use an ISO-8601 disposition date.") from exc
+
+
+def parse_required_timestamp(body: dict[str, Any], field_name: str) -> datetime:
+    """Parse one required ISO-8601 timestamp from a JSON officer workflow."""
+    value = parse_optional_timestamp(body.get(field_name))
+    if value is None:
+        raise HTTPException(status_code=400, detail=f"Name the {field_name} timestamp.")
+    return value
 
 
 def serialize_control(
@@ -212,6 +232,21 @@ def create_app(
             purpose_value,
             PurposeCode.COVERAGE_REVIEW,
             "grc.policy.read",
+        ).tenant_id
+
+    def tenant_for_compliance_read(
+        authorization: str | None,
+        purpose_value: str | None,
+    ) -> str:
+        """Resolve a tenant for obligation reads while preserving local preview mode."""
+        if access_token_verifier is None:
+            return LOCAL_DEVELOPMENT_TENANT
+        return require_request_actor(
+            authorization,
+            None,
+            purpose_value,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.read",
         ).tenant_id
 
     app = FastAPI(title="CWL GRC", version="0.1.0")
@@ -382,6 +417,249 @@ def create_app(
                 serialize_control(item.control_item, coverage_status=item.status)
                 for item in coverage
             ]
+        }
+
+    @app.post("/obligations/sources", status_code=201)
+    def post_regulatory_source(
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Register one authoritative source pointer without copying source text."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.write",
+        )
+        source = create_regulatory_source(
+            session,
+            decision,
+            body.get("source_code", ""),
+            body.get("source_kind", ""),
+            body.get("source_title", ""),
+            body.get("issuing_authority", ""),
+            body.get("official_reference_url", ""),
+            body.get("license_classification", ""),
+            source_artifact_reference=body.get("source_artifact_reference"),
+        )
+        return {"regulatory_source_id": source.regulatory_source_id, "source_code": source.source_code}
+
+    @app.post("/obligations/sources/{regulatory_source_id}/revisions", status_code=201)
+    def post_source_revision(
+        regulatory_source_id: str,
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Append one immutable source edition with its digest and effective dates."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.write",
+        )
+        revision = create_source_revision(
+            session,
+            decision,
+            regulatory_source_id,
+            body.get("revision_number"),
+            parse_required_timestamp(body, "publication_date"),
+            parse_required_timestamp(body, "effective_from"),
+            body.get("content_digest", ""),
+            body.get("revision_summary", ""),
+            withdrawn_at=parse_optional_timestamp(body.get("withdrawn_at")),
+            immutable_artifact_reference=body.get("immutable_artifact_reference"),
+        )
+        return {"source_revision_id": revision.source_revision_id, "revision_number": revision.revision_number}
+
+    @app.post("/obligations", status_code=201)
+    def post_obligation(
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Register one source-backed obligation for a precise scope and period."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.write",
+        )
+        obligation = create_compliance_obligation(
+            session,
+            decision,
+            body.get("source_revision_id", ""),
+            body.get("obligation_code", ""),
+            body.get("obligation_title", ""),
+            body.get("obligation_description", ""),
+            body.get("obligation_type", ""),
+            body.get("scope_type", ""),
+            body.get("scope_reference", ""),
+            parse_required_timestamp(body, "effective_from"),
+            effective_to=parse_optional_timestamp(body.get("effective_to")),
+            jurisdiction_id=body.get("jurisdiction_id"),
+        )
+        return _serialize_obligation(obligation, "unknown", None, "none", "Decide applicability for the exact tenant scope.")
+
+    @app.get("/obligations")
+    def get_obligations(
+        session: Session = Depends(get_session),
+        as_of: str | None = None,
+        upcoming_days: int = 30,
+        authorization: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """List same-tenant obligation status and overdue/upcoming next actions."""
+        tenant_id = tenant_for_compliance_read(authorization, x_purpose)
+        decision = AuthorizationDecision("compliance-reader", PurposeCode.COMPLIANCE_GOVERNANCE, tenant_id)
+        items = list_obligation_worklist(
+            session,
+            decision,
+            as_of=parse_optional_timestamp(as_of),
+            upcoming_days=upcoming_days,
+        )
+        return {"obligations": [_serialize_obligation_item(item) for item in items]}
+
+    @app.post("/obligations/{compliance_obligation_id}/applicability-decisions", status_code=201)
+    def post_applicability_decision(
+        compliance_obligation_id: str,
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Record an authorized applicability decision with rationale and evidence."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.write",
+        )
+        applicability = decide_applicability(
+            session,
+            decision,
+            compliance_obligation_id,
+            body.get("decision_code", ""),
+            body.get("scope_type", ""),
+            body.get("scope_reference", ""),
+            body.get("rationale", ""),
+            body.get("evidence_reference", ""),
+            parse_required_timestamp(body, "effective_from"),
+            parse_required_timestamp(body, "next_review_at"),
+            effective_to=parse_optional_timestamp(body.get("effective_to")),
+            applicability_rule_id=body.get("applicability_rule_id"),
+            supersedes_decision_id=body.get("supersedes_decision_id"),
+        )
+        return {
+            "applicability_decision_id": applicability.applicability_decision_id,
+            "decision_code": applicability.decision_code,
+            "next_review_at": applicability.next_review_at.isoformat(),
+        }
+
+    @app.post("/obligations/{compliance_obligation_id}/requirements", status_code=201)
+    def post_obligation_requirement(
+        compliance_obligation_id: str,
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Link an obligation to an approved policy or internal control target."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.write",
+        )
+        requirement = link_obligation_requirement(
+            session,
+            decision,
+            compliance_obligation_id,
+            body.get("requirement_code", ""),
+            body.get("requirement_title", ""),
+            body.get("mapping_rationale", ""),
+            policy_version_id=body.get("policy_version_id"),
+            internal_control_definition_id=body.get("internal_control_definition_id"),
+            control_implementation_id=body.get("control_implementation_id"),
+            control_item_id=body.get("control_item_id"),
+            source_locator=body.get("source_locator"),
+        )
+        return {"obligation_requirement_id": requirement.obligation_requirement_id, "review_status": requirement.review_status}
+
+    @app.post("/obligations/changes", status_code=201)
+    def post_regulatory_change(
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Record a source revision change for later impact triage."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.write",
+        )
+        change = record_regulatory_change(
+            session,
+            decision,
+            body.get("source_revision_id", ""),
+            body.get("change_code", ""),
+            body.get("change_summary", ""),
+            body.get("source_diff_reference", ""),
+            effective_at=parse_optional_timestamp(body.get("effective_at")),
+        )
+        return {"regulatory_change_id": change.regulatory_change_id, "change_status": change.change_status}
+
+    @app.post("/obligations/changes/{regulatory_change_id}/impact-assessments", status_code=201)
+    def post_change_impact(
+        regulatory_change_id: str,
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Assign and record one immutable source-change impact assessment."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.write",
+        )
+        assessment = assess_change_impact(
+            session,
+            decision,
+            regulatory_change_id,
+            body.get("compliance_obligation_id", ""),
+            body.get("impact_status", ""),
+            body.get("impact_rationale", ""),
+            body.get("assigned_owner_reference", ""),
+            body.get("implementation_plan", ""),
+            body.get("reapproval_status", ""),
+            due_at=parse_optional_timestamp(body.get("due_at")),
+        )
+        return {
+            "change_impact_assessment_id": assessment.change_impact_assessment_id,
+            "assessment_number": assessment.assessment_number,
+            "reapproval_status": assessment.reapproval_status,
         }
 
     @app.get("/controls/uncovered")
@@ -738,3 +1016,42 @@ def _serialize_evidence_retention(record: EvidenceRecord) -> dict[str, Any]:
         "legal_hold_authority": record.legal_hold_authority,
         "disposition_outcome": record.disposition_outcome,
     }
+
+
+def _serialize_obligation(
+    obligation: Any,
+    applicability_code: str,
+    next_review_at: datetime | None,
+    queue: str,
+    next_action: str,
+    *,
+    scope_type: str | None = None,
+    scope_reference: str | None = None,
+) -> dict[str, Any]:
+    """Serialize obligation truth without copying an external source body."""
+    return {
+        "compliance_obligation_id": obligation.compliance_obligation_id,
+        "obligation_code": obligation.obligation_code,
+        "obligation_title": obligation.obligation_title,
+        "obligation_type": obligation.obligation_type,
+        "scope_type": scope_type or obligation.scope_type,
+        "scope_reference": scope_reference or obligation.scope_reference,
+        "source_revision_id": obligation.source_revision_id,
+        "applicability_code": applicability_code,
+        "next_review_at": next_review_at.isoformat() if next_review_at is not None else None,
+        "queue": queue,
+        "next_action": next_action,
+    }
+
+
+def _serialize_obligation_item(item: ObligationWorkItem) -> dict[str, Any]:
+    """Serialize one obligation worklist projection."""
+    return _serialize_obligation(
+        item.obligation,
+        item.applicability_code,
+        item.next_review_at,
+        item.queue,
+        item.next_action,
+        scope_type=item.scope_type,
+        scope_reference=item.scope_reference,
+    )

@@ -76,6 +76,9 @@ class ControlItem(Base):
     requirement_mappings: Mapped[list[ControlRequirementMapping]] = relationship(
         back_populates="control_item"
     )
+    obligation_requirements: Mapped[list[ObligationRequirement]] = relationship(
+        back_populates="control_item"
+    )
 
 
 class AuthorizationPurpose(Base):
@@ -330,6 +333,9 @@ class PolicyVersion(Base):
     policy_control_mappings: Mapped[list[PolicyControlMapping]] = relationship(
         back_populates="policy_version"
     )
+    obligation_requirements: Mapped[list[ObligationRequirement]] = relationship(
+        back_populates="policy_version", overlaps="obligation,requirements,internal_control_definition,control_implementation"
+    )
 
 
 class PolicyControlMapping(Base):
@@ -366,6 +372,514 @@ class PolicyControlMapping(Base):
         back_populates="policy_control_mappings"
     )
     control_item: Mapped[ControlItem] = relationship()
+
+
+class JurisdictionRecord(Base):
+    """Tenant-owned reference to a jurisdiction without copying its legal body."""
+
+    __tablename__ = "jurisdiction_record"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "jurisdiction_id", name="jurisdiction_record_tenant_identity"),
+        UniqueConstraint("tenant_id", "jurisdiction_code", name="jurisdiction_record_tenant_code"),
+    )
+
+    jurisdiction_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
+    jurisdiction_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    jurisdiction_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    authority_level: Mapped[str] = mapped_column(String(64), nullable=False)
+    official_reference: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    obligations: Mapped[list[ComplianceObligation]] = relationship(
+        back_populates="jurisdiction"
+    )
+
+
+class RegulatorySource(Base):
+    """Tenant-owned pointer to an authoritative legal or commitment source."""
+
+    __tablename__ = "regulatory_source"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "regulatory_source_id", name="regulatory_source_tenant_identity"),
+        UniqueConstraint("tenant_id", "source_code", name="regulatory_source_tenant_code"),
+        CheckConstraint(
+            "source_kind IN ('legislation', 'regulation', 'contract', 'voluntary', 'internal_mandate')",
+            name="regulatory_source_kind",
+        ),
+        CheckConstraint(
+            "license_classification IN ('identifier_only', 'lawfully_stored', 'restricted', 'unknown')",
+            name="regulatory_source_license",
+        ),
+    )
+
+    regulatory_source_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
+    source_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    issuing_authority: Mapped[str] = mapped_column(String(255), nullable=False)
+    official_reference_url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    license_classification: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_artifact_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    revisions: Mapped[list[SourceRevision]] = relationship(back_populates="regulatory_source")
+
+
+class SourceRevision(Base):
+    """Immutable edition of an authoritative source with dates and digest."""
+
+    __tablename__ = "source_revision"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "source_revision_id", name="source_revision_tenant_identity"),
+        UniqueConstraint(
+            "tenant_id", "regulatory_source_id", "revision_number", name="source_revision_edition"
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "regulatory_source_id"],
+            ["regulatory_source.tenant_id", "regulatory_source.regulatory_source_id"],
+            name="source_revision_tenant_source",
+        ),
+        CheckConstraint("revision_number > 0", name="source_revision_number_positive"),
+        CheckConstraint(
+            "withdrawn_at IS NULL OR withdrawn_at >= effective_from",
+            name="source_revision_withdrawn_period",
+        ),
+        Index("source_revision_tenant_effective", "tenant_id", "effective_from"),
+    )
+
+    source_revision_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
+    regulatory_source_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    revision_number: Mapped[int] = mapped_column(nullable=False)
+    publication_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    effective_from: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    content_digest: Mapped[str] = mapped_column(String(128), nullable=False)
+    immutable_artifact_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    revision_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    regulatory_source: Mapped[RegulatorySource] = relationship(back_populates="revisions")
+    obligations: Mapped[list[ComplianceObligation]] = relationship(
+        back_populates="source_revision", overlaps="obligations,jurisdiction"
+    )
+    regulatory_changes: Mapped[list[RegulatoryChange]] = relationship(back_populates="source_revision")
+
+
+class ComplianceObligation(Base):
+    """Immutable tenant-scoped obligation derived from one source revision."""
+
+    __tablename__ = "compliance_obligation"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "compliance_obligation_id", name="compliance_obligation_tenant_identity"),
+        UniqueConstraint("tenant_id", "obligation_code", name="compliance_obligation_tenant_code"),
+        ForeignKeyConstraint(
+            ["tenant_id", "source_revision_id"],
+            ["source_revision.tenant_id", "source_revision.source_revision_id"],
+            name="compliance_obligation_tenant_revision",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "jurisdiction_id"],
+            ["jurisdiction_record.tenant_id", "jurisdiction_record.jurisdiction_id"],
+            name="compliance_obligation_tenant_jurisdiction",
+        ),
+        CheckConstraint(
+            "obligation_type IN ('statutory', 'regulatory', 'contractual', 'voluntary', 'internal_mandate')",
+            name="compliance_obligation_type",
+        ),
+        CheckConstraint(
+            "effective_to IS NULL OR effective_to >= effective_from",
+            name="compliance_obligation_period",
+        ),
+        Index("compliance_obligation_tenant_effective", "tenant_id", "effective_from", "effective_to"),
+    )
+
+    compliance_obligation_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
+    source_revision_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    jurisdiction_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    obligation_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    obligation_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    obligation_description: Mapped[str] = mapped_column(Text, nullable=False)
+    obligation_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    scope_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    scope_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    effective_from: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    effective_to: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    source_revision: Mapped[SourceRevision] = relationship(
+        back_populates="obligations", overlaps="obligations,jurisdiction"
+    )
+    jurisdiction: Mapped[JurisdictionRecord | None] = relationship(
+        back_populates="obligations", overlaps="obligations,source_revision"
+    )
+    requirements: Mapped[list[ObligationRequirement]] = relationship(
+        back_populates="obligation", overlaps="obligation_requirements,policy_version,internal_control_definition,control_implementation"
+    )
+    applicability_rules: Mapped[list[ApplicabilityRule]] = relationship(back_populates="obligation")
+    applicability_decisions: Mapped[list[ApplicabilityDecision]] = relationship(back_populates="obligation")
+    legal_interpretations: Mapped[list[LegalInterpretation]] = relationship(back_populates="obligation")
+    commitments: Mapped[list[ComplianceCommitment]] = relationship(back_populates="obligation")
+    owner_assignments: Mapped[list[ObligationOwnerAssignment]] = relationship(back_populates="obligation")
+    impact_assessments: Mapped[list[ChangeImpactAssessment]] = relationship(
+        back_populates="obligation", overlaps="impact_assessments,regulatory_change"
+    )
+
+
+class ObligationRequirement(Base):
+    """Reviewed relation from an obligation to a policy or internal control target."""
+
+    __tablename__ = "obligation_requirement"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "obligation_requirement_id", name="obligation_requirement_tenant_identity"),
+        UniqueConstraint(
+            "tenant_id", "compliance_obligation_id", "policy_version_id", "internal_control_definition_id",
+            "control_implementation_id", name="obligation_requirement_target",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "compliance_obligation_id"],
+            ["compliance_obligation.tenant_id", "compliance_obligation.compliance_obligation_id"],
+            name="obligation_requirement_tenant_obligation",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "policy_version_id"],
+            ["policy_version.tenant_id", "policy_version.policy_version_id"],
+            name="obligation_requirement_tenant_policy",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "internal_control_definition_id"],
+            ["internal_control_definition.tenant_id", "internal_control_definition.internal_control_definition_id"],
+            name="obligation_requirement_tenant_control",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "control_implementation_id"],
+            ["control_implementation.tenant_id", "control_implementation.control_implementation_id"],
+            name="obligation_requirement_tenant_implementation",
+        ),
+        CheckConstraint(
+            "policy_version_id IS NOT NULL OR internal_control_definition_id IS NOT NULL",
+            name="obligation_requirement_target_present",
+        ),
+        CheckConstraint(
+            "review_status IN ('proposed', 'approved', 'rejected')",
+            name="obligation_requirement_review",
+        ),
+    )
+
+    obligation_requirement_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
+    compliance_obligation_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    policy_version_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    internal_control_definition_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    control_implementation_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    control_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("control_item.control_item_id"), nullable=True
+    )
+    requirement_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    requirement_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_locator: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    review_status: Mapped[str] = mapped_column(String(32), nullable=False, default="proposed", server_default="proposed")
+    mapping_rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    reviewed_by_actor: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    obligation: Mapped[ComplianceObligation] = relationship(
+        back_populates="requirements", overlaps="requirements,obligation_requirements,policy_version,internal_control_definition,control_implementation"
+    )
+    policy_version: Mapped[PolicyVersion | None] = relationship(
+        back_populates="obligation_requirements", overlaps="obligation,requirements,internal_control_definition,control_implementation"
+    )
+    internal_control_definition: Mapped[InternalControlDefinition | None] = relationship(
+        back_populates="obligation_requirements", overlaps="obligation,requirements,obligation_requirements,policy_version,control_implementation"
+    )
+    control_implementation: Mapped[ControlImplementation | None] = relationship(
+        overlaps="obligation,requirements,obligation_requirements,policy_version,internal_control_definition"
+    )
+    control_item: Mapped[ControlItem | None] = relationship(back_populates="obligation_requirements")
+
+
+class ApplicabilityRule(Base):
+    """Versioned rule proposal used to evaluate an obligation for a scope."""
+
+    __tablename__ = "applicability_rule"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "applicability_rule_id", name="applicability_rule_tenant_identity"),
+        ForeignKeyConstraint(
+            ["tenant_id", "compliance_obligation_id"],
+            ["compliance_obligation.tenant_id", "compliance_obligation.compliance_obligation_id"],
+            name="applicability_rule_tenant_obligation",
+        ),
+        CheckConstraint("active IN (TRUE, FALSE)", name="applicability_rule_active"),
+    )
+
+    applicability_rule_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
+    compliance_obligation_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    rule_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    rule_expression: Mapped[str] = mapped_column(Text, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=true())
+    created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    obligation: Mapped[ComplianceObligation] = relationship(back_populates="applicability_rules")
+    decisions: Mapped[list[ApplicabilityDecision]] = relationship(
+        back_populates="applicability_rule", overlaps="applicability_decisions,obligation"
+    )
+
+
+class ApplicabilityDecision(Base):
+    """Immutable authorized applicability conclusion for one obligation and scope."""
+
+    __tablename__ = "applicability_decision"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "applicability_decision_id", name="applicability_decision_tenant_identity"),
+        ForeignKeyConstraint(
+            ["tenant_id", "compliance_obligation_id"],
+            ["compliance_obligation.tenant_id", "compliance_obligation.compliance_obligation_id"],
+            name="applicability_decision_tenant_obligation",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "applicability_rule_id"],
+            ["applicability_rule.tenant_id", "applicability_rule.applicability_rule_id"],
+            name="applicability_decision_tenant_rule",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "supersedes_decision_id"],
+            ["applicability_decision.tenant_id", "applicability_decision.applicability_decision_id"],
+            name="applicability_decision_tenant_supersession",
+        ),
+        CheckConstraint(
+            "decision_code IN ('applicable', 'not_applicable', 'partially_applicable', 'inherited', 'compensating_control', 'pending_review', 'unknown')",
+            name="applicability_decision_code",
+        ),
+        CheckConstraint(
+            "effective_to IS NULL OR effective_to >= effective_from",
+            name="applicability_decision_period",
+        ),
+        Index("applicability_decision_tenant_review", "tenant_id", "next_review_at"),
+    )
+
+    applicability_decision_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
+    compliance_obligation_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    applicability_rule_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    supersedes_decision_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    decision_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    scope_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    scope_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    decided_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    decided_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    effective_from: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    effective_to: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_review_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    obligation: Mapped[ComplianceObligation] = relationship(
+        back_populates="applicability_decisions", overlaps="decisions,applicability_rule"
+    )
+    applicability_rule: Mapped[ApplicabilityRule | None] = relationship(
+        back_populates="decisions", overlaps="applicability_decisions,obligation"
+    )
+
+
+class LegalInterpretation(Base):
+    """Immutable interpretation reference that records authority without legal advice."""
+
+    __tablename__ = "legal_interpretation"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "legal_interpretation_id", name="legal_interpretation_tenant_identity"),
+        UniqueConstraint(
+            "tenant_id", "compliance_obligation_id", "interpretation_number", name="legal_interpretation_version"
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "compliance_obligation_id"],
+            ["compliance_obligation.tenant_id", "compliance_obligation.compliance_obligation_id"],
+            name="legal_interpretation_tenant_obligation",
+        ),
+    )
+
+    legal_interpretation_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
+    compliance_obligation_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    interpretation_number: Mapped[int] = mapped_column(nullable=False)
+    interpretation_text: Mapped[str] = mapped_column(Text, nullable=False)
+    authority_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    interpreted_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    interpreted_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    obligation: Mapped[ComplianceObligation] = relationship(back_populates="legal_interpretations")
+
+
+class ComplianceCommitment(Base):
+    """Contractual or voluntary commitment kept separate from statutory sources."""
+
+    __tablename__ = "compliance_commitment"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "compliance_commitment_id", name="compliance_commitment_tenant_identity"),
+        UniqueConstraint("tenant_id", "commitment_code", name="compliance_commitment_tenant_code"),
+        ForeignKeyConstraint(
+            ["tenant_id", "compliance_obligation_id"],
+            ["compliance_obligation.tenant_id", "compliance_obligation.compliance_obligation_id"],
+            name="compliance_commitment_tenant_obligation",
+        ),
+        CheckConstraint("commitment_type IN ('contract', 'voluntary')", name="compliance_commitment_type"),
+        CheckConstraint(
+            "effective_to IS NULL OR effective_to >= effective_from",
+            name="compliance_commitment_period",
+        ),
+    )
+
+    compliance_commitment_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
+    compliance_obligation_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    commitment_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    commitment_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    commitment_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    counterparty_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    effective_from: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    effective_to: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    obligation: Mapped[ComplianceObligation] = relationship(back_populates="commitments")
+
+
+class ObligationOwnerAssignment(Base):
+    """Temporal owner assignment for an obligation, referencing an external identity."""
+
+    __tablename__ = "obligation_owner_assignment"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "obligation_owner_assignment_id", name="obligation_owner_tenant_identity"),
+        ForeignKeyConstraint(
+            ["tenant_id", "compliance_obligation_id"],
+            ["compliance_obligation.tenant_id", "compliance_obligation.compliance_obligation_id"],
+            name="obligation_owner_tenant_obligation",
+        ),
+        CheckConstraint("owner_kind IN ('accountable', 'legal', 'operator', 'reviewer')", name="obligation_owner_kind"),
+        CheckConstraint("valid_to IS NULL OR valid_to >= valid_from", name="obligation_owner_period"),
+    )
+
+    obligation_owner_assignment_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
+    compliance_obligation_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    owner_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    owner_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    valid_from: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    valid_to: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    assigned_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    assigned_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    obligation: Mapped[ComplianceObligation] = relationship(back_populates="owner_assignments")
+
+
+class RegulatoryChange(Base):
+    """Immutable source-revision change intake that starts impact triage."""
+
+    __tablename__ = "regulatory_change"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "regulatory_change_id", name="regulatory_change_tenant_identity"),
+        UniqueConstraint("tenant_id", "change_code", name="regulatory_change_tenant_code"),
+        ForeignKeyConstraint(
+            ["tenant_id", "source_revision_id"],
+            ["source_revision.tenant_id", "source_revision.source_revision_id"],
+            name="regulatory_change_tenant_revision",
+        ),
+        CheckConstraint(
+            "change_status IN ('detected', 'triaged', 'implemented', 'closed')",
+            name="regulatory_change_status",
+        ),
+    )
+
+    regulatory_change_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
+    source_revision_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    change_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    change_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    source_diff_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    change_status: Mapped[str] = mapped_column(String(32), nullable=False, default="detected", server_default="detected")
+    detected_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    effective_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    source_revision: Mapped[SourceRevision] = relationship(back_populates="regulatory_changes")
+    impact_assessments: Mapped[list[ChangeImpactAssessment]] = relationship(
+        back_populates="regulatory_change", overlaps="impact_assessments,obligation"
+    )
+
+
+class ChangeImpactAssessment(Base):
+    """Immutable triage and re-approval action for one source change and obligation."""
+
+    __tablename__ = "change_impact_assessment"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "change_impact_assessment_id", name="change_impact_tenant_identity"),
+        UniqueConstraint(
+            "tenant_id", "regulatory_change_id", "compliance_obligation_id", "assessment_number",
+            name="change_impact_assessment_version",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "regulatory_change_id"],
+            ["regulatory_change.tenant_id", "regulatory_change.regulatory_change_id"],
+            name="change_impact_tenant_change",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "compliance_obligation_id"],
+            ["compliance_obligation.tenant_id", "compliance_obligation.compliance_obligation_id"],
+            name="change_impact_tenant_obligation",
+        ),
+        CheckConstraint(
+            "impact_status IN ('pending', 'no_change', 'policy_update', 'control_update', 'retire_obligation')",
+            name="change_impact_status",
+        ),
+        CheckConstraint(
+            "reapproval_status IN ('not_required', 'required', 'in_progress', 'complete')",
+            name="change_impact_reapproval",
+        ),
+        CheckConstraint("due_at IS NULL OR due_at >= assessed_at", name="change_impact_due_period"),
+    )
+
+    change_impact_assessment_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+    )
+    regulatory_change_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    compliance_obligation_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    assessment_number: Mapped[int] = mapped_column(nullable=False)
+    impact_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    impact_rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    assigned_owner_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    implementation_plan: Mapped[str] = mapped_column(Text, nullable=False)
+    reapproval_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    assessed_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    assessed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    regulatory_change: Mapped[RegulatoryChange] = relationship(
+        back_populates="impact_assessments", overlaps="impact_assessments,obligation"
+    )
+    obligation: Mapped[ComplianceObligation] = relationship(
+        back_populates="impact_assessments", overlaps="impact_assessments,regulatory_change"
+    )
 
 
 class ControlObjective(Base):
@@ -462,6 +976,9 @@ class InternalControlDefinition(Base):
     )
     requirement_mappings: Mapped[list[ControlRequirementMapping]] = relationship(
         back_populates="internal_control_definition"
+    )
+    obligation_requirements: Mapped[list[ObligationRequirement]] = relationship(
+        back_populates="internal_control_definition", overlaps="obligation_requirements,obligation,requirements,policy_version,control_implementation"
     )
 
 
