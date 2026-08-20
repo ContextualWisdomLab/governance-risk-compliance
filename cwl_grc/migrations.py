@@ -134,7 +134,7 @@ def _apply_tenant_isolation_migration(connection: Connection) -> None:
 
 
 def install_integrity_guards(engine: Engine) -> None:
-    """Install idempotent database triggers for append-only and finalized rows."""
+    """Install idempotent database triggers for immutable and tenant-bound rows."""
     statements = integrity_guard_statements(engine.dialect.name)
     with engine.begin() as connection:
         for statement in statements:
@@ -151,7 +151,7 @@ def integrity_guard_statements(dialect_name: str) -> Sequence[str]:
 
 
 def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
-    """Return SQLite triggers that make audit and finalized policy rows immutable."""
+    """Return SQLite guards for immutable history and tenant-parent integrity."""
     return (
         """
         CREATE TRIGGER IF NOT EXISTS audit_event_block_update
@@ -165,6 +165,19 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
         BEFORE DELETE ON audit_event
         BEGIN
             SELECT RAISE(ABORT, 'audit_event is append-only');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS policy_version_require_tenant_document
+        BEFORE INSERT ON policy_version
+        WHEN NOT EXISTS (
+            SELECT 1
+            FROM policy_document
+            WHERE policy_document_id = NEW.policy_document_id
+              AND tenant_id = NEW.tenant_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'policy_version tenant parent mismatch');
         END
         """,
         """
@@ -230,6 +243,32 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
             SELECT RAISE(ABORT, 'cannot add mapping to finalized policy_version');
         END
         """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_binding_require_tenant_evidence_insert
+        BEFORE INSERT ON control_evidence_binding
+        WHEN NOT EXISTS (
+            SELECT 1
+            FROM evidence_record
+            WHERE evidence_record_id = NEW.evidence_record_id
+              AND tenant_id = NEW.tenant_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'control binding tenant parent mismatch');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_binding_require_tenant_evidence_update
+        BEFORE UPDATE OF tenant_id, evidence_record_id ON control_evidence_binding
+        WHEN NOT EXISTS (
+            SELECT 1
+            FROM evidence_record
+            WHERE evidence_record_id = NEW.evidence_record_id
+              AND tenant_id = NEW.tenant_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'control binding tenant parent mismatch');
+        END
+        """,
     )
 
 
@@ -255,6 +294,14 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
         RETURNS trigger LANGUAGE plpgsql AS $$
         BEGIN
             IF TG_OP = 'INSERT' THEN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM policy_document
+                    WHERE policy_document_id = NEW.policy_document_id
+                      AND tenant_id = NEW.tenant_id
+                ) THEN
+                    RAISE EXCEPTION 'policy_version tenant parent mismatch';
+                END IF;
                 IF NEW.is_finalized THEN
                     RAISE EXCEPTION 'new policy_version must start unfinalized';
                 END IF;
@@ -304,5 +351,28 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
         CREATE TRIGGER policy_control_mapping_immutable
         BEFORE INSERT OR UPDATE OR DELETE ON policy_control_mapping
         FOR EACH ROW EXECUTE FUNCTION prevent_policy_mapping_mutation()
+        """,
+        """
+        CREATE OR REPLACE FUNCTION enforce_control_binding_tenant_parent()
+        RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM evidence_record
+                WHERE evidence_record_id = NEW.evidence_record_id
+                  AND tenant_id = NEW.tenant_id
+            ) THEN
+                RAISE EXCEPTION 'control binding tenant parent mismatch';
+            END IF;
+            RETURN NEW;
+        END;
+        $$
+        """,
+        "DROP TRIGGER IF EXISTS control_binding_tenant_parent ON control_evidence_binding",
+        """
+        CREATE TRIGGER control_binding_tenant_parent
+        BEFORE INSERT OR UPDATE OF tenant_id, evidence_record_id
+        ON control_evidence_binding
+        FOR EACH ROW EXECUTE FUNCTION enforce_control_binding_tenant_parent()
         """,
     )
