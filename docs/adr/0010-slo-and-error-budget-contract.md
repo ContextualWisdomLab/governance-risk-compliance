@@ -31,14 +31,18 @@ high-cardinality identity and evidence labels.
    gauges with only the `db.system.name` label. Pools without these bounded
    SQLAlchemy methods, such as the in-memory SQLite test pool, emit no pool
    observation.
+6. Provide a recovery-event recording contract with only `replacement` and
+   `read_only` modes and `success` and `failure` outcomes. Emit count and
+   duration metrics only after an external recovery coordinator declares the
+   event; the telemetry call does not claim recovery by itself.
 
 ## Consequences
 
 - Operators have a concrete approval artifact and next action rather than an
   unverified production claim.
 - The current telemetry names map to the availability, mutation, audit, and
-  database-capacity portions of the policy; recovery remains a rehearsed
-  operational event.
+  database-capacity portions of the policy, and the recovery event contract
+  records declared outcomes; recovery remains a rehearsed operational event.
 - Dashboards and alert rules remain platform-owned integration work.
 
 ## Verification

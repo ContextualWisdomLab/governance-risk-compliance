@@ -83,6 +83,16 @@ class RequestTelemetry:
             unit="{write}",
             description="Audit events committed or rejected by the database transaction.",
         )
+        self._recovery_event_count: Counter = meter.create_counter(
+            "cwl_grc.recovery.event.count",
+            unit="{event}",
+            description="Declared recovery events observed by the service.",
+        )
+        self._recovery_duration: Histogram = meter.create_histogram(
+            "cwl_grc.recovery.duration",
+            unit="s",
+            description="Declared recovery event duration in seconds.",
+        )
         self._database_engine = None
         self._pool_gauges = tuple(
             meter.create_observable_gauge(
@@ -206,6 +216,24 @@ class RequestTelemetry:
             event_count,
             {"db.system.name": database_system, "cwl_grc.outcome": outcome},
         )
+
+    def record_recovery_event(
+        self,
+        recovery_mode: str,
+        outcome: str,
+        duration_seconds: float,
+    ) -> None:
+        """Record one bounded replacement or read-only recovery event."""
+        if recovery_mode not in {"replacement", "read_only"}:
+            raise ValueError("Recovery mode must be replacement or read_only.")
+        if outcome not in {"success", "failure"}:
+            raise ValueError("Recovery outcome must be success or failure.")
+        attributes = {
+            "cwl_grc.recovery.mode": recovery_mode,
+            "cwl_grc.outcome": outcome,
+        }
+        self._recovery_event_count.add(1, attributes)
+        self._recovery_duration.record(duration_seconds, attributes)
 
     def shutdown(self) -> None:
         """Flush configured exporters and release provider resources."""
