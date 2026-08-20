@@ -18,7 +18,7 @@ function renderFixture({ mobile = false, accessDenied = false, stale = false } =
     <main class="workspace" aria-labelledby="story-workspace-title">
       <header class="workspace__header">
         <div><p class="eyebrow">Acme Korea · Compliance officer · Evidence review purpose</p><h1 id="story-workspace-title">Compliance workspace</h1><p class="lede">Understand what applies, what is proven, and what needs action before anything is shared.</p></div>
-        <button class="button button--primary" type="button">Request evidence</button>
+        <a class="button button--primary" href="#story-feedback">Request evidence</a>
       </header>
       ${stale ? '<section class="notice notice--warning" aria-label="Evidence freshness"><strong>Evidence stale</strong><span>Review source versions before sharing.</span></section>' : ''}
       <section class="metric-grid" aria-label="Current posture">
@@ -27,7 +27,8 @@ function renderFixture({ mobile = false, accessDenied = false, stale = false } =
         <article class="metric"><span>Evidence fresh</span><strong>21 / 24</strong><span class="status status--warning">2 stale</span></article>
         <article class="metric"><span>Open deficiencies</span><strong>3</strong><span class="status status--danger">1 blocked</span></article>
       </section>
-      <section class="panel" aria-labelledby="story-next-actions"><h2 id="story-next-actions">Next actions</h2><p>${accessDenied ? 'The external-auditor package is access denied for this purpose. Request authorization instead of exposing hidden fields.' : 'Review stale evidence, assign blocked work, then confirm unknown applicability.'}</p><button class="button ${accessDenied ? 'button--secondary' : 'button--primary'}" type="button">${accessDenied ? 'Request access' : 'Open evidence room'}</button></section>
+      <section class="panel" aria-labelledby="story-next-actions"><h2 id="story-next-actions">Next actions</h2><p>${accessDenied ? 'The external-auditor package is access denied for this purpose. Request authorization instead of exposing hidden fields.' : 'Review stale evidence, assign blocked work, then confirm unknown applicability.'}</p><a class="button ${accessDenied ? 'button--secondary' : 'button--primary'}" href="#story-feedback">${accessDenied ? 'Request access' : 'Open evidence room'}</a></section>
+      <p id="story-feedback" class="limitation" role="status">Preview only: connect the verified GRC workflow before requesting or sharing evidence.</p>
     </main>`;
   return host;
 }

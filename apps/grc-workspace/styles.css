@@ -34,7 +34,7 @@ h2 { margin-bottom: 8px; font-size: 1.15rem; }
 .lede, .panel > p, .limitation { color: var(--grc-muted); line-height: 1.55; }
 .eyebrow { margin-bottom: 6px; color: var(--grc-muted); font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 
-.button { border: 1px solid transparent; border-radius: var(--grc-radius-sm); padding: 9px 14px; font-weight: 700; cursor: pointer; }
+.button { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: var(--grc-radius-sm); padding: 9px 14px; font-weight: 700; cursor: pointer; text-decoration: none; }
 .button--primary { color: #fff; background: var(--grc-brand); }
 .button--secondary { color: var(--grc-ink); background: var(--grc-surface); border-color: var(--grc-border); }
 .button:hover { filter: brightness(0.96); }

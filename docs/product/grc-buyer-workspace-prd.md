@@ -22,7 +22,7 @@ A compliance officer can distinguish proven posture from incomplete posture, tra
 
 The Figma desktop frame `1:72`, mobile frame `1:150`, reusable component section `1:2`, and interaction-state section `1:227` use the same semantic vocabulary as Storybook and `apps/grc-workspace/styles.css`. Storybook must expose desktop, mobile, stale-evidence, and access-denied stories with the a11y addon enabled.
 
-Repository tests must fail if the explicit buyer states, next-action labels, exact-value table, focus-visible rule, reduced-motion rule, print rule, responsive rule, Storybook inventory, or Figma traceability are removed.
+Repository tests and the exact-head Chromium check must fail if the explicit buyer states, next-action labels, exact-value table, focus-visible rule, reduced-motion rule, print rule, responsive rule, Storybook inventory, or Figma traceability are removed.
 
 ## Non-goals
 

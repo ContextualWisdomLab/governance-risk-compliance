@@ -21,8 +21,11 @@ def test_workspace_exposes_truthful_buyer_states_and_next_actions() -> None:
     for action in ("Request missing evidence", "View exact values", "Open evidence room"):
         assert action in html
     assert 'aria-labelledby="workspace-title"' in html
+    assert '<html lang="en">' in html
     assert '<table' in html
     assert '<caption>' in html
+    assert 'id="action-feedback"' in html
+    assert 'href="#exact-title"' in html
 
 
 def test_workspace_preserves_keyboard_motion_touch_print_and_responsive_contracts() -> None:
@@ -52,6 +55,23 @@ def test_storybook_inventory_covers_reusable_states_with_a11y_enabled() -> None:
     assert '"storybook": "10.5.10"' in package
     assert '"@storybook/web-components-vite": "10.5.10"' in package
     assert '"@storybook/addon-a11y": "10.5.10"' in package
+
+
+def test_frontend_toolchain_and_browser_gate_are_pinned() -> None:
+    """Keep CI reproducible and exercise the real static page in a browser."""
+
+    package = read("package.json")
+    lock = read("package-lock.json")
+    mise = read("mise.toml")
+    workflow = read(".github/workflows/buyer-workspace.yml")
+    assert '"@playwright/test": "1.62.1"' in package
+    assert '"test:buyer-workspace": "playwright test tests/buyer-workspace.spec.mjs"' in package
+    assert '"name": "cwl-grc-design-authority"' in lock
+    assert 'node = "24.18.0"' in mise
+    assert "corepack npm ci" in workflow
+    assert "node-version: '24.18.0'" in workflow
+    assert "playwright install --with-deps chromium" in workflow
+    assert "test:buyer-workspace" in workflow
 
 
 def test_design_authority_is_traceable_to_figma_and_decision_records() -> None:

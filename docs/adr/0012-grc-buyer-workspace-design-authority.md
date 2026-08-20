@@ -21,7 +21,7 @@ Use the Figma design file `ta1jjWSjmADz2BFxka9UPs` and repository Storybook as p
 
 The shared semantic tokens are defined in `apps/grc-workspace/styles.css`. Repeated states use explicit text plus color: `effective`, `unknown`, `not assessed`, `stale`, `blocked`, and `access denied`. Repeated actions use persistent controls for requesting evidence, opening the evidence room, and revealing exact values. No buyer-critical action depends on hover, drag, animation, or a chart alone.
 
-Storybook 10.5.10 uses the official Web Components + Vite framework and `@storybook/addon-a11y`. The initial inventory is:
+Storybook 10.5.10 uses the official Web Components + Vite framework and `@storybook/addon-a11y`. The checked-in npm lockfile and `mise.toml` pin the frontend toolchain; the exact-head workflow also runs a real Chromium interaction check. The initial inventory is:
 
 - `ComplianceOfficerDesktop`
 - `ComplianceOfficerMobile`
@@ -40,7 +40,7 @@ The Figma and Storybook artifacts in this ADR are design evidence, not authentic
 
 ## Consequences
 
-A reviewer can compare the desktop/mobile Figma frames with executable Storybook states and the static fixture from one traceable token/state vocabulary. Buyer-facing gaps can be repaired without inventing product truth. The trade-off is an additional frontend dev dependency surface; a checked-in lockfile and exact-head Storybook build must be established before this design runtime can be release evidence.
+A reviewer can compare the desktop/mobile Figma frames with executable Storybook states and the static fixture from one traceable token/state vocabulary. Buyer-facing gaps can be repaired without inventing product truth. The trade-off is an additional frontend dev dependency surface; the checked-in lockfile, exact-head Storybook build, and Chromium interaction check remain design evidence rather than release evidence.
 
 ## References
 

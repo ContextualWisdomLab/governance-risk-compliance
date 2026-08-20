@@ -8,6 +8,7 @@
 - Figma design authority `ta1jjWSjmADz2BFxka9UPs` with desktop/mobile frames, reusable semantic components, and interaction-state contracts paired with repository Storybook.
 - Storybook 10.5.10 Web Components + Vite inventory with accessibility addon coverage for desktop, mobile, stale-evidence, and access-denied states, plus an exact-PR-head build workflow.
 - ADR 0012, buyer-workspace PRD/TRD, and regression tests for design authority, WCAG-oriented keyboard/focus/touch/reduced-motion/responsive/print behavior, and projection/source-of-truth boundaries.
+- Checked-in npm lockfile, Node 24.18.0 pin, and exact-head Chromium interaction checks for keyboard, mobile overflow, print, and truthful preview action edges.
 - Versioned policy authoring: `policy_document`, `policy_version`, and `policy_control_mapping` mapped only to official catalog identifiers.
 - Policy-gap query that reuses `control_evidence_binding` (no second evidence model).
 - Officer home form to author a policy and see uncovered policy requirements.

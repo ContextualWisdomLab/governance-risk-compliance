@@ -6,8 +6,13 @@ on:
     paths:
       - 'apps/grc-workspace/**'
       - '.storybook/**'
+      - '.gitignore'
+      - 'mise.toml'
       - 'package.json'
+      - 'package-lock.json'
+      - 'playwright.config.mjs'
       - 'tests/test_buyer_workspace_design_contract.py'
+      - 'tests/buyer-workspace.spec.mjs'
       - 'docs/adr/0012-grc-buyer-workspace-design-authority.md'
       - 'docs/product/grc-buyer-workspace-*.md'
       - '.github/workflows/buyer-workspace.yml'
@@ -35,13 +40,19 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: '24'
+          node-version: '24.18.0'
           package-manager-cache: false
-      - name: Install pinned Storybook roots without mutating the tree
-        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Enable the checked-in package manager
+        run: corepack enable
+      - name: Install the hash-locked frontend
+        run: corepack npm ci --ignore-scripts --no-audit --no-fund
       - name: Build Storybook
         run: npm run build-storybook
+      - name: Install the pinned browser
+        run: corepack npm exec -- playwright install --with-deps chromium
+      - name: Run buyer-workspace browser checks
+        run: npm run test:buyer-workspace
       - name: Verify repository remains clean
         run: |
           git diff --check
-          test -z "$(git status --porcelain --untracked-files=no)"
+          test -z "$(git status --porcelain)"

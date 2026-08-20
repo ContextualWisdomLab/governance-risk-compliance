@@ -25,7 +25,7 @@ The paired design authority is:
 - Storybook 10.5.10 — `ComplianceOfficerDesktop`, `ComplianceOfficerMobile`, `StaleEvidence`, and `AccessDenied` stories with `@storybook/addon-a11y`;
 - ADR 0012 plus `docs/product/grc-buyer-workspace-prd.md` and `docs/product/grc-buyer-workspace-trd.md` for ownership, WCAG 2.2 AA, i18n, exact-value, and source-of-truth constraints.
 
-For local design review, install the exact-pinned root Storybook packages and run `npm run storybook`; CI runs `npm run build-storybook` on the exact pull-request head. The current Node dependency graph has no checked-in transitive lockfile, so this fixture and its Storybook build are **design evidence, not release/deployment evidence**. It does not authenticate a tenant, read protected APIs, create evidence requests, authorize exports, grant an auditor data room, or certify compliance/accessibility.
+For local design review, run `corepack npm ci` and `npm run storybook`; CI runs `npm run build-storybook` plus the Chromium interaction check on the exact pull-request head. This fixture and its Storybook/browser checks are **design evidence, not release/deployment evidence**. It does not authenticate a tenant, read protected APIs, create evidence requests, authorize exports, grant an auditor data room, or certify compliance/accessibility.
 
 ## Operator CLI
 

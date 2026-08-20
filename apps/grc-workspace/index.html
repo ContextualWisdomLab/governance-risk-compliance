@@ -14,7 +14,7 @@
         <h1 id="workspace-title">Compliance workspace</h1>
         <p class="lede">Understand what applies, what is proven, and what needs action before anything is shared.</p>
       </div>
-      <button class="button button--primary" type="button">Request evidence</button>
+      <a class="button button--primary" href="#action-feedback">Request evidence</a>
     </header>
 
     <section class="notice notice--warning" aria-labelledby="freshness-title">
@@ -22,7 +22,7 @@
         <h2 id="freshness-title">Evidence needs review</h2>
         <p>2 evidence items are stale. Review source versions before sharing with an auditor.</p>
       </div>
-      <button class="button button--secondary" type="button">Review stale evidence</button>
+      <a class="button button--secondary" href="#trace-title">Review stale evidence</a>
     </section>
 
     <section aria-labelledby="posture-title">
@@ -31,7 +31,7 @@
           <p class="eyebrow">Projection from authoritative records</p>
           <h2 id="posture-title">Current posture</h2>
         </div>
-        <button class="button button--secondary" type="button">View exact values</button>
+        <a class="button button--secondary" href="#exact-title">View exact values</a>
       </div>
       <div class="metric-grid">
         <article class="metric"><span>Applicable obligations</span><strong>18</strong><span class="status status--neutral">3 unknown</span></article>
@@ -53,8 +53,8 @@
           <li><span class="trace-kind">Evidence</span><span>Q3 retention rehearsal</span><span class="status status--warning">Stale</span></li>
         </ol>
         <div class="actions">
-          <button class="button button--primary" type="button">Request missing evidence</button>
-          <button class="button button--secondary" type="button">View exact values</button>
+          <a class="button button--primary" href="#action-feedback">Request missing evidence</a>
+          <a class="button button--secondary" href="#exact-title">View exact values</a>
         </div>
       </section>
 
@@ -67,7 +67,7 @@
           <li><span>Confirm 3 unknown applicability decisions</span><span class="status status--neutral">Unknown</span></li>
           <li><span>External-auditor package</span><span class="status status--danger">Access denied</span></li>
         </ul>
-        <button class="button button--primary" type="button">Open evidence room</button>
+        <a class="button button--primary" href="#action-feedback">Open evidence room</a>
       </aside>
     </div>
 
@@ -90,6 +90,7 @@
           </tbody>
         </table>
       </div>
+      <p id="action-feedback" class="limitation" role="status"><strong>Preview action:</strong> Connect the verified GRC workflow before requesting or sharing evidence.</p>
       <p class="limitation"><strong>Limitation:</strong> This local fixture demonstrates buyer-facing state semantics only. It does not authenticate a tenant, read protected GRC APIs, authorize exports, or certify compliance.</p>
     </section>
   </main>

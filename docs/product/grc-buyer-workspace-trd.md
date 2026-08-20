@@ -16,7 +16,7 @@ The workspace is a projection. Obligation/applicability truth is owned by #28, i
 
 ## Design runtime
 
-Storybook is pinned at 10.5.10 with `@storybook/web-components-vite` and `@storybook/addon-a11y`. Root package versions are exact, but no checked-in transitive lockfile is introduced in this bounded slice. A checked-in lockfile and exact-head Storybook build are required before Storybook can be release evidence.
+Storybook is pinned at 10.5.10 with `@storybook/web-components-vite` and `@storybook/addon-a11y`; `package-lock.json` and `mise.toml` pin the transitive npm graph and Node 24.18.0. The exact-head workflow builds Storybook and runs a Chromium interaction check. These remain design evidence rather than release evidence.
 
 Supported design states in this slice:
 
@@ -34,7 +34,7 @@ Supported design states in this slice:
 
 ## Verification
 
-`tests/test_buyer_workspace_design_contract.py` is intentionally added before the implementation artifacts. It requires the Figma source, Storybook inventory, semantic states, next actions, exact-value table, focus visibility, 44 px action target, reduced-motion handling, responsive layout, and print contract.
+`tests/test_buyer_workspace_design_contract.py` is intentionally added before the implementation artifacts. It requires the Figma source, Storybook inventory, semantic states, next actions, exact-value table, focus visibility, 44 px action target, reduced-motion handling, responsive layout, print contract, lockfile, and browser gate. `tests/buyer-workspace.spec.mjs` verifies keyboard action edges, mobile overflow containment, action sizing, print behavior, and the truthful preview boundary.
 
 The repository Product workflow should continue to run the Python regression suite at 100% owned production statement/branch coverage. A dedicated Storybook build lane must run on the exact PR head before the design runtime is considered merge-ready.
 
