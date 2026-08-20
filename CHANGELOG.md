@@ -55,6 +55,7 @@
 - Enable SQLite foreign-key enforcement and require PostgreSQL-compatible boolean constraints for the internal-control schema.
 - Add SQLite/PostgreSQL composite tenant guards and immutable-history triggers for obligation and regulatory-change records; require the dedicated `compliance_governance` purpose on the new JSON workflow.
 - Enforce null-safe obligation-target uniqueness, savepoint-backed concurrent-create conflicts, and proposed-only obligation-link insertion so creation cannot self-assert approval.
+- Construct migration tenant DDL and compatibility indexes through SQLAlchemy's quoted schema APIs instead of interpolated SQL identifiers.
 
 ### ADR
 
