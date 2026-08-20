@@ -395,6 +395,7 @@ def test_cli_serve_and_error_paths(tmp_path: Path, capsys, monkeypatch) -> None:
         "CWL_GRC_EVIDENCE_KEY",
         "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
     )
+    monkeypatch.setenv("CWL_GRC_DATABASE_URL", "sqlite://")
     monkeypatch.setattr("cwl_grc.cli.uvicorn.run", fake_run)
     assert cli_main(["serve"]) == 0
     assert captured == {"host": "127.0.0.1", "port": 8080, "title": "CWL GRC"}

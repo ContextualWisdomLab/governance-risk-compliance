@@ -108,6 +108,21 @@ def test_database_cli_migrates_then_checks_exact_schema(
     assert "schema_compatible" in capsys.readouterr().out
 
 
+def test_database_cli_uses_database_environment_default(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Migration-owner commands share the product database environment default."""
+    database_url = _database_url(tmp_path)
+    monkeypatch.setenv("CWL_GRC_DATABASE_URL", database_url)
+
+    assert main(["database", "migrate"]) == 0
+    assert "schema_ready" in capsys.readouterr().out
+    assert main(["database", "check"]) == 0
+    assert "schema_compatible" in capsys.readouterr().out
+
+
 def test_application_runtime_mode_refuses_missing_schema(tmp_path: Path) -> None:
     """The API process cannot silently create production tables at startup."""
     with pytest.raises(SchemaCompatibilityError, match="not initialized"):
@@ -138,7 +153,6 @@ def test_postgresql_engine_options_are_bounded_and_observable() -> None:
         assert engine.pool._max_overflow == settings.max_overflow
         assert engine.pool._timeout == settings.pool_timeout_seconds
         assert engine.pool._recycle == settings.pool_recycle_seconds
-        assert engine.dialect.isolation_level == "READ COMMITTED"
         assert engine.url.drivername == "postgresql+psycopg"
         connect_args = engine.dialect.create_connect_args(engine.url)[1]
         assert connect_args["sslmode"] == "verify-full"

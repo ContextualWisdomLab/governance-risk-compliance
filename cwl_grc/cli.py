@@ -103,12 +103,21 @@ def _parser() -> argparse.ArgumentParser:
         "migrate",
         help="Apply the exact supported schema as the single migration owner",
     )
-    migrate.add_argument("--database-url", required=True)
+    database_url = os.environ.get("CWL_GRC_DATABASE_URL")
+    migrate.add_argument(
+        "--database-url",
+        default=database_url,
+        required=database_url is None,
+    )
     check = database_sub.add_parser(
         "check",
         help="Verify schema compatibility without changing the database",
     )
-    check.add_argument("--database-url", required=True)
+    check.add_argument(
+        "--database-url",
+        default=database_url,
+        required=database_url is None,
+    )
 
     policy = sub.add_parser("policy", help="Author, revise, or list policies")
     policy_sub = policy.add_subparsers(dest="policy_command", required=True)

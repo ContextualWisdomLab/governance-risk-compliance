@@ -24,7 +24,7 @@ The repository also described a PostgreSQL-ready URL without an approved DBAPI d
 5. The supported production server matrix for this slice is PostgreSQL 18, tested on PostgreSQL 18.4. Earlier or later majors require a separate compatibility decision and exact acceptance evidence before support is claimed.
 6. Remote PostgreSQL connections use `sslmode=verify-full`. TLS may be disabled only through an explicit settings object when the host is loopback and the process is running the isolated CI acceptance lane.
 7. PostgreSQL connections have finite connect, statement, lock, idle-transaction, pool-acquisition, overflow, and recycle bounds. The lock timeout is strictly lower than the statement timeout so lock contention produces the more specific failure first.
-8. The migration owner obtains `pg_try_advisory_xact_lock` in the same transaction before schema DDL. A concurrent migration owner fails before changing schema state.
+8. The migration owner obtains `pg_try_advisory_xact_lock` in the same transaction before schema DDL. A concurrent migration owner fails before changing schema state and must retry only after the existing owner finishes.
 9. Product CI retains SQLite coverage. A separate exact-head PostgreSQL workflow uses a digest-pinned PostgreSQL 18.4 service and exercises clean install, DDL-free runtime startup, reference-data compatibility, advisory-lock contention, trigger parity, restart, and timeout policy.
 10. Shared catalog and purpose reference data is migration-owned. Runtime never silently repairs missing or partially damaged vocabulary.
 

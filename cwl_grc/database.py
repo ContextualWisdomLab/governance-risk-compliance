@@ -17,7 +17,7 @@ from cwl_grc.authorization import (
     seed_authorization_purposes,
 )
 from cwl_grc.catalog import (
-    _seed_rows,
+    catalog_seed_rows,
     framework_label,
     framework_source_url,
     seed_control_catalog,
@@ -33,7 +33,7 @@ from cwl_grc.models import Base
 POSTGRESQL_DRIVER = "postgresql+psycopg"
 POSTGRESQL_MIGRATION_LOCK_KEY = 0x43574C475243
 EXPECTED_MIGRATION_KEYS = frozenset({POLICY_INTEGRITY_MIGRATION})
-CATALOG_SEED_ROWS = tuple(_seed_rows())
+CATALOG_SEED_ROWS = tuple(catalog_seed_rows())
 EXPECTED_FRAMEWORK_ROWS = frozenset(
     (
         framework.value,
@@ -170,7 +170,6 @@ def _build_postgresql_engine(
         pool_recycle=settings.pool_recycle_seconds,
         isolation_level="READ COMMITTED",
     )
-    engine.dialect.isolation_level = "READ COMMITTED"
     return engine
 
 
@@ -240,7 +239,8 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
     missing_tables = expected_tables.difference(inspector.get_table_names())
     if missing_tables:
         raise SchemaCompatibilityError(
-            "The GRC schema is behind this binary; required tables are missing."
+            "The GRC schema is behind this binary; required tables are missing: "
+            + ", ".join(sorted(missing_tables))
         )
     with engine.connect() as connection:
         receipts = tuple(
@@ -279,12 +279,14 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
     missing_migrations = EXPECTED_MIGRATION_KEYS.difference(receipt_set)
     if missing_migrations:
         raise SchemaCompatibilityError(
-            "The GRC schema is behind this binary; run the migration owner."
+            "The GRC schema is behind this binary; run the migration owner. "
+            "Missing migrations: " + ", ".join(sorted(missing_migrations))
         )
     unknown_migrations = receipt_set.difference(EXPECTED_MIGRATION_KEYS)
     if unknown_migrations:
         raise SchemaCompatibilityError(
-            "The GRC schema is ahead of this binary; deploy a compatible application."
+            "The GRC schema is ahead of this binary; deploy a compatible application. "
+            "Unknown migrations: " + ", ".join(sorted(unknown_migrations))
         )
     if (
         framework_rows != EXPECTED_FRAMEWORK_ROWS
@@ -293,7 +295,9 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
     ):
         raise SchemaCompatibilityError(
             "The GRC schema reference data is incomplete or incompatible; "
-            "run the migration owner."
+            "run the migration owner. "
+            f"framework_rows={len(framework_rows)}, "
+            f"control_rows={len(control_rows)}, purpose_rows={len(purpose_rows)}."
         )
     return receipts
 
@@ -301,7 +305,7 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
 def create_session_factory(
     database_url: str,
     *,
-    manage_schema: bool = True,
+    manage_schema: bool = False,
     postgres_settings: PostgresEngineSettings | None = None,
 ) -> sessionmaker[Session]:
     """Return a session factory after explicit migration or fail-closed runtime check."""

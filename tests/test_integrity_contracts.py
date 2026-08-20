@@ -41,7 +41,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 def _seeded_policy_factory(database_url: str = "sqlite://"):  # noqa: ANN202
     """Return a product store containing one finalized policy edition."""
-    factory = create_session_factory(database_url)
+    factory = create_session_factory(database_url, manage_schema=True)
     with factory() as session:
         seed_control_catalog(session)
         seed_authorization_purposes(session)

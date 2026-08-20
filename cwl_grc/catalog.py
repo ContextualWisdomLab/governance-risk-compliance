@@ -77,7 +77,7 @@ def framework_source_url(code: FrameworkCode) -> str:
             assert_never(unreachable)
 
 
-def _seed_rows() -> list[tuple[FrameworkCode, str, str, str, str]]:
+def catalog_seed_rows() -> list[tuple[FrameworkCode, str, str, str, str]]:
     """Return official first-slice control rows: code, edition, id, title, statement."""
     return [
         (
@@ -473,7 +473,7 @@ def _seed_rows() -> list[tuple[FrameworkCode, str, str, str, str]]:
 
 def seed_control_catalog(session: Session) -> None:
     """Insert official first-slice controls once per catalog edition."""
-    for code, edition, identifier, title, statement in _seed_rows():
+    for code, edition, identifier, title, statement in catalog_seed_rows():
         framework = session.get(ControlFramework, code.value)
         if framework is None:
             framework = ControlFramework(
