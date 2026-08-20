@@ -17,7 +17,8 @@ telemetry must use registered route templates and low-cardinality attributes.
    provider. The official [OpenTelemetry Python instrumentation guidance](https://opentelemetry.io/docs/languages/python/instrumentation/)
    requires the SDK for application instrumentation.
 2. Create a W3C-parented server span for each request and record request rate,
-   duration, and authorization-denial metrics.
+   duration, authorization-denial, and request-scoped database transaction
+   outcome/duration metrics.
 3. Use only method, registered route template, response status, and service
    environment as request telemetry attributes. Do not attach tenant, actor,
    evidence, token, request-body, or arbitrary exception identifiers.
@@ -38,7 +39,8 @@ telemetry must use registered route templates and low-cardinality attributes.
 
 ## Verification
 
-Tests assert request count/duration and authorization-denial metric attributes,
-W3C-parented span execution, route-template redaction, exporter configuration,
-and exception recording. A live PostgreSQL probe also verified readiness and
-request metrics against PostgreSQL 18.6.
+Tests assert request count/duration, authorization-denial, and database
+transaction metric attributes, W3C-parented span execution, route-template
+redaction, exporter configuration, rollback behavior, and exception recording.
+A live PostgreSQL probe also verified readiness and request metrics against
+PostgreSQL 18.6.

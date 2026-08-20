@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator
+from typing import Any
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
@@ -51,14 +53,26 @@ def create_session_factory(database_url: str) -> sessionmaker[Session]:
     return sessionmaker(bind=engine, expire_on_commit=False)
 
 
-def session_dependency(factory: sessionmaker[Session]) -> Iterator[Session]:
+def session_dependency(
+    factory: sessionmaker[Session],
+    telemetry: Any | None = None,
+) -> Iterator[Session]:
     """Yield a request-scoped session and roll back on error."""
     session = factory()
+    started_at = time.perf_counter()
+    outcome = "commit"
     try:
         yield session
         session.commit()
     except Exception:
+        outcome = "rollback"
         session.rollback()
         raise
     finally:
+        if telemetry is not None:
+            telemetry.record_database_transaction(
+                session.bind.dialect.name,
+                outcome,
+                time.perf_counter() - started_at,
+            )
         session.close()

@@ -138,10 +138,11 @@ def create_app(
         environment,
         access_token_verifier,
     )
+    telemetry = RequestTelemetry(environment)
 
     def get_session() -> Iterator[Session]:
         """Yield the request session."""
-        yield from session_dependency(factory)
+        yield from session_dependency(factory, telemetry)
 
     def require_request_actor(
         authorization: str | None,
@@ -210,7 +211,7 @@ def create_app(
     app.state.lifecycle = LifecycleState()
     app.state.lifecycle.mark_ready()
     app.state.startup_report = startup_report
-    app.state.telemetry = RequestTelemetry(environment)
+    app.state.telemetry = telemetry
     app.router.add_event_handler("shutdown", app.state.lifecycle.begin_drain)
     app.router.add_event_handler("shutdown", app.state.telemetry.shutdown)
 

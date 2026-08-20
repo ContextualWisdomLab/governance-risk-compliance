@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 import cwl_grc.telemetry as telemetry_module
 from cwl_grc import create_app
+from cwl_grc.database import session_dependency
 from cwl_grc.observability import route_template
 from cwl_grc.telemetry import (
     OTEL_ENDPOINT_ENVIRONMENT_VARIABLE,
@@ -47,7 +48,12 @@ def test_requests_emit_otel_metrics_with_route_templates_and_spans() -> None:
 
     assert response.status_code == 200
     assert denied.status_code == 403
-    assert {"http.server.request.count", "http.server.request.duration"}.issubset(metrics)
+    assert {
+        "http.server.request.count",
+        "http.server.request.duration",
+        "cwl_grc.database.transaction.count",
+        "cwl_grc.database.transaction.duration",
+    }.issubset(metrics)
     request_points = metrics["http.server.request.count"].data.data_points  # type: ignore[attr-defined]
     assert any(
         point.attributes["http.route"] == "/healthz"
@@ -60,6 +66,15 @@ def test_requests_emit_otel_metrics_with_route_templates_and_spans() -> None:
         for point in denial_points
     )
     assert all("record-with-secret-id" not in point.attributes.values() for point in request_points)
+
+
+def test_session_dependency_supports_uninstrumented_callers() -> None:
+    """The database helper remains usable for callers without telemetry state."""
+    app = _app()
+    dependency = session_dependency(app.state.session_factory)
+    next(dependency)
+    with pytest.raises(StopIteration):
+        next(dependency)
 
 
 def test_telemetry_exception_and_otlp_exporter_configuration(monkeypatch) -> None:  # noqa: ANN001
