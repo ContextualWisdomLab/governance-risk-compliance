@@ -1,8 +1,8 @@
 # Product and technical gap baseline
 
-Snapshot: 2026-08-20, Asia/Seoul  
+Snapshot: 2026-08-21, Asia/Seoul
 Repository: `ContextualWisdomLab/governance-risk-compliance`  
-Baseline source head: `a747077757484c880fccf76e30cac068c593d3b0`
+Baseline source head: `17400a947fe2d51e61022031c7dc28f93152e18b`
 
 This document is the current product and technical truth baseline. It separates
 observed runtime or GitHub evidence from inferred gaps and proposed acceptance
@@ -29,6 +29,14 @@ exact head has green Product #468, local 100% statement/branch and docstring
 evidence, and real SQLite/PostgreSQL lifecycle probes. It remains unmerged and
 has no independent formal approval; those facts are a release gate, not a
 claim that the correction is already present on `develop`.
+
+PR #33 stages the Issue #28 obligation-applicability correction on top of PR
+#32. Its exact head `17400a947fe2d51e61022031c7dc28f93152e18b` has terminal
+Product #32401019372 and Devin Review success, resolved CodeRabbit findings,
+local 161-test 100% statement/branch and docstring evidence, and a fresh real
+PostgreSQL 18 lifecycle/immutability probe. It remains unmerged and depends on
+PR #32's protected independent-review gate; this evidence does not transfer to
+`develop` until the stacked merge sequence completes.
 
 The next production action is to integrate one verified Keyverse tenant and
 actor through the existing policy/evidence flow and prove that the same boundary
@@ -65,7 +73,7 @@ evidence rather than duplicating a privileged loop in this repository.
 | Policy authoring | `policy_document`, immutable `policy_version`, and `policy_control_mapping`; HTTP and CLI paths exist. | No approval/publication workflow, effective period, scheduled review, or tenant-backed identity. |
 | External-requirement catalogs | CSAP 2026.07, SOC 2 TSC, ISMS-P, ISO/IEC 27001:2022, NIST SP 800-53 Rev. 5, COSO 2013, and COSO 2017 identifiers are seeded. | The catalog is a small checked-in slice, not a licensed source-artifact ingestion, edition-diff, OSCAL, or OLIR service. |
 | Requirement/control semantics | PR #32 stages separate objectives, versioned internal-control definitions, scoped implementations, reviewed mappings, design/operating tests, deficiencies, exceptions, and evidence usage; direct bindings project to `unassessed`. | PR #32 is stacked and unmerged; stable authenticated APIs, production identity, and downstream risk/audit consumers remain incomplete. |
-| Compliance applicability | Policies can map to catalog identifiers. | No obligation register, jurisdiction, applicability decision, contractual commitment, source change, or impact workflow exists. |
+| Compliance applicability | PR #33 stages tenant-scoped source revisions, obligations, jurisdictions, applicability decisions, commitments, regulatory changes, impact assessments, and overdue/upcoming worklists; exact-head Product and PostgreSQL evidence is recorded above. | PR #33 is stacked and unmerged; production Keyverse authorization, stable versioned APIs, external source ingestion, and downstream risk/audit workflows remain incomplete. |
 | Evidence | Evidence is encrypted at rest, exact operational values remain usable, and artifacts bind to catalog rows. | Rotation, KMS/HSM, recovery rehearsal, disposition, request/review workflow, purpose-specific exports, and tenant authorization are incomplete. |
 | Gap query | PR #32 projects latest policy mappings and catalog rows through explicit control statuses; legacy direct bindings remain `unassessed`. | The feature is not merged, and risk priority, production ownership, authenticated APIs, and remediation workflows remain absent. |
 | Integrity | SQLite/PostgreSQL triggers protect audit history and finalized policy history; stale policy writers receive `409 Conflict`. | PostgreSQL lifecycle work is in PR #18 and is not merged at this snapshot. |
@@ -104,7 +112,7 @@ issues and PRs.
 | G-11 | P1 | A buyer lacks a role-aware compliance workspace, evidence request room, external-auditor data room, and controlled export. | The officer HTML is a loopback preview; saved views, exact-value reporting, export receipts, revocation, Figma, design tokens, Storybook, WCAG 2.2, print/PDF, and i18n evidence are absent. | Deliver tenant- and purpose-scoped posture, traceability, evidence requests, action queues, accessible exact-value views, reproducible CSV/JSON/PDF exports, and expiring/revocable auditor packages. | [Issue #30](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/30) |
 | G-12 | P1 | Cross-repository consumers cannot rely on a governed GRC contract. | Architecture names Keyverse, Orgmetra, AIS, Billing, naruon, EA, and Semantic Data Portal as future consumers or authorities only. | Publish minimal OpenAPI/event contracts, opaque references, purpose/tenant/provenance envelopes, contract tests, and explicit authoritative/observed/inferred/proposed boundaries. | [ARCHITECTURE.md](../ARCHITECTURE.md) |
 | G-13 | P0 | External requirements, internal controls, implementations, tests, and evidence use are conflated. | PR #32 exact head `138c8331723785d7188c4f5403cff61a1d9e9f40` stages the separated model, migration backfill, explicit statuses, SQLite/PostgreSQL guards, Product #468 success, and real PostgreSQL 18 probe; no independent approval or protected merge is observed. | Re-fetch PR #32 exact head after review, resolve valid findings, obtain independent approval, merge through branch protection, and then integrate authenticated stable APIs before risk/audit consumers depend on the model. | [Issue #27](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/27) |
-| G-14 | P1 | The product cannot prove which laws, regulations, contracts, and commitments apply to a precise tenant, scope, jurisdiction, and time. | No authoritative source revision, obligation, jurisdiction, applicability rule/decision, legal interpretation, commitment, change, or impact object exists. | Add a versioned ISO 37301-aligned obligation register, authorized applicability decisions including `not_applicable`, source changes, impact triage, owner, due date, and re-approval. | [Issue #28](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/28) |
+| G-14 | P1 | The product cannot prove which laws, regulations, contracts, and commitments apply to a precise tenant, scope, jurisdiction, and time. | PR #33 exact head `17400a947fe2d51e61022031c7dc28f93152e18b` stages source revisions, obligations, jurisdiction references, applicability decisions, legal interpretations, commitments, source changes, impact assessments, tenant checks, immutable guards, exact-head Product/Devin evidence, and a PostgreSQL 18 probe; no protected merge is observed. | Complete the protected PR #32 → PR #33 merge sequence, then add production Keyverse authorization, lawful source-artifact ingestion/diff, stable authenticated APIs, and downstream risk/audit/workspace consumers. | [Issue #28](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/28) |
 
 ## Current open-issue snapshot
 
@@ -149,6 +157,7 @@ force-push, or predecessor-head evidence is valid.
 | [#26](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/26) | `7564e175eb1d8bd9797184583cb681a5aa2225a6` | Ready, stacked, review-required | Bounded database-pool telemetry stacked on #25. Product run #442 is terminal-success on the exact head; no other workflow run was returned for that head, and independent approval remains unobserved. |
 | [#31](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/31) | `2e34c86b9a0c20fade2b6b67c1e472fa599228d2` | Ready, stacked, review-required | Declared recovery-event telemetry stacked on #26. Product run #450 is terminal-success on the exact head; the PR expressly excludes a recovery coordinator, collector, dashboards, paging, rehearsal, owner approval, and production recovery evidence. |
 | [#32](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/32) | `138c8331723785d7188c4f5403cff61a1d9e9f40` | Ready, stacked, review-required | Internal-control model stacked on #31 for Issue #27. Product run #468 is terminal-success on the exact head; local and PostgreSQL evidence is recorded, but CodeRabbit skips non-default base branches and no independent formal approval or protected merge is observed. |
+| [#33](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/33) | `17400a947fe2d51e61022031c7dc28f93152e18b` | Ready, stacked, review-required | Obligation applicability and regulatory-change model stacked on #32 for Issue #28. Product run #32401019372 and Devin Review are terminal-success on the exact head; local 161-test/100% evidence, PostgreSQL 18 lifecycle/immutability evidence, and resolved CodeRabbit findings are recorded. Keep unmerged until PR #32 independently approves and protected merge completes. |
 | [#16](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/16) | `c1496be499473befc273ff55ea284ac9f5582b73` | Draft, mergeable | Tenant isolation remains stacked behind #7. Preserve the shared official catalog outside tenant-owned records; regenerate all current-head gates after parent integration. |
 | [#7](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/7) | `ebac50ccbb9cf528044cc53d4832ceec176b50c9` | Draft, mergeable | Route enforcement remains stacked behind #6. Revalidate every protected route and scope on the integrated parent. |
 | [#6](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/6) | `887f5c64843cca5cd8f699cae58e33afa3b7498f` | Draft, mergeable | OIDC/JWKS loading remains stacked behind #5. Preserve bounded source retrieval, exact issuer matching, address pinning, TLS identity, and rotation semantics. |
