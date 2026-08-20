@@ -15,6 +15,18 @@ This repository is the ContextualWisdomLab home for policy, control, risk, evide
 
 The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. The command-line server binds to `127.0.0.1`, and the app always rejects proxy-forwarded or non-loopback traffic. No runtime bypass exists. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
 
+## Buyer-workspace design preview
+
+Issue #30 has a bounded design/runtime fixture at `apps/grc-workspace/`. Its purpose is to make the commercial GRC journey reviewable before authenticated backend integration: the officer sees explicit `unknown`, `not assessed`, `stale`, `blocked`, and `access denied` states; traces a requirement through control → test → evidence; gets a concrete next action; and can reveal an exact-value table instead of relying on a badge or percentage alone.
+
+The paired design authority is:
+
+- Figma file `ta1jjWSjmADz2BFxka9UPs` — desktop `1:72`, mobile `1:150`, reusable tokens/components `1:2`, interaction contracts `1:227`;
+- Storybook 10.5.10 — `ComplianceOfficerDesktop`, `ComplianceOfficerMobile`, `StaleEvidence`, and `AccessDenied` stories with `@storybook/addon-a11y`;
+- ADR 0012 plus `docs/product/grc-buyer-workspace-prd.md` and `docs/product/grc-buyer-workspace-trd.md` for ownership, WCAG 2.2 AA, i18n, exact-value, and source-of-truth constraints.
+
+For local design review, install the exact-pinned root Storybook packages and run `npm run storybook`; CI runs `npm run build-storybook` on the exact pull-request head. The current Node dependency graph has no checked-in transitive lockfile, so this fixture and its Storybook build are **design evidence, not release/deployment evidence**. It does not authenticate a tenant, read protected APIs, create evidence requests, authorize exports, grant an auditor data room, or certify compliance/accessibility.
+
 ## Operator CLI
 
 ```bash
