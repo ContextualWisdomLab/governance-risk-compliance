@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import re
 from collections.abc import Sequence
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 
@@ -15,6 +17,9 @@ EXPECTED_TARGET = "production"
 ISSUE_URL_PREFIX = f"https://github.com/{EXPECTED_REPOSITORY}/issues/"
 ALLOWED_PRIORITIES = frozenset({"P0", "P1", "P2"})
 ALLOWED_STATUSES = frozenset({"blocked", "in_progress", "ready"})
+REPOSITORY_FILE_EVIDENCE = "repository_file"
+REPOSITORY_FILE_FIELDS = frozenset({"kind", "path", "sha256"})
+SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 REQUIRED_GATE_CONTRACTS = {
     "identity-tenant-authorization": ("P0", 4),
     "postgresql-lifecycle": ("P0", 8),
@@ -84,7 +89,7 @@ def validate_manifest(manifest: dict[str, Any]) -> list[dict[str, Any]]:
             allow_empty=False,
         )
         blockers = _require_string_list(gate, "blockers", path, allow_empty=True)
-        evidence = _require_string_list(gate, "evidence", path, allow_empty=True)
+        evidence = _require_evidence_list(gate, path)
 
         if gate_id in seen_ids:
             raise ReadinessManifestError(f"duplicate gate id: {gate_id}.")
@@ -141,6 +146,52 @@ def validate_manifest(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     return validated
 
 
+def verify_repository_evidence(
+    gates: Sequence[dict[str, Any]],
+    repository_root: Path,
+) -> None:
+    """Verify every evidence path and digest against one reviewed repository tree."""
+    try:
+        root = repository_root.resolve(strict=True)
+    except OSError as exc:
+        raise ReadinessManifestError(
+            f"Repository root {repository_root} cannot be resolved."
+        ) from exc
+    if not root.is_dir():
+        raise ReadinessManifestError(f"Repository root {root} must be a directory.")
+
+    for gate_index, gate in enumerate(gates):
+        for evidence_index, evidence in enumerate(gate["evidence"]):
+            path = f"gates[{gate_index}].evidence[{evidence_index}]"
+            candidate = root / evidence["path"]
+            try:
+                resolved = candidate.resolve(strict=True)
+            except OSError as exc:
+                raise ReadinessManifestError(
+                    f"{path}.path does not identify a readable repository file."
+                ) from exc
+            try:
+                resolved.relative_to(root)
+            except ValueError as exc:
+                raise ReadinessManifestError(
+                    f"{path}.path escapes the repository root."
+                ) from exc
+            if not resolved.is_file():
+                raise ReadinessManifestError(
+                    f"{path}.path must identify a regular repository file."
+                )
+            try:
+                digest = hashlib.sha256(resolved.read_bytes()).hexdigest()
+            except OSError as exc:
+                raise ReadinessManifestError(
+                    f"{path}.path cannot be read for digest verification."
+                ) from exc
+            if digest != evidence["sha256"]:
+                raise ReadinessManifestError(
+                    f"{path}.sha256 does not match the repository file."
+                )
+
+
 def readiness_summary(gates: Sequence[dict[str, Any]]) -> dict[str, Any]:
     """Return a deterministic readiness result for validated ``gates``."""
     blocking_gates: list[dict[str, Any]] = []
@@ -174,6 +225,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("manifest", type=Path)
     parser.add_argument(
+        "--repository-root",
+        type=Path,
+        default=Path.cwd(),
+        help="Repository tree used to verify hash-bound evidence paths.",
+    )
+    parser.add_argument(
         "--require-ready",
         action="store_true",
         help="Exit 1 while any validated production gate is not ready.",
@@ -181,6 +238,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         gates = validate_manifest(load_manifest(args.manifest))
+        verify_repository_evidence(gates, args.repository_root)
     except ReadinessManifestError as exc:
         print(json.dumps({"error": str(exc), "valid": False}, sort_keys=True))
         return 2
@@ -194,7 +252,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _require_string(gate: dict[str, Any], field: str, path: str) -> str:
-    """Return one required non-empty string field from a gate."""
+    """Return one required non-empty string field from a gate or evidence object."""
     value = gate.get(field)
     if not isinstance(value, str):
         raise ReadinessManifestError(f"{path}.{field} must be a non-empty string.")
@@ -238,6 +296,70 @@ def _require_string_list(
             )
         normalized.append(item)
     return normalized
+
+
+def _require_evidence_list(
+    gate: dict[str, Any],
+    path: str,
+) -> list[dict[str, str]]:
+    """Return canonical hash-bound repository-file evidence objects."""
+    value = gate.get("evidence")
+    if not isinstance(value, list):
+        raise ReadinessManifestError(f"{path}.evidence must be a list.")
+    validated: list[dict[str, str]] = []
+    seen_paths: set[str] = set()
+    for index, item in enumerate(value):
+        evidence_path = f"{path}.evidence[{index}]"
+        if not isinstance(item, dict):
+            raise ReadinessManifestError(
+                f"{path}.evidence must contain evidence objects."
+            )
+        if set(item) != REPOSITORY_FILE_FIELDS:
+            raise ReadinessManifestError(
+                f"{evidence_path} must contain exactly kind, path, and sha256."
+            )
+        kind = _require_string(item, "kind", evidence_path)
+        if kind != REPOSITORY_FILE_EVIDENCE:
+            raise ReadinessManifestError(
+                f"{evidence_path}.kind must be {REPOSITORY_FILE_EVIDENCE}."
+            )
+        repository_path = _require_string(item, "path", evidence_path)
+        if not _is_canonical_repository_path(repository_path):
+            raise ReadinessManifestError(
+                f"{evidence_path}.path must be a canonical repository-relative path."
+            )
+        digest = _require_string(item, "sha256", evidence_path)
+        if SHA256_PATTERN.fullmatch(digest) is None:
+            raise ReadinessManifestError(
+                f"{evidence_path}.sha256 must be 64 lowercase hexadecimal characters."
+            )
+        if repository_path in seen_paths:
+            raise ReadinessManifestError(
+                f"{path}.evidence has duplicate repository path: {repository_path}."
+            )
+        seen_paths.add(repository_path)
+        validated.append(
+            {
+                "kind": kind,
+                "path": repository_path,
+                "sha256": digest,
+            }
+        )
+    return validated
+
+
+def _is_canonical_repository_path(value: str) -> bool:
+    """Return whether ``value`` is one unambiguous path inside a repository tree."""
+    if "\\" in value:
+        return False
+    candidate = PurePosixPath(value)
+    return (
+        not candidate.is_absolute()
+        and bool(candidate.parts)
+        and candidate.parts[0] != ".git"
+        and all(part not in {".", ".."} for part in candidate.parts)
+        and candidate.as_posix() == value
+    )
 
 
 def _is_canonical_issue_url(value: str) -> bool:
