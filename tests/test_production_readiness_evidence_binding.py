@@ -33,13 +33,19 @@ def _write_manifest(path: Path, manifest: object) -> None:
     path.write_text(json.dumps(manifest), encoding="utf-8")
 
 
-def _bound_repository_evidence(*, digest: str | None = None) -> dict[str, str]:
+def _git_blob_sha(contents: bytes) -> str:
+    """Return the repository-native Git object identity for exact contents."""
+    header = f"blob {len(contents)}\0".encode("ascii")
+    return hashlib.sha1(header + contents, usedforsecurity=False).hexdigest()
+
+
+def _bound_repository_evidence(*, blob_sha: str | None = None) -> dict[str, str]:
     """Return one repository-file evidence reference bound to exact content."""
     source = REPOSITORY_ROOT / EVIDENCE_PATH
     return {
         "kind": "repository_file",
         "path": EVIDENCE_PATH,
-        "sha256": digest or hashlib.sha256(source.read_bytes()).hexdigest(),
+        "git_blob_sha": blob_sha or _git_blob_sha(source.read_bytes()),
     }
 
 
@@ -63,7 +69,7 @@ def test_release_mode_rejects_opaque_success_words_as_evidence(
 def test_release_mode_accepts_hash_bound_repository_file_evidence(
     tmp_path: Path,
 ) -> None:
-    """A canonical repository file with its exact SHA-256 digest is verifiable evidence."""
+    """A canonical repository file with its exact Git blob identity is verifiable."""
     path = tmp_path / "manifest.json"
     _write_manifest(path, _all_ready_manifest([_bound_repository_evidence()]))
 
@@ -84,7 +90,7 @@ def test_release_mode_rejects_wrong_repository_file_digest(
     path = tmp_path / "manifest.json"
     _write_manifest(
         path,
-        _all_ready_manifest([_bound_repository_evidence(digest="0" * 64)]),
+        _all_ready_manifest([_bound_repository_evidence(blob_sha="0" * 40)]),
     )
 
     assert main(
