@@ -31,6 +31,14 @@ boundary holds for every read, write, export, audit event, and background job.
 - **Proposed** means the smallest acceptance slice to turn the gap into an
   observable product capability.
 
+## Automation status
+
+No repository workflow currently declares an hourly `schedule` trigger, and no
+authenticated contextual-orchestrator scheduler executor is available in this
+environment. No placeholder automation was added: the next action is to wire
+an approved scheduler identity to the protected PR queue, exact-head checks,
+independent review, and safe handoff evidence before enabling hourly runs.
+
 ## Current product contract
 
 | Capability | Observed implementation | Boundary that still matters |
