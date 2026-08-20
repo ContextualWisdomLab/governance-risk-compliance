@@ -3,7 +3,7 @@
 Snapshot: 2026-08-21, Asia/Seoul
 Repository: `ContextualWisdomLab/governance-risk-compliance`  
 Baseline source head: `78770c63d16a6124dbb1d647c3ac482624f1745a`
-Develop-based buyer-workspace head: `e61a2a45fd0950bc700ce7393b0d2dd97d59194c`
+Develop-based buyer-workspace head: `aa235c52e41c63a97aa7061fa540bfd6ec2af30d`
 Active reviewed security/model/catalog/obligation fix heads: PR #33 `161e183c97d2b52ebd32b66bb29887385121d537`, PR #36 `cb1a48395109c87c17ad287ea1fc81dc25b135e1`, PR #37 `bfb3f61767886075be32b669871cc4b21b168708`, PR #38 `0c4084705b4f86913acdefa1ada3d17aa2d1e6f7`, and PR #40 `9bff870e8b540e49745e3c48f39caa6de96ccbf2`. This baseline follow-up is PR #39.
 
 This document is the current product and technical truth baseline. It separates
@@ -41,14 +41,15 @@ current external gates and independent approval remain outstanding. It remains
 unmerged and depends on PR #32's protected independent-review gate.
 
 PR #34 stages the Issue #30 buyer-workspace design authority directly on
-`develop`. Its exact head `e61a2a45fd0950bc700ce7393b0d2dd97d59194c` adds the
-current NIST SP 800-53 Release 5.2.0 APA 7 reference to the existing checked-in
-npm lockfile/Node pin, Storybook build, and Chromium interaction evidence. The
-new head has local Python 49-test 100% statement/branch coverage, Storybook
-10.5.10 build, and two Chromium interaction tests; refreshed external gates
-and independent review are outstanding. It remains Draft; the fixture is not
-authentication, API, export, accessibility-certification, or deployment
-evidence.
+`develop`. Its exact head `aa235c52e41c63a97aa7061fa540bfd6ec2af30d` records the
+current NIST SP 800-53 Release 5.2.0 APA 7 reference and the rendered Figma
+repair against the existing checked-in npm lockfile/Node pin, Storybook build,
+and Chromium interaction evidence. The current head has local Python 52-test
+100% statement/branch coverage, Storybook 10.5.10 build, and two Chromium
+interaction tests. Product #556 and Buyer Workspace #8 are terminal-success;
+SAST/Security #176 remain queued and independent review is outstanding. It
+remains Draft; the fixture is not authentication, API, export,
+accessibility-certification, or deployment evidence.
 
 PR #36 stages the reviewed PR #32 correction on the internal-control branch.
 Its exact head `cb1a48395109c87c17ad287ea1fc81dc25b135e1` has local 157-test,
@@ -150,7 +151,7 @@ issues and PRs.
 | G-08 | P1 | An auditor cannot run a complete governed audit from program planning through independent closure. | Evidence and `audit_event` exist, but audit universe, program, engagement, procedures, sampling, workpapers, findings, competence, independence, supervision, remediation, retest, closure, and quality assessment do not. | Implement the ISO 19011:2026 and IIA-aligned workflow against actual internal-control implementations and purpose-bound evidence usage. | [Issue #14](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/14) |
 | G-09 | P0 | A green workflow can be mistaken for release authority without one exact machine-verifiable readiness decision. | PR #17 adds a fail-closed readiness manifest and repository-file evidence binding; it remains unmerged and intentionally reports `production_ready=false`. | Require exact current source/artifact evidence, freshness, branch policy, security gates, independent approval, and zero blockers before release mode succeeds. | [Issue #15](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/15) |
 | G-10 | P1 | Catalog maintenance can drift, lose provenance, overstate mappings, or redistribute source text without authority. | Catalog rows are manually checked into `cwl_grc/catalog.py`; PR #37 now stages provenance metadata, source/version/import/receipt/release persistence, reviewed APA references, and a server-owned source-host boundary, but no remote fetch, OSCAL/OLIR parser, or `control_framework` publication is claimed. | Add lawful source-artifact ingestion, versioned release/diff, export restrictions, OSCAL 1.2.3 Catalog/Profile/Mapping round trips, reviewed mapping semantics, OLIR provenance, and change impact. | [Issue #29](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/29) |
-| G-11 | P1 | A buyer lacks a role-aware compliance workspace, evidence request room, external-auditor data room, and controlled export. | PR #34 exact head `aa7ab7bcb53bae8a3a219568fbc34f5f97c71b06` adds Figma/Storybook authority, semantic design tokens, exact-value and next-action fixture states, lockfile/Node pinning, and Chromium interaction evidence; PR #40 stages the local pinned-Playwright correction. It remains a static local preview. | Deliver tenant- and purpose-scoped posture, traceability, real evidence requests, action queues, accessible exact-value views, reproducible CSV/JSON/PDF exports, i18n consistency, and expiring/revocable auditor packages. | [Issue #30](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/30) |
+| G-11 | P1 | A buyer lacks a role-aware compliance workspace, evidence request room, external-auditor data room, and controlled export. | PR #34 exact head `aa235c52e41c63a97aa7061fa540bfd6ec2af30d` adds Figma/Storybook authority, semantic design tokens, exact-value and next-action fixture states, lockfile/Node pinning, Chromium interaction evidence, and rendered desktop/mobile Figma layout repair; PR #40 stages the local pinned-Playwright correction. It remains a static local preview. | Deliver tenant- and purpose-scoped posture, traceability, real evidence requests, action queues, accessible exact-value views, reproducible CSV/JSON/PDF exports, i18n consistency, and expiring/revocable auditor packages. | [Issue #30](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/30) |
 | G-12 | P1 | Cross-repository consumers cannot rely on a governed GRC contract. | Architecture names Keyverse, Orgmetra, AIS, Billing, naruon, EA, and Semantic Data Portal as future consumers or authorities only. | Publish minimal OpenAPI/event contracts, opaque references, purpose/tenant/provenance envelopes, contract tests, and explicit authoritative/observed/inferred/proposed boundaries. | [ARCHITECTURE.md](../ARCHITECTURE.md) |
 | G-13 | P0 | External requirements, internal controls, implementations, tests, and evidence use are conflated. | PR #32 exact head `138c8331723785d7188c4f5403cff61a1d9e9f40` stages the separated model; PR #36 exact head `cb1a48395109c87c17ad287ea1fc81dc25b135e1` stages review fixes, local 100% evidence, and real PostgreSQL 18.6 upgrade/graph probes. Neither has independent approval or protected merge evidence. | Re-fetch PR #32 and its PR #36 fix exact heads after review, resolve valid findings, obtain independent approval, merge through branch protection, and then integrate authenticated stable APIs before risk/audit consumers depend on the model. | [Issue #27](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/27) |
 | G-14 | P1 | The product cannot prove which laws, regulations, contracts, and commitments apply to a precise tenant, scope, jurisdiction, and time. | PR #33 exact head `78770c63d16a6124dbb1d647c3ac482624f1745a` stages source revisions, obligations, jurisdiction references, applicability decisions, legal interpretations, commitments, proposed-only requirement links, source changes, impact assessments, tenant checks, null-safe target uniqueness, immutable guards, exact-head Product/Devin evidence, and a PostgreSQL 18 probe; no protected merge is observed. | Complete the protected PR #32 → PR #33 merge sequence, then add production Keyverse authorization, independent approval workflow, lawful source-artifact ingestion/diff, stable authenticated APIs, and downstream risk/audit/workspace consumers. | [Issue #28](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/28) |
@@ -200,7 +201,7 @@ self-approval, admin merge, force-push, or predecessor-head evidence is valid.
 | [#31](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/31) | `2e34c86b9a0c20fade2b6b67c1e472fa599228d2` | Ready, stacked, review-required | Declared recovery-event telemetry stacked on #26. Product run #450 is terminal-success on the exact head; the PR expressly excludes a recovery coordinator, collector, dashboards, paging, rehearsal, owner approval, and production recovery evidence. |
 | [#32](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/32) | `138c8331723785d7188c4f5403cff61a1d9e9f40` | Ready, stacked, review-required | Internal-control model stacked on #31 for Issue #27. Product run #468 is terminal-success on the exact head; local and PostgreSQL evidence is recorded. PR #36 carries the current review-fix head on this branch; no independent formal approval or protected merge is observed. |
 | [#33](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/33) | `161e183c97d2b52ebd32b66bb29887385121d537` | Ready, stacked, review-required | Obligation applicability and regulatory-change model stacked on #32 for Issue #28. Current head adds the Semgrep migration fix and changelog entry; local full 100% coverage, exact Semgrep 0-findings, and PostgreSQL 18.6 migration probes pass. Predecessor Product/Devin evidence does not transfer; current external gates and independent approval remain outstanding. |
-| [#34](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/34) | `e61a2a45fd0950bc700ce7393b0d2dd97d59194c` | Draft, mergeable, review-required | Issue #30 buyer-workspace design authority on `develop`. The exact current head has local Python 49-test 100% statement/branch coverage, Storybook 10.5.10 build, two Chromium interaction tests, and the current NIST SP 800-53 Release 5.2.0 APA 7 reference. Refreshed SAST/Security and independent review remain outstanding. |
+| [#34](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/34) | `aa235c52e41c63a97aa7061fa540bfd6ec2af30d` | Draft, mergeable, review-required | Issue #30 buyer-workspace design authority on `develop`. The exact current head has local Python 52-test 100% statement/branch coverage, Storybook 10.5.10 build, two Chromium interaction tests, current NIST SP 800-53 Release 5.2.0 APA 7 reference, and rendered Figma repair evidence: desktop 2:1 panels plus mobile wrapped/stacked content without horizontal clipping. Product #556 and Buyer Workspace #8 succeed; SAST/Security #176 are queued and independent review remains outstanding. |
 | [#35](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/35) | `2861c9c5bfd17f6ac6778e42db1b4d735a809ce9` | Draft, stacked, review-required | Buyer-gap baseline refresh for PR #33 and PR #34 on the baseline branch. PR #39 carries the current queue follow-up; neither docs PR is production, issue-completion, or merge approval evidence. |
 | [#36](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/36) | `cb1a48395109c87c17ad287ea1fc81dc25b135e1` | Draft, stacked, review-required | Review fixes for PR #32 on `feat/internal-control-model`, including owner graph guards and objective/definition race conflicts. Local 157-test 100% evidence and PostgreSQL 18.6 upgrade/graph probes pass; Product is green, while required/security gates and independent approval remain outstanding. |
 | [#37](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/37) | `bfb3f61767886075be32b669871cc4b21b168708` | Draft, mergeable, review-required | Issue #29 catalog-provenance slice on `develop`. Current head makes the HTTP source-host allowlist server-owned; local full 100% evidence and PostgreSQL 18.6 host-boundary probe pass. Scope excludes remote source retrieval and OSCAL/OLIR parsing; refreshed required/security gates and independent approval remain outstanding. |
@@ -293,10 +294,10 @@ OSCAL adapter does not establish conformance or certification.
 
 PR #34 now records a bounded Figma/Storybook design authority, semantic tokens,
 accessibility and exact-value-table behavior, keyboard/touch action edges,
-print/PDF, responsive states, i18n intent, and ownership boundaries. Those
-artifacts are still static design evidence; a customer-facing component system
-requires authenticated contracts, connected data, export controls, and release
-evidence.
+print/PDF, responsive states, i18n intent, ownership boundaries, and a
+rendered repair of the desktop/mobile authority frames. Those artifacts are
+still static design evidence; a customer-facing component system requires
+authenticated contracts, connected data, export controls, and release evidence.
 
 ## Verification loop
 
