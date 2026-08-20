@@ -9,6 +9,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     LargeBinary,
     String,
     Text,
@@ -34,7 +35,9 @@ class ControlFramework(Base):
     official_title: Mapped[str] = mapped_column(String(255), nullable=False)
     edition_label: Mapped[str] = mapped_column(String(64), nullable=False)
     source_url: Mapped[str] = mapped_column(String(1024), nullable=False)
-    control_items: Mapped[list[ControlItem]] = relationship(back_populates="control_framework")
+    control_items: Mapped[list[ControlItem]] = relationship(
+        back_populates="control_framework"
+    )
 
 
 class ControlItem(Base):
@@ -42,7 +45,11 @@ class ControlItem(Base):
 
     __tablename__ = "control_item"
     __table_args__ = (
-        UniqueConstraint("framework_key", "catalog_identifier", name="control_item_catalog_identity"),
+        UniqueConstraint(
+            "framework_key",
+            "catalog_identifier",
+            name="control_item_catalog_identity",
+        ),
     )
 
     control_item_id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -53,7 +60,9 @@ class ControlItem(Base):
     catalog_identifier: Mapped[str] = mapped_column(String(64), nullable=False)
     control_title: Mapped[str] = mapped_column(String(255), nullable=False)
     control_statement: Mapped[str] = mapped_column(Text, nullable=False)
-    control_framework: Mapped[ControlFramework] = relationship(back_populates="control_items")
+    control_framework: Mapped[ControlFramework] = relationship(
+        back_populates="control_items"
+    )
     evidence_bindings: Mapped[list[ControlEvidenceBinding]] = relationship(
         back_populates="control_item"
     )
@@ -73,10 +82,20 @@ class EvidenceRecord(Base):
     """One tenant-owned evidence artifact kept usable for authorized officers."""
 
     __tablename__ = "evidence_record"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "evidence_record_id",
+            name="evidence_record_tenant_identity",
+        ),
+    )
 
     evidence_record_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+        String(128),
+        nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
     )
     evidence_title: Mapped[str] = mapped_column(String(255), nullable=False)
     collector_actor: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -97,24 +116,30 @@ class ControlEvidenceBinding(Base):
     __tablename__ = "control_evidence_binding"
     __table_args__ = (
         UniqueConstraint(
+            "tenant_id",
             "control_item_id",
             "evidence_record_id",
             name="control_evidence_binding_pair",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "evidence_record_id"],
+            ["evidence_record.tenant_id", "evidence_record.evidence_record_id"],
+            name="control_evidence_binding_tenant_evidence",
         ),
     )
 
     binding_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+        String(128),
+        nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
     )
     control_item_id: Mapped[str] = mapped_column(
         ForeignKey("control_item.control_item_id"),
         nullable=False,
     )
-    evidence_record_id: Mapped[str] = mapped_column(
-        ForeignKey("evidence_record.evidence_record_id"),
-        nullable=False,
-    )
+    evidence_record_id: Mapped[str] = mapped_column(String(64), nullable=False)
     bound_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
     purpose_code: Mapped[str] = mapped_column(
         ForeignKey("authorization_purpose.purpose_code"),
@@ -122,7 +147,9 @@ class ControlEvidenceBinding(Base):
     )
     bound_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     control_item: Mapped[ControlItem] = relationship(back_populates="evidence_bindings")
-    evidence_record: Mapped[EvidenceRecord] = relationship(back_populates="evidence_bindings")
+    evidence_record: Mapped[EvidenceRecord] = relationship(
+        back_populates="evidence_bindings"
+    )
 
 
 class AuditEvent(Base):
@@ -132,7 +159,10 @@ class AuditEvent(Base):
 
     audit_event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+        String(128),
+        nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
     )
     actor_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
     purpose_code: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -147,6 +177,11 @@ class PolicyDocument(Base):
 
     __tablename__ = "policy_document"
     __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "policy_document_id",
+            name="policy_document_tenant_identity",
+        ),
         CheckConstraint(
             "current_version_number >= 0",
             name="policy_document_version_nonnegative",
@@ -155,7 +190,10 @@ class PolicyDocument(Base):
 
     policy_document_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
+        String(128),
+        nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
     )
     policy_title: Mapped[str] = mapped_column(String(255), nullable=False)
     created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -165,7 +203,9 @@ class PolicyDocument(Base):
         default=0,
         server_default="0",
     )
-    policy_versions: Mapped[list[PolicyVersion]] = relationship(back_populates="policy_document")
+    policy_versions: Mapped[list[PolicyVersion]] = relationship(
+        back_populates="policy_document"
+    )
 
 
 class PolicyVersion(Base):
@@ -173,18 +213,33 @@ class PolicyVersion(Base):
 
     __tablename__ = "policy_version"
     __table_args__ = (
-        UniqueConstraint("policy_document_id", "version_number", name="policy_version_edition"),
+        UniqueConstraint(
+            "tenant_id",
+            "policy_version_id",
+            name="policy_version_tenant_identity",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "policy_document_id",
+            "version_number",
+            name="policy_version_edition",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "policy_document_id"],
+            ["policy_document.tenant_id", "policy_document.policy_document_id"],
+            name="policy_version_tenant_document",
+        ),
         CheckConstraint("version_number > 0", name="policy_version_number_positive"),
     )
 
     policy_version_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
-    )
-    policy_document_id: Mapped[str] = mapped_column(
-        ForeignKey("policy_document.policy_document_id"),
+        String(128),
         nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
     )
+    policy_document_id: Mapped[str] = mapped_column(String(64), nullable=False)
     version_number: Mapped[int] = mapped_column(nullable=False)
     policy_body: Mapped[str] = mapped_column(Text, nullable=False)
     authored_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -195,7 +250,9 @@ class PolicyVersion(Base):
         default=False,
         server_default=false(),
     )
-    policy_document: Mapped[PolicyDocument] = relationship(back_populates="policy_versions")
+    policy_document: Mapped[PolicyDocument] = relationship(
+        back_populates="policy_versions"
+    )
     policy_control_mappings: Mapped[list[PolicyControlMapping]] = relationship(
         back_populates="policy_version"
     )
@@ -207,23 +264,31 @@ class PolicyControlMapping(Base):
     __tablename__ = "policy_control_mapping"
     __table_args__ = (
         UniqueConstraint(
+            "tenant_id",
             "policy_version_id",
             "control_item_id",
             name="policy_control_mapping_pair",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "policy_version_id"],
+            ["policy_version.tenant_id", "policy_version.policy_version_id"],
+            name="policy_control_mapping_tenant_version",
         ),
     )
 
     mapping_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, default=LOCAL_DEVELOPMENT_TENANT, server_default=LOCAL_DEVELOPMENT_TENANT
-    )
-    policy_version_id: Mapped[str] = mapped_column(
-        ForeignKey("policy_version.policy_version_id"),
+        String(128),
         nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
     )
+    policy_version_id: Mapped[str] = mapped_column(String(64), nullable=False)
     control_item_id: Mapped[str] = mapped_column(
         ForeignKey("control_item.control_item_id"),
         nullable=False,
     )
-    policy_version: Mapped[PolicyVersion] = relationship(back_populates="policy_control_mappings")
+    policy_version: Mapped[PolicyVersion] = relationship(
+        back_populates="policy_control_mappings"
+    )
     control_item: Mapped[ControlItem] = relationship()
