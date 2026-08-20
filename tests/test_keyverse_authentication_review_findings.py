@@ -54,13 +54,19 @@ def _claims(**overrides: Any) -> dict[str, Any]:
     return claims
 
 
-def _token(private_key: Any, claims: dict[str, Any], *, typ: str = "at+jwt") -> str:
+def _token(
+    private_key: Any,
+    claims: dict[str, Any],
+    *,
+    typ: str = "at+jwt",
+    kid: str = "key-1",
+) -> str:
     """Sign one token for the reviewed resource-server profile."""
     return jwt.encode(
         claims,
         private_key,
         algorithm="RS256",
-        headers={"typ": typ, "kid": "key-1"},
+        headers={"typ": typ, "kid": kid},
     )
 
 
@@ -145,9 +151,7 @@ def test_signed_identifier_claims_with_edge_whitespace_are_rejected_not_trimmed(
         original = str(_claims()[claim_name])
         for altered in (f" {original}", f"{original} "):
             with pytest.raises(AccessTokenValidationError, match="invalid"):
-                verifier.verify(
-                    _token(private_key, _claims(**{claim_name: altered}))
-                )
+                verifier.verify(_token(private_key, _claims(**{claim_name: altered})))
 
 
 def test_registered_full_access_token_media_type_remains_supported() -> None:
@@ -157,3 +161,49 @@ def test_registered_full_access_token_media_type_remains_supported() -> None:
         _token(private_key, _claims(), typ="application/at+jwt")
     )
     assert principal.actor_id == "subject-1"
+
+
+def test_resource_server_settings_reject_edge_whitespace_without_normalizing() -> None:
+    """Configured issuer, audience, clients, and roles retain exact signed semantics."""
+    invalid_settings = (
+        {
+            "issuer": f"{ISSUER} ",
+            "audience": AUDIENCE,
+            "allowed_client_ids": frozenset({CLIENT_ID}),
+            "allowed_roles": frozenset({"compliance_officer"}),
+        },
+        {
+            "issuer": ISSUER,
+            "audience": f" {AUDIENCE}",
+            "allowed_client_ids": frozenset({CLIENT_ID}),
+            "allowed_roles": frozenset({"compliance_officer"}),
+        },
+        {
+            "issuer": ISSUER,
+            "audience": AUDIENCE,
+            "allowed_client_ids": frozenset({f"{CLIENT_ID} "}),
+            "allowed_roles": frozenset({"compliance_officer"}),
+        },
+        {
+            "issuer": ISSUER,
+            "audience": AUDIENCE,
+            "allowed_client_ids": frozenset({CLIENT_ID}),
+            "allowed_roles": frozenset({" compliance_officer"}),
+        },
+    )
+    for values in invalid_settings:
+        with pytest.raises(ValueError, match="exact"):
+            KeyverseAccessTokenSettings(**values)
+
+
+def test_jwk_and_token_key_identifiers_reject_edge_whitespace() -> None:
+    """Key selection never silently normalizes an untrusted `kid` identifier."""
+    private_key, jwk = _material()
+    for altered in (" key-1", "key-1 "):
+        altered_jwk = dict(jwk)
+        altered_jwk["kid"] = altered
+        with pytest.raises(AccessTokenValidationError, match="key identifier"):
+            parse_keyverse_jwks(json.dumps({"keys": [altered_jwk]}).encode())
+
+        with pytest.raises(AccessTokenValidationError, match="key identifier"):
+            _verifier(jwk).verify(_token(private_key, _claims(), kid=altered))
