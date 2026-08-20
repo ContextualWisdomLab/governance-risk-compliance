@@ -71,7 +71,11 @@ class KeyverseAccessTokenSettings:
             not role or role != role.strip() for role in self.allowed_roles
         ):
             raise ValueError("Keyverse requires an exact non-empty allowed role set.")
-        if not 0 <= self.clock_skew_seconds <= MAX_CLOCK_SKEW_SECONDS:
+        if (
+            isinstance(self.clock_skew_seconds, bool)
+            or not isinstance(self.clock_skew_seconds, int)
+            or not 0 <= self.clock_skew_seconds <= MAX_CLOCK_SKEW_SECONDS
+        ):
             raise ValueError("Keyverse clock skew must be between 0 and 300 seconds.")
 
 
@@ -364,7 +368,7 @@ def _numeric_date(value: Any, label: str) -> datetime:
 
 
 def _normalized_utc(value: datetime, label: str) -> datetime:
-    """Require an aware clock and normalize it to UTC."""
-    if value.tzinfo is None:
+    """Require a clock with a defined UTC offset and normalize it to UTC."""
+    if value.tzinfo is None or value.utcoffset() is None:
         raise AccessTokenValidationError(f"The Keyverse {label} must be timezone-aware.")
     return value.astimezone(timezone.utc)
