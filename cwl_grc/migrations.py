@@ -10,6 +10,7 @@ from sqlalchemy import Connection, Engine, inspect, text
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
 TENANT_ISOLATION_MIGRATION = "0002_tenant_isolation"
+EVIDENCE_ENCRYPTION_MIGRATION = "0003_evidence_encryption"
 LOCAL_DEVELOPMENT_TENANT = "local_development"
 TENANT_OWNED_TABLES = (
     "policy_document",
@@ -40,6 +41,9 @@ def apply_schema_migrations(engine: Engine) -> None:
         if not _migration_applied(connection, TENANT_ISOLATION_MIGRATION):
             _apply_tenant_isolation_migration(connection)
             _record_migration(connection, TENANT_ISOLATION_MIGRATION)
+        if not _migration_applied(connection, EVIDENCE_ENCRYPTION_MIGRATION):
+            _apply_evidence_encryption_migration(connection)
+            _record_migration(connection, EVIDENCE_ENCRYPTION_MIGRATION)
 
 
 def _migration_applied(connection: Connection, migration_key: str) -> bool:
@@ -131,6 +135,45 @@ def _apply_tenant_isolation_migration(connection: Connection) -> None:
             )
         )
         inspector = inspect(connection)
+
+
+def _apply_evidence_encryption_migration(connection: Connection) -> None:
+    """Add explicit legacy metadata before new evidence uses versioned envelopes."""
+    inspector = inspect(connection)
+    if not inspector.has_table("evidence_record"):
+        return
+    additions = (
+        (
+            "encryption_key_id",
+            "ALTER TABLE evidence_record ADD COLUMN encryption_key_id VARCHAR(128) "
+            "NOT NULL DEFAULT 'legacy-v1'",
+        ),
+        (
+            "encryption_algorithm_version",
+            "ALTER TABLE evidence_record ADD COLUMN encryption_algorithm_version VARCHAR(64) "
+            "NOT NULL DEFAULT 'fernet-v1-legacy'",
+        ),
+        (
+            "encryption_context_digest",
+            "ALTER TABLE evidence_record ADD COLUMN encryption_context_digest VARCHAR(64) "
+            "NOT NULL DEFAULT ''",
+        ),
+        (
+            "source_content_digest",
+            "ALTER TABLE evidence_record ADD COLUMN source_content_digest VARCHAR(64) "
+            "NOT NULL DEFAULT ''",
+        ),
+        (
+            "integrity_digest",
+            "ALTER TABLE evidence_record ADD COLUMN integrity_digest VARCHAR(64) "
+            "NOT NULL DEFAULT ''",
+        ),
+    )
+    for column_name, statement in additions:
+        columns = {column["name"] for column in inspector.get_columns("evidence_record")}
+        if column_name not in columns:
+            connection.execute(text(statement))
+            inspector = inspect(connection)
 
 
 def install_integrity_guards(engine: Engine) -> None:

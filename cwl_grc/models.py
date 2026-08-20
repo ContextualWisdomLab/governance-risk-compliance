@@ -104,6 +104,36 @@ class EvidenceRecord(Base):
         nullable=False,
     )
     ciphertext_payload: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    encryption_key_id: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default="legacy-v1",
+        server_default="legacy-v1",
+    )
+    encryption_algorithm_version: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default="fernet-v1-legacy",
+        server_default="fernet-v1-legacy",
+    )
+    encryption_context_digest: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default="",
+        server_default="",
+    )
+    source_content_digest: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default="",
+        server_default="",
+    )
+    integrity_digest: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default="",
+        server_default="",
+    )
     collected_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     evidence_bindings: Mapped[list[ControlEvidenceBinding]] = relationship(
         back_populates="evidence_record"

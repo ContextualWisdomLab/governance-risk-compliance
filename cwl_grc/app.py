@@ -19,8 +19,12 @@ from cwl_grc.authorization import (
 from cwl_grc.catalog import FrameworkCode, list_control_items, seed_control_catalog
 from cwl_grc.coverage import list_uncovered_controls
 from cwl_grc.database import create_session_factory, session_dependency
-from cwl_grc.encryption import EvidenceCipher
-from cwl_grc.evidence import bind_control_evidence, create_evidence_record
+from cwl_grc.encryption import EvidenceCipher, EvidenceKeyring, make_evidence_context
+from cwl_grc.evidence import (
+    bind_control_evidence,
+    create_evidence_record,
+    record_encryption_envelope,
+)
 from cwl_grc.health import health_payload
 from cwl_grc.keyverse_authentication import (
     AccessTokenValidationError,
@@ -69,6 +73,7 @@ def create_app(
     *,
     database_url: str | None = None,
     evidence_key: str | None = None,
+    evidence_keyring: EvidenceKeyring | None = None,
     access_token_verifier: KeyverseAccessTokenVerifier | None = None,
 ) -> FastAPI:
     """Build a local-only GRC app with optional Keyverse route authentication."""
@@ -76,13 +81,17 @@ def create_app(
         "CWL_GRC_DATABASE_URL",
         "sqlite:///grc_product.sqlite",
     )
-    key = evidence_key if evidence_key is not None else os.environ.get(
-        "CWL_GRC_EVIDENCE_KEY"
-    )
+    keyring = evidence_keyring
+    key = evidence_key
+    if keyring is None and key is None:
+        keyring = EvidenceKeyring.from_environment()
+    if keyring is None and key is None:
+        key = os.environ.get("CWL_GRC_EVIDENCE_KEY")
     factory = create_session_factory(url)
     cipher = EvidenceCipher(
         key,
         allow_ephemeral=url in {"sqlite://", "sqlite:///:memory:"},
+        keyring=keyring,
     )
     with factory() as session:
         seed_control_catalog(session)
@@ -448,10 +457,14 @@ def create_app(
 
 def _serialize_evidence(record: EvidenceRecord, cipher: EvidenceCipher) -> dict[str, Any]:
     """Return stored evidence with usable, unmasked payload text."""
+    payload_text = cipher.decrypt_record(
+        record_encryption_envelope(record),
+        context=make_evidence_context(record.tenant_id, record.evidence_record_id),
+    )
     return {
         "evidence_record_id": record.evidence_record_id,
         "evidence_title": record.evidence_title,
         "collector_actor": record.collector_actor,
-        "payload_text": cipher.decrypt(record.ciphertext_payload),
+        "payload_text": payload_text,
         "next_action": "Bind this evidence to the uncovered control.",
     }
