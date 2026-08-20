@@ -178,11 +178,12 @@ entries were open at the snapshot; their state can change after this commit.
 
 ## Current pull-request queue
 
-Snapshot inclusion rule: every open pull request except PR #19, which is the
-branch carrying this baseline and is described after the table. Every row below
-uses the full 40-character head SHA observed on 2026-08-20. A later push makes
-that row stale and requires a new snapshot. No self-approval, admin merge,
-force-push, or predecessor-head evidence is valid.
+Snapshot inclusion rule: every open pull request is listed. Rows without a date
+marker use the full 40-character head SHA observed on 2026-08-20; PR #19 was
+rechecked on 2026-08-21 after its review-fix push. PR #39 uses its immutable
+parent head because embedding its child head would change this document on
+every edit. A later push makes a row stale and requires a new snapshot. No
+self-approval, admin merge, force-push, or predecessor-head evidence is valid.
 
 | PR | Exact head at snapshot | State | Current evidence/action |
 | --- | --- | --- | --- |
@@ -205,6 +206,7 @@ force-push, or predecessor-head evidence is valid.
 | [#38](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/38) | `0c4084705b4f86913acdefa1ada3d17aa2d1e6f7` | Draft, stacked, review-required | Optional JTI replay guard stacked on PR #5's Keyverse branch. Local 72-test 100% evidence and Product success are observed; Strix and other required/security gates are still pending, with no independent approval. |
 | [#39](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/39) | parent `2861c9c5bfd17f6ac6778e42db1b4d735a809ce9` | Draft, stacked, review-required | Current buyer-gap baseline follow-up stacked on PR #35. Its child head is intentionally tracked by the PR metadata because this document records the queue it describes; it records the exact heads and observed boundaries for PR #36, #37, and #38 and remains documentation evidence only. |
 | [#40](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/40) | `9bff870e8b540e49745e3c48f39caa6de96ccbf2` | Draft, stacked, review-required | Scorecard Pinned-Dependencies fix for PR #34. Local Storybook and two browser tests pass; refreshed Scorecard/Security checks and independent approval remain outstanding. |
+| [#19](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/19) | `eec019293c03c672e506b4c26c0e83996e0f8e21` (2026-08-21) | Ready, review-required | Documentation baseline and GRC roadmap review fixes. Local 47-test statement/branch coverage and docstring checks pass; exact-head external gates and independent approval remain outstanding. |
 | [#16](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/16) | `c1496be499473befc273ff55ea284ac9f5582b73` | Draft, mergeable | Tenant isolation remains stacked behind #7. Preserve the shared official catalog outside tenant-owned records; regenerate all current-head gates after parent integration. |
 | [#7](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/7) | `ebac50ccbb9cf528044cc53d4832ceec176b50c9` | Draft, mergeable | Route enforcement remains stacked behind #6. Revalidate every protected route and scope on the integrated parent. |
 | [#6](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/6) | `887f5c64843cca5cd8f699cae58e33afa3b7498f` | Draft, mergeable | OIDC/JWKS loading remains stacked behind #5. Preserve bounded source retrieval, exact issuer matching, address pinning, TLS identity, and rotation semantics. |
