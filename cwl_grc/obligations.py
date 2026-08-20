@@ -623,8 +623,13 @@ def list_obligation_worklist(
 ) -> list[ObligationWorkItem]:
     """Project same-tenant obligations into overdue, upcoming, or unqueued work."""
     _require_compliance_purpose(decision)
-    if isinstance(upcoming_days, bool) or not isinstance(upcoming_days, int) or upcoming_days < 0:
-        raise HTTPException(status_code=400, detail="Upcoming days must be a non-negative integer.")
+    if (
+        isinstance(upcoming_days, bool)
+        or not isinstance(upcoming_days, int)
+        or upcoming_days < 0
+        or upcoming_days > 3660
+    ):
+        raise HTTPException(status_code=400, detail="Upcoming days must be an integer between 0 and 3660.")
     current = _utc(as_of)
     horizon = current + timedelta(days=upcoming_days)
     items: list[ObligationWorkItem] = []

@@ -412,8 +412,10 @@ def test_obligation_rejects_wrong_purpose_bad_periods_and_cross_tenant_targets()
         second_control = create_control_foundation(session, control_decision, objective_code="OBJ-BOUNDARY", objective_title="Boundary", objective_statement="Boundary", control_code="IC-BOUNDARY-2", control_name="Second", control_statement="Second", control_type="preventive", execution_mode="manual", frequency="monthly", expected_evidence="Register", scope_type="organization", scope_reference="tenant-2", owner_reference="owner", effective_from=FEBRUARY)
         with pytest.raises(HTTPException, match="do not match"):
             link_obligation_requirement(session, compliance, obligation.compliance_obligation_id, "R-MISMATCH", "Mismatch", "Mismatch", internal_control_definition_id=first_control.definition.internal_control_definition_id, control_implementation_id=second_control.implementation.control_implementation_id)
-        with pytest.raises(HTTPException, match="non-negative"):
+        with pytest.raises(HTTPException, match="between 0 and 3660"):
             list_obligation_worklist(session, compliance, upcoming_days=-1)
+        with pytest.raises(HTTPException, match="between 0 and 3660"):
+            list_obligation_worklist(session, compliance, upcoming_days=3661)
         other = _decision(tenant_id="tenant-two")
         with pytest.raises(HTTPException, match="not on file"):
             create_compliance_obligation(session, other, revision.source_revision_id, "OTHER", "Other", "Other", "regulatory", "tenant", "two", FEBRUARY)
