@@ -11,8 +11,8 @@ from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from cwl_grc.authorization import seed_authorization_purposes
-from cwl_grc.catalog import seed_control_catalog
+from cwl_grc.authorization import PurposeCode, seed_authorization_purposes
+from cwl_grc.catalog import FrameworkCode, _seed_rows, seed_control_catalog
 from cwl_grc.migrations import (
     POLICY_INTEGRITY_MIGRATION,
     apply_schema_migrations,
@@ -24,11 +24,12 @@ from cwl_grc.models import Base
 POSTGRESQL_DRIVER = "postgresql+psycopg"
 POSTGRESQL_MIGRATION_LOCK_KEY = 0x43574C475243
 EXPECTED_MIGRATION_KEYS = frozenset({POLICY_INTEGRITY_MIGRATION})
-REQUIRED_REFERENCE_TABLES = (
-    "control_framework",
-    "control_item",
-    "authorization_purpose",
+EXPECTED_FRAMEWORK_KEYS = frozenset(code.value for code in FrameworkCode)
+EXPECTED_CONTROL_IDENTITIES = frozenset(
+    (framework.value, catalog_identifier)
+    for framework, _edition, catalog_identifier, _title, _statement in _seed_rows()
 )
+EXPECTED_PURPOSE_CODES = frozenset(code.value for code in PurposeCode)
 
 
 class SchemaCompatibilityError(RuntimeError):
@@ -227,13 +228,24 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
                 text("SELECT migration_key FROM schema_migration ORDER BY migration_key")
             ).scalars()
         )
-        missing_reference_tables = tuple(
-            table_name
-            for table_name in REQUIRED_REFERENCE_TABLES
-            if connection.execute(
-                text(f"SELECT COUNT(*) FROM {table_name}")
-            ).scalar_one()
-            == 0
+        framework_keys = frozenset(
+            connection.execute(
+                text("SELECT framework_key FROM control_framework")
+            ).scalars()
+        )
+        control_identities = frozenset(
+            tuple(row)
+            for row in connection.execute(
+                text(
+                    "SELECT framework_key, catalog_identifier "
+                    "FROM control_item"
+                )
+            )
+        )
+        purpose_codes = frozenset(
+            connection.execute(
+                text("SELECT purpose_code FROM authorization_purpose")
+            ).scalars()
         )
     receipt_set = frozenset(receipts)
     missing_migrations = EXPECTED_MIGRATION_KEYS.difference(receipt_set)
@@ -246,9 +258,14 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
         raise SchemaCompatibilityError(
             "The GRC schema is ahead of this binary; deploy a compatible application."
         )
-    if missing_reference_tables:
+    if (
+        framework_keys != EXPECTED_FRAMEWORK_KEYS
+        or control_identities != EXPECTED_CONTROL_IDENTITIES
+        or purpose_codes != EXPECTED_PURPOSE_CODES
+    ):
         raise SchemaCompatibilityError(
-            "The GRC schema reference data is incomplete; run the migration owner."
+            "The GRC schema reference data is incomplete or incompatible; "
+            "run the migration owner."
         )
     return receipts
 
