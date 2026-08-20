@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from cryptography.hazmat.primitives.asymmetric import rsa
 from sqlalchemy import delete, update
-from sqlalchemy.exc import DBAPIError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from cwl_grc.app import create_app
 from cwl_grc.authorization import AuthorizationDecision, PurposeCode, seed_authorization_purposes
@@ -26,6 +26,7 @@ from cwl_grc.models import (
     ControlItem,
     PolicyDocument,
     PolicyVersion,
+    RegulatorySource,
     SourceRevision,
 )
 from cwl_grc.keyverse_authentication import (
@@ -150,7 +151,7 @@ def _protected_client() -> tuple[TestClient, Any]:
     return TestClient(create_app(database_url="sqlite://", evidence_key=None, access_token_verifier=verifier)), private_key
 
 
-def _protected_token(private_key: Any) -> str:
+def _protected_token(private_key: Any, scope: str = "grc.compliance.read") -> str:
     """Sign one valid compliance-read access token for the protected route."""
     return jwt.encode(
         {
@@ -162,7 +163,7 @@ def _protected_token(private_key: Any) -> str:
             "iat": int((AUTH_NOW - timedelta(seconds=1)).timestamp()),
             "jti": "obligation-route-token",
             "client_id": "cwl-grc-web",
-            "scope": "grc.compliance.read",
+            "scope": scope,
             "role": "compliance_officer",
             "org": "tenant-1",
             "workspace": "workspace-1",
@@ -259,6 +260,16 @@ def test_obligation_lifecycle_preserves_applicability_and_change_history() -> No
             control_item_id=session.query(ControlItem).first().control_item_id,
             source_locator="article-1",
         )
+        with pytest.raises(HTTPException, match="target already exists"):
+            link_obligation_requirement(
+                session,
+                decision,
+                obligation.compliance_obligation_id,
+                "DORA-REQ-1-DUPLICATE",
+                "Duplicate resilience policy requirement",
+                "The same policy target cannot be linked twice.",
+                policy_version_id=policy_version_id,
+            )
         change = record_regulatory_change(
             session,
             decision,
@@ -360,6 +371,31 @@ def test_obligation_can_link_internal_control_and_worklist_unknown() -> None:
         assert obligation_next_action("unexpected") == obligation_next_action("unknown")
 
 
+def test_obligation_version_number_conflict_is_client_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A concurrent append-only version collision is returned as a conflict, not a 500."""
+    factory = _factory()
+    decision = _decision()
+    with factory() as session:
+        _source_row, revision = _source(session, decision)
+        obligation = _obligation(session, decision, revision)
+
+        real_flush = session.flush
+        flush_calls = 0
+
+        def fail_flush(*_args: Any, **_kwargs: Any) -> None:
+            """Simulate the unique-version race at the database boundary."""
+            nonlocal flush_calls
+            flush_calls += 1
+            if flush_calls <= 2:
+                real_flush(*_args, **_kwargs)
+                return
+            raise IntegrityError("insert", {}, RuntimeError("duplicate version"))
+
+        monkeypatch.setattr(session, "flush", fail_flush)
+        with pytest.raises(HTTPException, match="legal interpretation version"):
+            add_legal_interpretation(session, decision, obligation.compliance_obligation_id, "Interpretation", "authority://1")
+
+
 def test_obligation_rejects_wrong_purpose_bad_periods_and_cross_tenant_targets() -> None:
     """Purpose, period, tenant, and controlled-state boundaries fail closed."""
     factory = _factory()
@@ -410,6 +446,8 @@ def test_obligation_rejects_wrong_purpose_bad_periods_and_cross_tenant_targets()
         control_decision = _decision(PurposeCode.COVERAGE_REVIEW)
         first_control = create_control_foundation(session, control_decision, objective_code="OBJ-BOUNDARY", objective_title="Boundary", objective_statement="Boundary", control_code="IC-BOUNDARY-1", control_name="First", control_statement="First", control_type="preventive", execution_mode="manual", frequency="monthly", expected_evidence="Register", scope_type="organization", scope_reference="tenant-1", owner_reference="owner", effective_from=FEBRUARY)
         second_control = create_control_foundation(session, control_decision, objective_code="OBJ-BOUNDARY", objective_title="Boundary", objective_statement="Boundary", control_code="IC-BOUNDARY-2", control_name="Second", control_statement="Second", control_type="preventive", execution_mode="manual", frequency="monthly", expected_evidence="Register", scope_type="organization", scope_reference="tenant-2", owner_reference="owner", effective_from=FEBRUARY)
+        with pytest.raises(HTTPException, match="internal control definition"):
+            link_obligation_requirement(session, compliance, obligation.compliance_obligation_id, "R-MISSING-CONTROL", "Missing control", "The implementation needs its definition.", control_implementation_id=first_control.implementation.control_implementation_id)
         with pytest.raises(HTTPException, match="do not match"):
             link_obligation_requirement(session, compliance, obligation.compliance_obligation_id, "R-MISMATCH", "Mismatch", "Mismatch", internal_control_definition_id=first_control.definition.internal_control_definition_id, control_implementation_id=second_control.implementation.control_implementation_id)
         with pytest.raises(HTTPException, match="between 0 and 3660"):
@@ -571,6 +609,7 @@ def test_obligation_http_workflow_uses_local_boundary() -> None:
         },
     )
     assert change.status_code == 201
+    assert change.json()["change_status"] == "detected"
     impact = client.post(
         f"/obligations/changes/{change.json()['regulatory_change_id']}/impact-assessments",
         headers=headers,
@@ -601,3 +640,43 @@ def test_obligation_read_uses_verified_keyverse_tenant() -> None:
     )
     assert response.status_code == 200
     assert response.json()["obligations"] == []
+
+
+def test_obligation_write_routes_require_write_scope_and_bind_identity() -> None:
+    """Protected obligation writes require their scope and preserve verified identity."""
+    client, private_key = _protected_client()
+    read_headers = {
+        "Authorization": f"Bearer {_protected_token(private_key)}",
+        "X-Purpose": PurposeCode.COMPLIANCE_GOVERNANCE.value,
+    }
+    write_headers = {
+        "Authorization": f"Bearer {_protected_token(private_key, 'grc.compliance.write')}",
+        "X-Purpose": PurposeCode.COMPLIANCE_GOVERNANCE.value,
+    }
+    for path in (
+        "/obligations/sources",
+        "/obligations/sources/missing/revisions",
+        "/obligations",
+        "/obligations/missing/applicability-decisions",
+        "/obligations/missing/requirements",
+        "/obligations/changes",
+        "/obligations/changes/missing/impact-assessments",
+    ):
+        assert client.post(path, headers=read_headers, json={}).status_code == 403
+    source = client.post(
+        "/obligations/sources",
+        headers=write_headers,
+        json={
+            "source_code": "KEYVERSE-SOURCE",
+            "source_kind": "regulation",
+            "source_title": "Protected source",
+            "issuing_authority": "Authority",
+            "official_reference_url": "https://example.test/protected",
+            "license_classification": "identifier_only",
+        },
+    )
+    assert source.status_code == 201
+    with client.app.state.session_factory() as session:
+        stored = session.query(RegulatorySource).filter_by(source_code="KEYVERSE-SOURCE").one()
+        assert stored.tenant_id == "tenant-1"
+        assert stored.created_by_actor == "keyverse-compliance-officer"

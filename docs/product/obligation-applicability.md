@@ -51,7 +51,8 @@ Controlled applicability states are `applicable`, `not_applicable`,
 `partially_applicable`, `inherited`, `compensating_control`, `pending_review`,
 and `unknown`. A `not_applicable` decision requires rationale, evidence
 reference, effective period, and next review. The worklist returns `overdue`,
-`upcoming`, or `none` based on the latest decision for the tenant.
+`upcoming`, or `none` based on the latest decision for the tenant; its
+`upcoming_days` horizon is an integer from 0 through 3660.
 
 ## UML / relationship map
 
@@ -68,7 +69,7 @@ classDiagram
     compliance_obligation "1" --> "many" obligation_requirement
     policy_version "1" --> "many" obligation_requirement
     internal_control_definition "1" --> "many" obligation_requirement
-    regulatory_source "1" --> "many" regulatory_change
+    source_revision "1" --> "many" regulatory_change
     regulatory_change "1" --> "many" change_impact_assessment
     compliance_obligation "1" --> "many" change_impact_assessment
 ```
@@ -91,8 +92,8 @@ effectiveness.
 
 ## Acceptance evidence
 
-- realistic jurisdiction, contract, partial-applicability, supersession, late-
-  change, and cross-tenant scenarios pass;
+- realistic jurisdiction, contract, partial-applicability, supersession,
+  late-change, and cross-tenant scenarios pass;
 - source and decision history is database-immutable in SQLite and PostgreSQL;
 - exact source digest and diff references are retained;
 - local tests maintain 100% production statement/branch coverage and public

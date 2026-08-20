@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from cwl_grc.audit import record_audit_event
@@ -125,6 +126,16 @@ def _same_tenant(session: Session, model: type[ModelT], identifier: str, tenant_
     if row is None:
         raise HTTPException(status_code=404, detail="That compliance record is not on file.")
     return row
+
+
+def _flush_versioned_row(session: Session, row: ModelT, conflict_detail: str) -> None:
+    """Flush one append-only version and convert concurrent number conflicts to 409."""
+    try:
+        with session.begin_nested():
+            session.add(row)
+            session.flush()
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail=conflict_detail) from exc
 
 
 def create_jurisdiction(
@@ -385,8 +396,7 @@ def add_legal_interpretation(
         interpreted_by_actor=decision.actor_identifier,
         interpreted_at=_utc(),
     )
-    session.add(interpretation)
-    session.flush()
+    _flush_versioned_row(session, interpretation, "That legal interpretation version already exists.")
     record_audit_event(session, decision, "add_legal_interpretation", "legal_interpretation", interpretation.legal_interpretation_id)
     return interpretation
 
@@ -481,7 +491,7 @@ def link_obligation_requirement(
     """Create a reviewed obligation link to a finalized policy or internal control."""
     _require_compliance_purpose(decision)
     obligation = _same_tenant(session, ComplianceObligation, compliance_obligation_id, decision.tenant_id)
-    if not policy_version_id and not internal_control_definition_id:
+    if not policy_version_id and not internal_control_definition_id and not control_implementation_id:
         raise HTTPException(status_code=400, detail="Link the obligation to a policy or internal control.")
     catalog_item = None
     if control_item_id:
@@ -498,9 +508,20 @@ def link_obligation_requirement(
         control = _same_tenant(session, InternalControlDefinition, internal_control_definition_id, decision.tenant_id)
     implementation = None
     if control_implementation_id:
+        if control is None:
+            raise HTTPException(status_code=400, detail="Name the internal control definition for the implementation.")
         implementation = _same_tenant(session, ControlImplementation, control_implementation_id, decision.tenant_id)
-        if control is None or implementation.internal_control_definition_id != control.internal_control_definition_id:
+        if implementation.internal_control_definition_id != control.internal_control_definition_id:
             raise HTTPException(status_code=409, detail="The implementation and control definition do not match.")
+    existing = session.query(ObligationRequirement).filter_by(
+        tenant_id=decision.tenant_id,
+        compliance_obligation_id=obligation.compliance_obligation_id,
+        policy_version_id=policy.policy_version_id if policy else None,
+        internal_control_definition_id=control.internal_control_definition_id if control else None,
+        control_implementation_id=implementation.control_implementation_id if implementation else None,
+    ).first()
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="That obligation requirement target already exists.")
     requirement = ObligationRequirement(
         obligation_requirement_id=uuid4().hex,
         tenant_id=decision.tenant_id,
@@ -595,8 +616,7 @@ def assess_change_impact(
         assessed_by_actor=decision.actor_identifier,
         assessed_at=assessed_at,
     )
-    session.add(assessment)
-    session.flush()
+    _flush_versioned_row(session, assessment, "That change impact assessment version already exists.")
     record_audit_event(session, decision, "assess_change_impact", "change_impact_assessment", assessment.change_impact_assessment_id)
     return assessment
 
@@ -633,20 +653,21 @@ def list_obligation_worklist(
     current = _utc(as_of)
     horizon = current + timedelta(days=upcoming_days)
     items: list[ObligationWorkItem] = []
+    decisions_by_obligation: dict[str, dict[tuple[str, str], ApplicabilityDecision]] = {}
+    for candidate in (
+        session.query(ApplicabilityDecision)
+        .filter_by(tenant_id=decision.tenant_id)
+        .order_by(ApplicabilityDecision.decided_at.desc(), ApplicabilityDecision.applicability_decision_id.desc())
+        .all()
+    ):
+        decisions_by_obligation.setdefault(candidate.compliance_obligation_id, {}).setdefault(
+            (candidate.scope_type, candidate.scope_reference), candidate
+        )
     obligations = session.query(ComplianceObligation).filter_by(tenant_id=decision.tenant_id).order_by(ComplianceObligation.effective_from).all()
     for obligation in obligations:
-        latest_by_scope: dict[tuple[str, str], ApplicabilityDecision] = {}
-        for candidate in (
-            session.query(ApplicabilityDecision)
-            .filter_by(tenant_id=decision.tenant_id, compliance_obligation_id=obligation.compliance_obligation_id)
-            .order_by(ApplicabilityDecision.decided_at.desc())
-            .all()
-        ):
-            scope = (candidate.scope_type, candidate.scope_reference)
-            previous = latest_by_scope.get(scope)
-            if previous is None or candidate.decided_at > previous.decided_at:
-                latest_by_scope[scope] = candidate
-        latest_decisions: list[ApplicabilityDecision | None] = list(latest_by_scope.values()) or [None]
+        latest_decisions: list[ApplicabilityDecision | None] = list(
+            decisions_by_obligation.get(obligation.compliance_obligation_id, {}).values()
+        ) or [None]
         for latest in latest_decisions:
             review_at = latest.next_review_at if latest else None
             if review_at is not None and review_at < current:

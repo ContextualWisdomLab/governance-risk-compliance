@@ -44,8 +44,9 @@ from cwl_grc.keyverse_authentication import (
     KeyverseAccessTokenVerifier,
     require_access_scopes,
 )
-from cwl_grc.models import ControlItem, EvidenceRecord
+from cwl_grc.models import ComplianceObligation, ControlItem, EvidenceRecord
 from cwl_grc.obligations import (
+    ApplicabilityCode,
     ObligationWorkItem,
     assess_change_impact,
     create_compliance_obligation,
@@ -91,21 +92,21 @@ def parse_framework(value: str | None) -> FrameworkCode | None:
         raise HTTPException(status_code=400, detail="Unknown control framework.") from exc
 
 
-def parse_optional_timestamp(value: Any) -> datetime | None:
+def parse_optional_timestamp(value: Any, field_name: str = "disposition date") -> datetime | None:
     """Parse one optional ISO-8601 timestamp supplied by an officer workflow."""
     if value is None or value == "":
         return None
     if not isinstance(value, str):
-        raise HTTPException(status_code=400, detail="A disposition date must be text.")
+        raise HTTPException(status_code=400, detail=f"The {field_name} must be text.")
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Use an ISO-8601 disposition date.") from exc
+        raise HTTPException(status_code=400, detail=f"Use an ISO-8601 {field_name}.") from exc
 
 
 def parse_required_timestamp(body: dict[str, Any], field_name: str) -> datetime:
     """Parse one required ISO-8601 timestamp from a JSON officer workflow."""
-    value = parse_optional_timestamp(body.get(field_name))
+    value = parse_optional_timestamp(body.get(field_name), field_name)
     if value is None:
         raise HTTPException(status_code=400, detail=f"Name the {field_name} timestamp.")
     return value
@@ -234,20 +235,24 @@ def create_app(
             "grc.policy.read",
         ).tenant_id
 
-    def tenant_for_compliance_read(
+    def decision_for_compliance_read(
         authorization: str | None,
         purpose_value: str | None,
-    ) -> str:
+    ) -> AuthorizationDecision:
         """Resolve a tenant for obligation reads while preserving local preview mode."""
         if access_token_verifier is None:
-            return LOCAL_DEVELOPMENT_TENANT
+            return AuthorizationDecision(
+                "compliance-reader",
+                PurposeCode.COMPLIANCE_GOVERNANCE,
+                LOCAL_DEVELOPMENT_TENANT,
+            )
         return require_request_actor(
             authorization,
             None,
             purpose_value,
             PurposeCode.COMPLIANCE_GOVERNANCE,
             "grc.compliance.read",
-        ).tenant_id
+        )
 
     app = FastAPI(title="CWL GRC", version="0.1.0")
     app.state.evidence_cipher = cipher
@@ -474,7 +479,7 @@ def create_app(
             parse_required_timestamp(body, "effective_from"),
             body.get("content_digest", ""),
             body.get("revision_summary", ""),
-            withdrawn_at=parse_optional_timestamp(body.get("withdrawn_at")),
+            withdrawn_at=parse_optional_timestamp(body.get("withdrawn_at"), "withdrawn_at"),
             immutable_artifact_reference=body.get("immutable_artifact_reference"),
         )
         return {"source_revision_id": revision.source_revision_id, "revision_number": revision.revision_number}
@@ -506,10 +511,16 @@ def create_app(
             body.get("scope_type", ""),
             body.get("scope_reference", ""),
             parse_required_timestamp(body, "effective_from"),
-            effective_to=parse_optional_timestamp(body.get("effective_to")),
+            effective_to=parse_optional_timestamp(body.get("effective_to"), "effective_to"),
             jurisdiction_id=body.get("jurisdiction_id"),
         )
-        return _serialize_obligation(obligation, "unknown", None, "none", "Decide applicability for the exact tenant scope.")
+        return _serialize_obligation(
+            obligation,
+            ApplicabilityCode.UNKNOWN.value,
+            None,
+            "none",
+            "Decide applicability for the exact tenant scope.",
+        )
 
     @app.get("/obligations")
     def get_obligations(
@@ -520,12 +531,11 @@ def create_app(
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """List same-tenant obligation status and overdue/upcoming next actions."""
-        tenant_id = tenant_for_compliance_read(authorization, x_purpose)
-        decision = AuthorizationDecision("compliance-reader", PurposeCode.COMPLIANCE_GOVERNANCE, tenant_id)
+        decision = decision_for_compliance_read(authorization, x_purpose)
         items = list_obligation_worklist(
             session,
             decision,
-            as_of=parse_optional_timestamp(as_of),
+            as_of=parse_optional_timestamp(as_of, "as_of"),
             upcoming_days=upcoming_days,
         )
         return {"obligations": [_serialize_obligation_item(item) for item in items]}
@@ -558,7 +568,7 @@ def create_app(
             body.get("evidence_reference", ""),
             parse_required_timestamp(body, "effective_from"),
             parse_required_timestamp(body, "next_review_at"),
-            effective_to=parse_optional_timestamp(body.get("effective_to")),
+            effective_to=parse_optional_timestamp(body.get("effective_to"), "effective_to"),
             applicability_rule_id=body.get("applicability_rule_id"),
             supersedes_decision_id=body.get("supersedes_decision_id"),
         )
@@ -623,7 +633,7 @@ def create_app(
             body.get("change_code", ""),
             body.get("change_summary", ""),
             body.get("source_diff_reference", ""),
-            effective_at=parse_optional_timestamp(body.get("effective_at")),
+            effective_at=parse_optional_timestamp(body.get("effective_at"), "effective_at"),
         )
         return {"regulatory_change_id": change.regulatory_change_id, "change_status": change.change_status}
 
@@ -654,7 +664,7 @@ def create_app(
             body.get("assigned_owner_reference", ""),
             body.get("implementation_plan", ""),
             body.get("reapproval_status", ""),
-            due_at=parse_optional_timestamp(body.get("due_at")),
+            due_at=parse_optional_timestamp(body.get("due_at"), "due_at"),
         )
         return {
             "change_impact_assessment_id": assessment.change_impact_assessment_id,
@@ -1019,7 +1029,7 @@ def _serialize_evidence_retention(record: EvidenceRecord) -> dict[str, Any]:
 
 
 def _serialize_obligation(
-    obligation: Any,
+    obligation: ComplianceObligation,
     applicability_code: str,
     next_review_at: datetime | None,
     queue: str,

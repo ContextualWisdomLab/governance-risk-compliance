@@ -15,8 +15,8 @@ changes without rewriting an earlier conclusion. Contractual and voluntary
 commitments also need the same policy/control workflow while remaining distinct
 from legislation and regulation.
 
-ISO 37301:2021 and its 2024 climate-action amendment are the compliance-
-management research baseline. The repository stores governed references and
+ISO 37301:2021 and its 2024 climate-action amendment are the
+compliance-management research baseline. The repository stores governed references and
 decisions; it does not copy protected legal or standards text.
 
 ## Decision

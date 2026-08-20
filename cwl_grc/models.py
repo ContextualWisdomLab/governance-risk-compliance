@@ -572,7 +572,7 @@ class ObligationRequirement(Base):
             name="obligation_requirement_target_present",
         ),
         CheckConstraint(
-            "review_status IN ('proposed', 'approved', 'rejected')",
+            "review_status = 'approved'",
             name="obligation_requirement_review",
         ),
     )
@@ -591,7 +591,7 @@ class ObligationRequirement(Base):
     requirement_code: Mapped[str] = mapped_column(String(64), nullable=False)
     requirement_title: Mapped[str] = mapped_column(String(255), nullable=False)
     source_locator: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    review_status: Mapped[str] = mapped_column(String(32), nullable=False, default="proposed", server_default="proposed")
+    review_status: Mapped[str] = mapped_column(String(32), nullable=False, default="approved", server_default="approved")
     mapping_rationale: Mapped[str] = mapped_column(Text, nullable=False)
     reviewed_by_actor: Mapped[str | None] = mapped_column(String(128), nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -804,7 +804,7 @@ class RegulatoryChange(Base):
             name="regulatory_change_tenant_revision",
         ),
         CheckConstraint(
-            "change_status IN ('detected', 'triaged', 'implemented', 'closed')",
+            "change_status = 'detected'",
             name="regulatory_change_status",
         ),
     )

@@ -46,7 +46,7 @@ The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `
 | Register source and exact revision | `POST /obligations/sources`, `POST /obligations/sources/{id}/revisions` with `X-Purpose: compliance_governance` |
 | Register and decide an obligation | `POST /obligations`, `POST /obligations/{id}/applicability-decisions`; decisions require rationale, evidence reference, period, and next review |
 | Link obligation truth | `POST /obligations/{id}/requirements` to a finalized policy or reviewed internal control |
-| Review obligations and source changes | `GET /obligations`, `POST /obligations/changes`, and `POST /obligations/changes/{id}/impact-assessments` |
+| Review obligations and source changes | `GET /obligations` (`upcoming_days` 0–3660), `POST /obligations/changes`, and `POST /obligations/changes/{id}/impact-assessments` |
 | Liveness probe | `GET /healthz` (dependency-free) |
 | Readiness probe | `GET /readyz` (returns `503` with stable reason codes when traffic is unsafe) |
 | Startup probe | `GET /startupz` (reports the checks completed before admission) |
