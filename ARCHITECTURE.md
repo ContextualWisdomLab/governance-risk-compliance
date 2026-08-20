@@ -17,7 +17,9 @@ flowchart LR
     authz --> preview
     preview --> kernel[cwl_grc kernel]
     cli --> kernel
-    probe[/healthz /readyz /startupz] --> preview
+    probe[/healthz] --> preview
+    ready_probe[/readyz] --> preview
+    startup_probe[/startupz] --> preview
     preview --> telemetry[Correlated JSON request logs]
     kernel --> policy[(tenant-owned policy records)]
     kernel --> catalog[(shared control catalog)]
