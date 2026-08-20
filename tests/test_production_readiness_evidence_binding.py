@@ -35,19 +35,18 @@ def _write_manifest(path: Path, manifest: object) -> None:
     path.write_text(json.dumps(manifest), encoding="utf-8")
 
 
-def _git_blob_sha(contents: bytes) -> str:
-    """Return the repository-native Git object identity for exact contents."""
-    header = f"blob {len(contents)}\0".encode("ascii")
-    return hashlib.sha1(header + contents, usedforsecurity=False).hexdigest()
+def _sha256(contents: bytes) -> str:
+    """Return the SHA-256 digest for exact contents."""
+    return hashlib.sha256(contents).hexdigest()
 
 
-def _bound_repository_evidence(*, blob_sha: str | None = None) -> dict[str, str]:
+def _bound_repository_evidence(*, digest: str | None = None) -> dict[str, str]:
     """Return one repository-file evidence reference bound to exact content."""
     source = REPOSITORY_ROOT / EVIDENCE_PATH
     return {
         "kind": "repository_file",
         "path": EVIDENCE_PATH,
-        "git_blob_sha": blob_sha or _git_blob_sha(source.read_bytes()),
+        "sha256": digest or _sha256(source.read_bytes()),
     }
 
 
@@ -74,7 +73,7 @@ def test_release_mode_rejects_opaque_success_words_as_evidence(
 def test_release_mode_accepts_hash_bound_repository_file_evidence(
     tmp_path: Path,
 ) -> None:
-    """A canonical repository file with its exact Git blob identity is verifiable."""
+    """A canonical repository file with its exact SHA-256 digest is verifiable."""
     path = tmp_path / "manifest.json"
     _write_manifest(path, _all_ready_manifest([_bound_repository_evidence()]))
 
@@ -88,7 +87,7 @@ def test_release_mode_rejects_wrong_repository_file_digest(
     path = tmp_path / "manifest.json"
     _write_manifest(
         path,
-        _all_ready_manifest([_bound_repository_evidence(blob_sha="0" * 40)]),
+        _all_ready_manifest([_bound_repository_evidence(digest="0" * 64)]),
     )
 
     assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2
@@ -146,7 +145,7 @@ def test_release_mode_rejects_missing_repository_evidence_file(
     evidence = {
         "kind": "repository_file",
         "path": "missing.txt",
-        "git_blob_sha": "0" * 40,
+        "sha256": "0" * 64,
     }
     _write_manifest(path, _all_ready_manifest([evidence]))
 
@@ -164,7 +163,7 @@ def test_release_mode_rejects_evidence_symlink_escape(tmp_path: Path) -> None:
     evidence = {
         "kind": "repository_file",
         "path": "escape.txt",
-        "git_blob_sha": _git_blob_sha(outside.read_bytes()),
+        "sha256": _sha256(outside.read_bytes()),
     }
     _write_manifest(path, _all_ready_manifest([evidence]))
 
@@ -179,7 +178,7 @@ def test_release_mode_rejects_directory_as_evidence(tmp_path: Path) -> None:
     evidence = {
         "kind": "repository_file",
         "path": "evidence",
-        "git_blob_sha": "0" * 40,
+        "sha256": "0" * 64,
     }
     _write_manifest(path, _all_ready_manifest([evidence]))
 
