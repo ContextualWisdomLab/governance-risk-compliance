@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
       - name: Setup Node
-        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1113a # v6.0.0
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '24'
       - name: Install pinned Storybook roots without mutating the tree
