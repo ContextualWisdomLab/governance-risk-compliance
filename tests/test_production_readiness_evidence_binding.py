@@ -7,6 +7,8 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
+import pytest
+
 from cwl_grc.production_readiness import load_manifest, main
 
 
@@ -49,6 +51,16 @@ def _bound_repository_evidence(*, blob_sha: str | None = None) -> dict[str, str]
     }
 
 
+def _main_arguments(manifest_path: Path, repository_root: Path) -> list[str]:
+    """Return release-mode CLI arguments for one manifest and repository tree."""
+    return [
+        str(manifest_path),
+        "--repository-root",
+        str(repository_root),
+        "--require-ready",
+    ]
+
+
 def test_release_mode_rejects_opaque_success_words_as_evidence(
     tmp_path: Path,
 ) -> None:
@@ -56,14 +68,7 @@ def test_release_mode_rejects_opaque_success_words_as_evidence(
     path = tmp_path / "manifest.json"
     _write_manifest(path, _all_ready_manifest(["verified"]))
 
-    assert main(
-        [
-            str(path),
-            "--repository-root",
-            str(REPOSITORY_ROOT),
-            "--require-ready",
-        ]
-    ) == 2
+    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2
 
 
 def test_release_mode_accepts_hash_bound_repository_file_evidence(
@@ -73,14 +78,7 @@ def test_release_mode_accepts_hash_bound_repository_file_evidence(
     path = tmp_path / "manifest.json"
     _write_manifest(path, _all_ready_manifest([_bound_repository_evidence()]))
 
-    assert main(
-        [
-            str(path),
-            "--repository-root",
-            str(REPOSITORY_ROOT),
-            "--require-ready",
-        ]
-    ) == 0
+    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 0
 
 
 def test_release_mode_rejects_wrong_repository_file_digest(
@@ -93,14 +91,7 @@ def test_release_mode_rejects_wrong_repository_file_digest(
         _all_ready_manifest([_bound_repository_evidence(blob_sha="0" * 40)]),
     )
 
-    assert main(
-        [
-            str(path),
-            "--repository-root",
-            str(REPOSITORY_ROOT),
-            "--require-ready",
-        ]
-    ) == 2
+    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2
 
 
 def test_release_mode_rejects_repository_path_escape(
@@ -112,11 +103,100 @@ def test_release_mode_rejects_repository_path_escape(
     evidence["path"] = "../outside.txt"
     _write_manifest(path, _all_ready_manifest([evidence]))
 
-    assert main(
-        [
-            str(path),
-            "--repository-root",
-            str(REPOSITORY_ROOT),
-            "--require-ready",
-        ]
-    ) == 2
+    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2
+
+
+def test_release_mode_rejects_backslash_repository_path(
+    tmp_path: Path,
+) -> None:
+    """Platform-dependent backslash paths cannot alter repository evidence meaning."""
+    path = tmp_path / "manifest.json"
+    evidence = _bound_repository_evidence()
+    evidence["path"] = r"tests\evidence.py"
+    _write_manifest(path, _all_ready_manifest([evidence]))
+
+    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2
+
+
+def test_release_mode_rejects_missing_repository_root(tmp_path: Path) -> None:
+    """Evidence verification fails when the reviewed repository tree is absent."""
+    path = tmp_path / "manifest.json"
+    _write_manifest(path, _all_ready_manifest([_bound_repository_evidence()]))
+
+    assert main(_main_arguments(path, tmp_path / "missing-root")) == 2
+
+
+def test_release_mode_rejects_non_directory_repository_root(tmp_path: Path) -> None:
+    """A regular file cannot serve as the repository evidence authority."""
+    path = tmp_path / "manifest.json"
+    root = tmp_path / "not-a-directory"
+    root.write_text("not a repository", encoding="utf-8")
+    _write_manifest(path, _all_ready_manifest([_bound_repository_evidence()]))
+
+    assert main(_main_arguments(path, root)) == 2
+
+
+def test_release_mode_rejects_missing_repository_evidence_file(
+    tmp_path: Path,
+) -> None:
+    """A syntactically valid locator cannot certify a file that is absent."""
+    path = tmp_path / "manifest.json"
+    root = tmp_path / "repository"
+    root.mkdir()
+    evidence = {
+        "kind": "repository_file",
+        "path": "missing.txt",
+        "git_blob_sha": "0" * 40,
+    }
+    _write_manifest(path, _all_ready_manifest([evidence]))
+
+    assert main(_main_arguments(path, root)) == 2
+
+
+def test_release_mode_rejects_evidence_symlink_escape(tmp_path: Path) -> None:
+    """A repository path cannot redirect evidence verification outside the tree."""
+    path = tmp_path / "manifest.json"
+    root = tmp_path / "repository"
+    root.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("outside evidence", encoding="utf-8")
+    (root / "escape.txt").symlink_to(outside)
+    evidence = {
+        "kind": "repository_file",
+        "path": "escape.txt",
+        "git_blob_sha": _git_blob_sha(outside.read_bytes()),
+    }
+    _write_manifest(path, _all_ready_manifest([evidence]))
+
+    assert main(_main_arguments(path, root)) == 2
+
+
+def test_release_mode_rejects_directory_as_evidence(tmp_path: Path) -> None:
+    """Only regular repository files can become readiness evidence."""
+    path = tmp_path / "manifest.json"
+    root = tmp_path / "repository"
+    (root / "evidence").mkdir(parents=True)
+    evidence = {
+        "kind": "repository_file",
+        "path": "evidence",
+        "git_blob_sha": "0" * 40,
+    }
+    _write_manifest(path, _all_ready_manifest([evidence]))
+
+    assert main(_main_arguments(path, root)) == 2
+
+
+def test_release_mode_rejects_unreadable_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A file read failure is a typed non-passing evidence condition."""
+    path = tmp_path / "manifest.json"
+    evidence = _bound_repository_evidence()
+    _write_manifest(path, _all_ready_manifest([evidence]))
+
+    def fail_read(_path: Path) -> bytes:
+        raise OSError("simulated read failure")
+
+    monkeypatch.setattr(Path, "read_bytes", fail_read)
+    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2
