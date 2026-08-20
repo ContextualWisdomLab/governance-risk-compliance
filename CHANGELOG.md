@@ -16,6 +16,9 @@
 - Product CI for lint, docstring coverage, and 100% statement/branch test coverage.
 - Hash-locked `uv.lock` dependency graph for runtime and development dependencies.
 - Versioned schema-upgrade receipts for existing first-slice stores.
+- `docs/product-technical-gap-baseline.md` with observed product truth, the live PR queue, buyer-visible production and domain gaps, standards corrections, ownership boundaries, and exact next actions.
+- `docs/product/grc-domain-completion-roadmap.md` defining the closed obligation → requirement → policy → internal control → implementation → test/evidence → risk/audit → remediation → controlled-reporting loop and its release gates.
+- Current doctoring references for ISO 37301:2021 and Amendment 1:2024, ISO 19011:2026 Edition 4, OSCAL 1.2.3, and the NIST OLIR Program without claiming certification or source-text redistribution rights.
 
 ### Security
 
@@ -33,3 +36,4 @@
 
 - `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
+- `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — preserve external catalogs while adding distinct internal-control definitions, implementations, reviewed mappings, tests, effectiveness results, deficiencies, and purpose-bound evidence usage before risk and audit depend on the model.
