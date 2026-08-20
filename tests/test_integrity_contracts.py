@@ -294,7 +294,9 @@ def test_integrity_guard_ddl_covers_supported_and_unknown_dialects() -> None:
     postgres_ddl = "\n".join(integrity_guard_statements("postgresql"))
     assert "audit_event_block_update" in sqlite_ddl
     assert "policy_control_mapping_require_open_version" in sqlite_ddl
+    assert "control_owner_assignment_require_matching_foundation" in sqlite_ddl
     assert "prevent_audit_event_mutation" in postgres_ddl
     assert "prevent_policy_mapping_mutation" in postgres_ddl
+    assert "control_owner_assignment_graph_consistency" in postgres_ddl
     with pytest.raises(ValueError, match="Unsupported GRC database dialect"):
         integrity_guard_statements("mysql")

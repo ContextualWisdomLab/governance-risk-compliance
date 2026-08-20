@@ -39,6 +39,7 @@ from cwl_grc.models import (
     ControlEvidenceBinding,
     ControlDefinitionVersion,
     ControlDeficiency,
+    ControlOwnerAssignment,
     ControlTestPlan,
     ControlTestExecution,
     EvidenceRecord,
@@ -682,6 +683,40 @@ def test_duplicate_internal_control_writes_return_conflicts_on_insert_races(
                 "Concurrent result.",
             )
 
+    factory = _factory()
+    with factory() as session:
+        session.autoflush = False
+        original_flush = session.flush
+        flush_count = 0
+
+        def objective_race_flush(*_args, **_kwargs) -> None:  # noqa: ANN002, ANN003
+            nonlocal flush_count
+            flush_count += 1
+            if flush_count == 2:
+                raise IntegrityError("objective race", {}, RuntimeError("objective race"))
+            original_flush(*_args, **_kwargs)
+
+        monkeypatch.setattr(session, "flush", objective_race_flush)
+        with pytest.raises(HTTPException, match="objective already exists"):
+            _foundation(session, _decision(), "IC-RACE-OBJECTIVE")
+
+    factory = _factory()
+    with factory() as session:
+        session.autoflush = False
+        original_flush = session.flush
+        flush_count = 0
+
+        def definition_race_flush(*_args, **_kwargs) -> None:  # noqa: ANN002, ANN003
+            nonlocal flush_count
+            flush_count += 1
+            if flush_count == 4:
+                raise IntegrityError("definition race", {}, RuntimeError("definition race"))
+            original_flush(*_args, **_kwargs)
+
+        monkeypatch.setattr(session, "flush", definition_race_flush)
+        with pytest.raises(HTTPException, match="internal control code already exists"):
+            _foundation(session, _decision(), "IC-RACE-DEFINITION")
+
 
 def test_legacy_binding_backfill_and_sqlite_immutability() -> None:
     """Legacy direct bindings become unassessed and finalized histories cannot mutate."""
@@ -829,6 +864,36 @@ def test_sqlite_control_graph_triggers_reject_mismatched_foundations() -> None:
                     created_at=_JANUARY_START,
                 )
             )
+            session.flush()
+        session.rollback()
+        mismatched_owner = ControlOwnerAssignment(
+            assignment_id=uuid4().hex,
+            tenant_id=decision.tenant_id,
+            internal_control_definition_id=first.definition.internal_control_definition_id,
+            control_implementation_id=second.implementation.control_implementation_id,
+            owner_kind="reviewer",
+            owner_reference="reviewer-owner",
+            valid_from=_JANUARY_START,
+            assigned_at=_JANUARY_START,
+        )
+        with pytest.raises(IntegrityError, match="owner assignment foundation mismatch"):
+            session.add(mismatched_owner)
+            session.flush()
+        session.rollback()
+        valid_owner = ControlOwnerAssignment(
+            assignment_id=uuid4().hex,
+            tenant_id=decision.tenant_id,
+            internal_control_definition_id=first.definition.internal_control_definition_id,
+            control_implementation_id=first.implementation.control_implementation_id,
+            owner_kind="reviewer",
+            owner_reference="reviewer-owner",
+            valid_from=_JANUARY_START,
+            assigned_at=_JANUARY_START,
+        )
+        session.add(valid_owner)
+        session.flush()
+        valid_owner.control_implementation_id = second.implementation.control_implementation_id
+        with pytest.raises(IntegrityError, match="owner assignment foundation mismatch"):
             session.flush()
 
 

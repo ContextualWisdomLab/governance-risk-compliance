@@ -150,8 +150,15 @@ def create_control_foundation(
             created_by_actor=decision.actor_identifier,
             created_at=now,
         )
-        session.add(objective)
-        session.flush()
+        try:
+            with session.begin_nested():
+                session.add(objective)
+                session.flush()
+        except IntegrityError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail="That control objective already exists.",
+            ) from exc
     elif (
         objective.objective_title != objective_title
         or objective.objective_statement != objective_statement
@@ -177,8 +184,15 @@ def create_control_foundation(
         created_by_actor=decision.actor_identifier,
         created_at=now,
     )
-    session.add(definition)
-    session.flush()
+    try:
+        with session.begin_nested():
+            session.add(definition)
+            session.flush()
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="That internal control code already exists.",
+        ) from exc
     definition_version = ControlDefinitionVersion(
         control_definition_version_id=uuid4().hex,
         tenant_id=decision.tenant_id,
