@@ -6,11 +6,11 @@ Proposed; requires service-owner approval and collector acceptance.
 
 ## Context
 
-The service now emits request, database transaction, and audit-write telemetry,
-but it has no approved reliability targets, error-budget policy, dashboards, or
-paging route. A green local test cannot prove production availability or
-recovery. Alert thresholds also need to avoid high-cardinality identity and
-evidence labels.
+The service now emits request, database transaction, audit-write, and bounded
+database pool telemetry, but it has no approved reliability targets,
+error-budget policy, dashboards, or paging route. A green local test cannot
+prove production availability or recovery. Alert thresholds also need to avoid
+high-cardinality identity and evidence labels.
 
 ## Decision
 
@@ -27,13 +27,18 @@ evidence labels.
 4. Keep SLO labels bounded to route templates, method, status class, database
    system, environment, and outcome. Never label telemetry with tenant, actor,
    evidence, request, token, or raw path identifiers.
+5. Expose the SQLAlchemy pool's size, checked-out, checked-in, and overflow
+   gauges with only the `db.system.name` label. Pools without these bounded
+   SQLAlchemy methods, such as the in-memory SQLite test pool, emit no pool
+   observation.
 
 ## Consequences
 
 - Operators have a concrete approval artifact and next action rather than an
   unverified production claim.
-- The current telemetry names map to the availability, mutation, and audit
-  portions of the policy; recovery remains a rehearsed operational event.
+- The current telemetry names map to the availability, mutation, audit, and
+  database-capacity portions of the policy; recovery remains a rehearsed
+  operational event.
 - Dashboards and alert rules remain platform-owned integration work.
 
 ## Verification

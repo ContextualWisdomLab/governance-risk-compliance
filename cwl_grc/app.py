@@ -122,12 +122,13 @@ def create_app(
         keyring = EvidenceKeyring.from_environment()
     if keyring is None and key is None:
         key = os.environ.get("CWL_GRC_EVIDENCE_KEY")
-    factory = create_session_factory(url)
     cipher = EvidenceCipher(
         key,
         allow_ephemeral=url in {"sqlite://", "sqlite:///:memory:"},
         keyring=keyring,
     )
+    telemetry = RequestTelemetry(environment)
+    factory = create_session_factory(url, telemetry)
     with factory() as session:
         seed_control_catalog(session)
         seed_authorization_purposes(session)
@@ -138,8 +139,6 @@ def create_app(
         environment,
         access_token_verifier,
     )
-    telemetry = RequestTelemetry(environment)
-
     def get_session() -> Iterator[Session]:
         """Yield the request session."""
         yield from session_dependency(factory, telemetry)

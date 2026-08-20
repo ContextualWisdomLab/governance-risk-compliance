@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -90,6 +91,27 @@ def test_session_dependency_supports_uninstrumented_callers() -> None:
         next(dependency)
 
 
+def test_database_pool_metrics_use_bounded_database_labels(tmp_path: Path) -> None:
+    """A durable SQLite QueuePool emits bounded pool observations."""
+    app = create_app(
+        database_url=f"sqlite:///{tmp_path / 'pool.sqlite'}",
+        evidence_key="MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
+    )
+    with TestClient(app) as client:
+        assert client.get("/healthz").status_code == 200
+        metrics = _metrics(app)
+
+    for name in (
+        "cwl_grc.database.pool.size",
+        "cwl_grc.database.pool.checked_out",
+        "cwl_grc.database.pool.checked_in",
+        "cwl_grc.database.pool.overflow",
+    ):
+        points = metrics[name].data.data_points  # type: ignore[attr-defined]
+        assert points
+        assert {point.attributes["db.system.name"] for point in points} == {"sqlite"}
+
+
 def test_session_dependency_records_failed_audit_commit() -> None:
     """A failed transaction records audit failure without changing rollback behavior."""
     class Dialect:
@@ -155,6 +177,7 @@ def test_telemetry_exception_and_otlp_exporter_configuration(monkeypatch) -> Non
     with pytest.raises(RuntimeError, match="telemetry failure"):
         with telemetry.server_span("GET", "/healthz", {}):
             raise RuntimeError("telemetry failure")
+    assert telemetry.metric_reader.get_metrics_data() is None
     telemetry.record_request("GET", "/healthz", 403, 0.01)
     telemetry.shutdown()
     assert metric_exporter.shutdown.called

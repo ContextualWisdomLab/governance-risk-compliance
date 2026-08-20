@@ -44,7 +44,10 @@ method, status class, database system, and bounded outcome only.
 ## Current implementation boundary
 
 The service currently emits request count/duration, authorization denial,
-database transaction outcome/duration, and audit-write outcome metrics through
-OpenTelemetry. Pool metrics, recovery event recording, collector delivery,
+database transaction outcome/duration, audit-write outcome, and bounded
+database pool gauges through OpenTelemetry. The pool gauges are
+`cwl_grc.database.pool.size`, `cwl_grc.database.pool.checked_out`,
+`cwl_grc.database.pool.checked_in`, and `cwl_grc.database.pool.overflow`; each
+uses only `db.system.name`. Recovery event recording, collector delivery,
 recording rules, dashboards, paging integration, and restore/rollback rehearsal
 remain the next actions. `/readyz` remains the first operator check.
