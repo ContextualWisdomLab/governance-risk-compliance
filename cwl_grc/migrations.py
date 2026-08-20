@@ -5,7 +5,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime, timezone
 
-from sqlalchemy import Connection, Engine, inspect, text
+from sqlalchemy import Connection, DDL, Engine, Index, MetaData, String, Table, inspect, text
+from sqlalchemy.schema import CreateIndex
 
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
@@ -171,6 +172,10 @@ def _apply_policy_integrity_migration(connection: Connection) -> None:
 def _apply_tenant_isolation_migration(connection: Connection) -> None:
     """Backfill tenant keys onto existing tenant-owned rows without inventing identities."""
     inspector = inspect(connection)
+    metadata = MetaData()
+    tenant_default = String(128).literal_processor(connection.dialect)(
+        LOCAL_DEVELOPMENT_TENANT
+    )
     for table_name in TENANT_OWNED_TABLES:
         if not inspector.has_table(table_name):
             continue
@@ -178,10 +183,11 @@ def _apply_tenant_isolation_migration(connection: Connection) -> None:
         if "tenant_id" in columns:
             continue
         connection.execute(
-            text(
-                f"ALTER TABLE {table_name} ADD COLUMN tenant_id VARCHAR(128) "
-                f"NOT NULL DEFAULT '{LOCAL_DEVELOPMENT_TENANT}'"
-            )
+            DDL(
+                "ALTER TABLE %(table)s ADD COLUMN tenant_id VARCHAR(128) "
+                "NOT NULL DEFAULT %(tenant_default)s",
+                context={"tenant_default": tenant_default},
+            ).against(Table(table_name, metadata))
         )
         inspector = inspect(connection)
 
@@ -293,11 +299,14 @@ def _apply_internal_control_model_migration(connection: Connection) -> None:
         ),
     ):
         if inspector.has_table(table_name):
+            table = Table(table_name, MetaData(), autoload_with=connection)
+            index = Index(
+                index_name,
+                *(table.c[column_name.strip()] for column_name in columns.split(",")),
+                unique=True,
+            )
             connection.execute(
-                text(
-                    f"CREATE UNIQUE INDEX IF NOT EXISTS {index_name} "
-                    f"ON {table_name} ({columns})"
-                )
+                CreateIndex(index, if_not_exists=True)
             )
     Base.metadata.create_all(connection)
     connection.execute(
