@@ -203,7 +203,7 @@ def test_stale_concurrent_policy_revision_returns_conflict(tmp_path: Path) -> No
 def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
     tmp_path: Path,
 ) -> None:
-    """A pre-integrity SQLite store receives counters and finalization state."""
+    """Legacy policy rows receive integrity state and the local tenant backfill."""
     engine = create_engine(f"sqlite:///{tmp_path / 'legacy.sqlite'}")
     with engine.begin() as connection:
         connection.execute(
@@ -251,6 +251,8 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
     }
     assert "current_version_number" in policy_columns
     assert "is_finalized" in version_columns
+    assert "tenant_id" in policy_columns
+    assert "tenant_id" in version_columns
     with engine.connect() as connection:
         counter = connection.execute(
             text(
@@ -264,12 +266,26 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
                 "WHERE policy_version_id = 'version-1'"
             )
         ).scalar_one()
+        policy_tenant = connection.execute(
+            text(
+                "SELECT tenant_id FROM policy_document "
+                "WHERE policy_document_id = 'policy-1'"
+            )
+        ).scalar_one()
+        version_tenant = connection.execute(
+            text(
+                "SELECT tenant_id FROM policy_version "
+                "WHERE policy_version_id = 'version-1'"
+            )
+        ).scalar_one()
         receipt_count = connection.execute(
             text("SELECT COUNT(*) FROM schema_migration")
         ).scalar_one()
     assert counter == 3
     assert finalized in {True, 1}
-    assert receipt_count == 1
+    assert policy_tenant == "local_development"
+    assert version_tenant == "local_development"
+    assert receipt_count == 2
 
 
 def test_integrity_guard_ddl_covers_supported_and_unknown_dialects() -> None:
