@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import argparse
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -10,7 +12,7 @@ from sqlalchemy import text
 
 import cwl_grc.database as database_module
 from cwl_grc import create_app
-from cwl_grc.cli import main
+from cwl_grc.cli import _database_command, main
 from cwl_grc.database import (
     PostgresEngineSettings,
     SchemaCompatibilityError,
@@ -18,6 +20,7 @@ from cwl_grc.database import (
     build_engine,
     migrate_database,
 )
+from cwl_grc.migrations import install_integrity_guards
 
 
 def test_application_rejects_unknown_schema_mode() -> None:
@@ -56,6 +59,15 @@ def test_database_cli_reports_unsupported_dialect(
     assert "migration owner" in payload
 
 
+def test_database_command_rejects_unexpected_parser_state() -> None:
+    """A parser state outside migrate/check is a typed non-success result."""
+    namespace = argparse.Namespace(
+        database_command="unexpected",
+        database_url="sqlite://",
+    )
+    assert _database_command(namespace) == 2
+
+
 def test_postgresql_rejects_ambiguous_or_mismatched_sslmode() -> None:
     """The URL cannot override or multiply the reviewed TLS policy."""
     with pytest.raises(ValueError, match="one exact value"):
@@ -92,7 +104,7 @@ def test_postgresql_loopback_profile_accepts_localhost() -> None:
     engine.dispose()
 
 
-def test_runtime_rejects_schema_missing_required_table(tmp_path: Any) -> None:
+def test_runtime_rejects_schema_missing_required_table(tmp_path: Path) -> None:
     """Migration receipts cannot hide an incomplete or damaged table set."""
     database_url = f"sqlite:///{tmp_path / 'missing-table.sqlite'}"
     migrate_database(database_url)
@@ -102,6 +114,17 @@ def test_runtime_rejects_schema_missing_required_table(tmp_path: Any) -> None:
             connection.execute(text("DROP TABLE policy_document"))
         with pytest.raises(SchemaCompatibilityError, match="required tables"):
             assert_schema_compatible(engine)
+    finally:
+        engine.dispose()
+
+
+def test_integrity_guard_installer_accepts_engine(tmp_path: Path) -> None:
+    """The public guard installer remains idempotent for engine-owning callers."""
+    database_url = f"sqlite:///{tmp_path / 'guard-engine.sqlite'}"
+    migrate_database(database_url)
+    engine = build_engine(database_url)
+    try:
+        install_integrity_guards(engine)
     finally:
         engine.dispose()
 
