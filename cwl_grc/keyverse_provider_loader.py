@@ -452,7 +452,8 @@ def _validate_issuer_syntax(issuer: str) -> None:
     """Require the exact OIDC issuer URL shape before discovery concatenation."""
     parsed = urlsplit(issuer)
     if (
-        parsed.scheme != "https"
+        issuer != issuer.strip()
+        or parsed.scheme != "https"
         or not parsed.netloc
         or not parsed.hostname
         or parsed.username is not None
