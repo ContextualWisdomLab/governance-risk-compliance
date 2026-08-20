@@ -4,15 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from cryptography.fernet import Fernet
 from sqlalchemy import text
 
 from cwl_grc import create_app
-from cwl_grc.database import build_engine, migrate_database
+from cwl_grc.database import SchemaCompatibilityError, build_engine, migrate_database
 
 
 def test_runtime_never_recreates_missing_reference_data(tmp_path: Path) -> None:
-    """Runtime startup checks schema but never mutates shared catalog vocabulary."""
+    """Runtime refuses missing reference data instead of mutating shared vocabulary."""
     database_url = f"sqlite:///{tmp_path / 'reference-bootstrap.sqlite'}"
     migrate_database(database_url)
     engine = build_engine(database_url)
@@ -31,11 +32,12 @@ def test_runtime_never_recreates_missing_reference_data(tmp_path: Path) -> None:
             connection.execute(text("DELETE FROM authorization_purpose"))
         assert all(count > 0 for count in initial_counts)
 
-        create_app(
-            database_url=database_url,
-            evidence_key=Fernet.generate_key().decode("ascii"),
-            schema_mode="runtime",
-        )
+        with pytest.raises(SchemaCompatibilityError, match="reference data"):
+            create_app(
+                database_url=database_url,
+                evidence_key=Fernet.generate_key().decode("ascii"),
+                schema_mode="runtime",
+            )
 
         with engine.connect() as connection:
             runtime_counts = tuple(
