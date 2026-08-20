@@ -1,34 +1,22 @@
 # Production readiness evidence
 
-`production-readiness.json` is the repository-owned, versioned register of the evidence
-required before CWL GRC may be promoted as a production service. It is deliberately
-separate from the ordinary Product workflow: green unit tests do not prove that identity,
-data lifecycle, recovery, release, operations, API, risk, and audit-product obligations are
-complete.
+`production-readiness.json` is the repository-owned, machine-readable register for the production target. It is deliberately separate from ordinary Product CI: green tests cannot prove that identity, tenant isolation, data lifecycle, recovery, release, operations, API, risk, and audit-product obligations are complete.
 
-This register is **not self-certification**. A gate may be marked `ready` only when its
-canonical issue has concrete implementation evidence and the exact release head still
-satisfies independent review and centrally owned security checks.
+The register is **not self-certification**. Ordinary validation may succeed while `production_ready` is `false`. Release mode remains non-zero until every required gate is `ready`, has no blockers, and cites repository evidence whose exact Git blob identity matches the checked-out tree.
 
 ## Gate contract
 
-Every gate has a stable `id`, `title`, `priority`, `status`, `owner`, canonical `issue_url`,
-`required_evidence`, current `blockers`, and completed `evidence`.
+Every gate has a stable `id`, `title`, `priority`, `status`, `owner`, canonical `issue_url`, `required_evidence`, current `blockers`, and completed `evidence`.
 
 - Priorities are `P0`, `P1`, or `P2`.
 - Statuses are `blocked`, `in_progress`, or `ready`.
 - `blocked` and `in_progress` gates must name at least one current blocker.
-- `ready` gates must have no blockers and must name concrete evidence.
-- The manifest belongs to `ContextualWisdomLab/governance-risk-compliance` and targets
-  `production`; every gate owner must match that repository exactly.
-- The required gate IDs form a closed, versioned set. Missing gates and undeclared replacement
-  gates are rejected rather than allowing a smaller all-ready manifest to certify a release.
-- Each required gate ID is pinned to its reviewed priority and canonical issue number. Changing
-  that mapping requires an explicit validator and regression-test change, not only a manifest edit.
-- Scalar and list string values must be canonical and must not contain surrounding whitespace.
-  Validation rejects ambiguous values instead of silently normalizing them.
+- `ready` gates must have no blockers and at least one verified evidence object.
+- The manifest belongs exactly to `ContextualWisdomLab/governance-risk-compliance` and targets `production`.
+- The gate-ID set and each gate’s reviewed priority/issue mapping are closed and versioned.
+- Unknown replacement gates, missing gates, ambiguous strings, and silent normalization are rejected.
 
-The initial closed gate set is:
+The initial gate set is:
 
 | Gate ID | Priority | Canonical issue |
 | --- | --- | --- |
@@ -42,43 +30,66 @@ The initial closed gate set is:
 | `audit-management` | P1 | #14 |
 | `readiness-evidence-contract` | P0 | #15 |
 
-## Validate the evidence contract
+## Evidence object contract
 
-Run ordinary validation on every change:
+Schema version 1 accepts only repository-file evidence:
+
+```json
+{
+  "kind": "repository_file",
+  "path": "cwl_grc/production_readiness.py",
+  "git_blob_sha": "40-lowercase-hexadecimal-characters"
+}
+```
+
+The validator requires exactly those three fields.
+
+- `path` is an unambiguous POSIX-style repository-relative path: no absolute path, `.` or `..`, backslashes, `.git` authority, or path escape.
+- The target must exist inside the supplied repository root, resolve to a regular readable file, and may not escape through a symlink.
+- `git_blob_sha` must equal the repository-native identity of the current file: `sha1("blob <length>\0" + contents)`.
+
+This binds the claim to exact reviewed file content in the exact checked-out tree. It does **not** replace release-artifact digests, SBOMs, provenance attestations, or signatures; those remain separate issue #10 controls.
+
+Opaque strings such as `verified`, PR prose, model judgments, status names, stale workflow results, and predecessor-head evidence are not valid evidence. Adding another evidence kind requires an explicit schema-version decision, validator implementation, realistic regressions, and updated documentation; unknown kinds fail closed.
+
+## Commands
+
+Validate the manifest, evidence schema, repository paths, and Git blob identities:
 
 ```bash
 uv run python -c \
   'from cwl_grc.production_readiness import main; raise SystemExit(main())' \
-  docs/production/production-readiness.json
+  docs/production/production-readiness.json \
+  --repository-root .
 ```
 
-Ordinary validation exits successfully when the manifest is structurally and internally
-valid, even when the emitted `production_ready` value is `false`. That behavior lets pull
-requests improve one gate without pretending the whole product is ready.
-
-Release promotion must use fail-closed mode:
+Require every gate for a release decision:
 
 ```bash
 uv run python -c \
   'from cwl_grc.production_readiness import main; raise SystemExit(main())' \
-  docs/production/production-readiness.json --require-ready
+  docs/production/production-readiness.json \
+  --repository-root . \
+  --require-ready
 ```
 
-`--require-ready` exits with code `1` while any validated gate is not `ready`. Invalid JSON
-or an inconsistent contract exits with code `2`. The command emits deterministic JSON so a
-release workflow can preserve the exact blocker set as evidence.
+| Exit code | Meaning | Next action |
+| ---: | --- | --- |
+| `0` | Manifest and evidence bindings are valid; in release mode every gate is ready. | Continue through the remaining protected release controls. |
+| `1` | Manifest and evidence bindings are valid, but at least one production gate is non-ready. | Work the listed canonical issues; do not release. |
+| `2` | JSON, gate contract, evidence object, repository path, or Git blob identity is invalid. | Repair the evidence contract before using its result. |
+
+The ordinary GitHub workflow intentionally omits `--require-ready`; it proves only structural and evidence-binding integrity. A manually requested or release workflow using `--require-ready` must fail until all gates genuinely satisfy their evidence obligations.
 
 ## Updating a gate
 
-1. Update the canonical issue first with current-head implementation and verification evidence.
-2. Change only the corresponding manifest gate; do not hide work by deleting or replacing a
-   required gate.
-3. Keep the gate ID, owner, priority, and canonical issue mapping exact.
-4. Keep non-ready blockers concrete and current.
-5. Mark a gate ready only after its implementation evidence exists and no gate-local blocker remains.
-6. Re-run the Product and Production Readiness workflows on the exact pull-request head.
-7. Release only when `--require-ready` succeeds and independent review/security evidence is current.
+1. Implement the canonical issue on an exact branch head.
+2. Collect exact-current-head Product, security, review, migration, recovery, and operational evidence required by that gate.
+3. Persist the deterministic evidence file in this repository.
+4. Read the file’s Git blob SHA from the exact current tree and add a `repository_file` object.
+5. Remove only blockers proven resolved on the integrated head.
+6. Mark the gate `ready` only when no blocker remains.
+7. Run ordinary validation and `--require-ready`; the latter must still fail if any other gate remains non-ready.
+8. Revalidate every live branch, review, security, and release rule before merge or release.
 
-The initial register intentionally reports CWL GRC as not production-ready. Issue #4 and
-issues #8 through #14 remain the authoritative work queues; issue #15 owns only this evidence
-contract and validator.
+The manifest is a decision input, not an authorization system. It cannot override Keyverse, tenant/purpose/resource authorization, branch protection, independent review, centrally owned security controls, or release governance.
