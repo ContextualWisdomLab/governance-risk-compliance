@@ -17,7 +17,6 @@ from cwl_grc.authorization import (
     seed_authorization_purposes,
 )
 from cwl_grc.catalog import (
-    FrameworkCode,
     _seed_rows,
     framework_label,
     framework_source_url,
