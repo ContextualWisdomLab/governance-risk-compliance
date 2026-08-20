@@ -11,6 +11,8 @@ from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from cwl_grc.authorization import seed_authorization_purposes
+from cwl_grc.catalog import seed_control_catalog
 from cwl_grc.migrations import (
     POLICY_INTEGRITY_MIGRATION,
     apply_schema_migrations,
@@ -22,6 +24,11 @@ from cwl_grc.models import Base
 POSTGRESQL_DRIVER = "postgresql+psycopg"
 POSTGRESQL_MIGRATION_LOCK_KEY = 0x43574C475243
 EXPECTED_MIGRATION_KEYS = frozenset({POLICY_INTEGRITY_MIGRATION})
+REQUIRED_REFERENCE_TABLES = (
+    "control_framework",
+    "control_item",
+    "authorization_purpose",
+)
 
 
 class SchemaCompatibilityError(RuntimeError):
@@ -160,13 +167,19 @@ def migrate_database(
     *,
     postgres_settings: PostgresEngineSettings | None = None,
 ) -> tuple[str, ...]:
-    """Run the single-writer schema upgrade and return exact migration receipts."""
+    """Run the single-writer schema and reference bootstrap, then return receipts."""
     engine = build_engine(database_url, postgres_settings=postgres_settings)
     try:
-        _migrate_engine(engine)
+        _prepare_schema(engine)
         return assert_schema_compatible(engine)
     finally:
         engine.dispose()
+
+
+def _prepare_schema(engine: Engine) -> None:
+    """Apply DDL and bootstrap shared reference vocabulary under schema ownership."""
+    _migrate_engine(engine)
+    _seed_reference_data(engine)
 
 
 def _migrate_engine(engine: Engine) -> None:
@@ -186,8 +199,17 @@ def _migrate_engine(engine: Engine) -> None:
         install_integrity_guards(connection)
 
 
+def _seed_reference_data(engine: Engine) -> None:
+    """Insert shared catalog and purpose vocabulary only from a schema-owning path."""
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with factory() as session:
+        seed_control_catalog(session)
+        seed_authorization_purposes(session)
+        session.commit()
+
+
 def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
-    """Reject missing, older, or newer schemas before a runtime session is opened."""
+    """Reject missing, older, newer, or reference-incomplete schemas before runtime."""
     inspector = inspect(engine)
     if not inspector.has_table("schema_migration"):
         raise SchemaCompatibilityError(
@@ -205,6 +227,14 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
                 text("SELECT migration_key FROM schema_migration ORDER BY migration_key")
             ).scalars()
         )
+        missing_reference_tables = tuple(
+            table_name
+            for table_name in REQUIRED_REFERENCE_TABLES
+            if connection.execute(
+                text(f"SELECT COUNT(*) FROM {table_name}")
+            ).scalar_one()
+            == 0
+        )
     receipt_set = frozenset(receipts)
     missing_migrations = EXPECTED_MIGRATION_KEYS.difference(receipt_set)
     if missing_migrations:
@@ -215,6 +245,10 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
     if unknown_migrations:
         raise SchemaCompatibilityError(
             "The GRC schema is ahead of this binary; deploy a compatible application."
+        )
+    if missing_reference_tables:
+        raise SchemaCompatibilityError(
+            "The GRC schema reference data is incomplete; run the migration owner."
         )
     return receipts
 
@@ -229,7 +263,7 @@ def create_session_factory(
     engine = build_engine(database_url, postgres_settings=postgres_settings)
     try:
         if manage_schema:
-            _migrate_engine(engine)
+            _prepare_schema(engine)
         assert_schema_compatible(engine)
     except Exception:
         engine.dispose()
