@@ -18,8 +18,8 @@ ISSUE_URL_PREFIX = f"https://github.com/{EXPECTED_REPOSITORY}/issues/"
 ALLOWED_PRIORITIES = frozenset({"P0", "P1", "P2"})
 ALLOWED_STATUSES = frozenset({"blocked", "in_progress", "ready"})
 REPOSITORY_FILE_EVIDENCE = "repository_file"
-REPOSITORY_FILE_FIELDS = frozenset({"kind", "path", "sha256"})
-SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+REPOSITORY_FILE_FIELDS = frozenset({"kind", "path", "git_blob_sha"})
+GIT_BLOB_SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
 REQUIRED_GATE_CONTRACTS = {
     "identity-tenant-authorization": ("P0", 4),
     "postgresql-lifecycle": ("P0", 8),
@@ -150,7 +150,7 @@ def verify_repository_evidence(
     gates: Sequence[dict[str, Any]],
     repository_root: Path,
 ) -> None:
-    """Verify every evidence path and digest against one reviewed repository tree."""
+    """Verify every evidence path and Git blob identity in one reviewed tree."""
     try:
         root = repository_root.resolve(strict=True)
     except OSError as exc:
@@ -181,14 +181,14 @@ def verify_repository_evidence(
                     f"{path}.path must identify a regular repository file."
                 )
             try:
-                digest = hashlib.sha256(resolved.read_bytes()).hexdigest()
+                contents = resolved.read_bytes()
             except OSError as exc:
                 raise ReadinessManifestError(
-                    f"{path}.path cannot be read for digest verification."
+                    f"{path}.path cannot be read for Git blob verification."
                 ) from exc
-            if digest != evidence["sha256"]:
+            if _git_blob_sha(contents) != evidence["git_blob_sha"]:
                 raise ReadinessManifestError(
-                    f"{path}.sha256 does not match the repository file."
+                    f"{path}.git_blob_sha does not match the repository file."
                 )
 
 
@@ -228,7 +228,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--repository-root",
         type=Path,
         default=Path.cwd(),
-        help="Repository tree used to verify hash-bound evidence paths.",
+        help="Repository tree used to verify evidence paths and Git blob identities.",
     )
     parser.add_argument(
         "--require-ready",
@@ -302,7 +302,7 @@ def _require_evidence_list(
     gate: dict[str, Any],
     path: str,
 ) -> list[dict[str, str]]:
-    """Return canonical hash-bound repository-file evidence objects."""
+    """Return canonical repository-file evidence objects bound to Git blobs."""
     value = gate.get("evidence")
     if not isinstance(value, list):
         raise ReadinessManifestError(f"{path}.evidence must be a list.")
@@ -316,7 +316,7 @@ def _require_evidence_list(
             )
         if set(item) != REPOSITORY_FILE_FIELDS:
             raise ReadinessManifestError(
-                f"{evidence_path} must contain exactly kind, path, and sha256."
+                f"{evidence_path} must contain exactly kind, path, and git_blob_sha."
             )
         kind = _require_string(item, "kind", evidence_path)
         if kind != REPOSITORY_FILE_EVIDENCE:
@@ -328,10 +328,10 @@ def _require_evidence_list(
             raise ReadinessManifestError(
                 f"{evidence_path}.path must be a canonical repository-relative path."
             )
-        digest = _require_string(item, "sha256", evidence_path)
-        if SHA256_PATTERN.fullmatch(digest) is None:
+        blob_sha = _require_string(item, "git_blob_sha", evidence_path)
+        if GIT_BLOB_SHA_PATTERN.fullmatch(blob_sha) is None:
             raise ReadinessManifestError(
-                f"{evidence_path}.sha256 must be 64 lowercase hexadecimal characters."
+                f"{evidence_path}.git_blob_sha must be 40 lowercase hexadecimal characters."
             )
         if repository_path in seen_paths:
             raise ReadinessManifestError(
@@ -342,7 +342,7 @@ def _require_evidence_list(
             {
                 "kind": kind,
                 "path": repository_path,
-                "sha256": digest,
+                "git_blob_sha": blob_sha,
             }
         )
     return validated
@@ -360,6 +360,12 @@ def _is_canonical_repository_path(value: str) -> bool:
         and all(part not in {".", ".."} for part in candidate.parts)
         and candidate.as_posix() == value
     )
+
+
+def _git_blob_sha(contents: bytes) -> str:
+    """Return the Git object identity for exact file ``contents``."""
+    header = f"blob {len(contents)}\0".encode("ascii")
+    return hashlib.sha1(header + contents, usedforsecurity=False).hexdigest()
 
 
 def _is_canonical_issue_url(value: str) -> bool:
