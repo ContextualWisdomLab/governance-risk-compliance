@@ -270,6 +270,7 @@ def test_host_normalization_and_issuer_validation_fail_closed() -> None:
     for issuer in (
         "https:///realms/cwl",
         "https://user@identity.example.test/realms/cwl",
+        f"{ISSUER} ",
     ):
         with pytest.raises(ValueError, match="HTTPS issuer"):
             build_openid_configuration_url(issuer)

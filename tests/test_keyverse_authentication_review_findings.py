@@ -15,6 +15,7 @@ from cwl_grc.keyverse_authentication import (
     AccessTokenValidationError,
     KeyverseAccessTokenSettings,
     KeyverseAccessTokenVerifier,
+    _clock_skew_boundary,
     parse_keyverse_jwks,
 )
 
@@ -135,6 +136,12 @@ def test_expiration_skew_overflow_fails_closed_as_validation_error() -> None:
     verifier = _verifier(jwk)
     with pytest.raises(AccessTokenValidationError, match="expiration claim"):
         verifier.verify(_token(private_key, _claims(exp=253402300799)))
+
+
+def test_clock_skew_boundary_overflow_fails_closed_as_validation_error() -> None:
+    """A maximum verification clock cannot leak a datetime OverflowError."""
+    with pytest.raises(AccessTokenValidationError, match="clock-skew boundary"):
+        _clock_skew_boundary(datetime.max.replace(tzinfo=timezone.utc), timedelta(seconds=1))
 
 
 def test_jwks_parser_cannot_raise_the_hard_one_mebibyte_limit() -> None:
