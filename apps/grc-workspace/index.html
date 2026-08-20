@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GRC Compliance Workspace</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="workspace" aria-labelledby="workspace-title">
+    <header class="workspace__header">
+      <div>
+        <p class="eyebrow">Acme Korea · Compliance officer · Evidence review purpose</p>
+        <h1 id="workspace-title">Compliance workspace</h1>
+        <p class="lede">Understand what applies, what is proven, and what needs action before anything is shared.</p>
+      </div>
+      <button class="button button--primary" type="button">Request evidence</button>
+    </header>
+
+    <section class="notice notice--warning" aria-labelledby="freshness-title">
+      <div>
+        <h2 id="freshness-title">Evidence needs review</h2>
+        <p>2 evidence items are stale. Review source versions before sharing with an auditor.</p>
+      </div>
+      <button class="button button--secondary" type="button">Review stale evidence</button>
+    </section>
+
+    <section aria-labelledby="posture-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Projection from authoritative records</p>
+          <h2 id="posture-title">Current posture</h2>
+        </div>
+        <button class="button button--secondary" type="button">View exact values</button>
+      </div>
+      <div class="metric-grid">
+        <article class="metric"><span>Applicable obligations</span><strong>18</strong><span class="status status--neutral">3 unknown</span></article>
+        <article class="metric"><span>Controls tested</span><strong>12 / 16</strong><span class="status status--neutral">2 not assessed</span></article>
+        <article class="metric"><span>Evidence fresh</span><strong>21 / 24</strong><span class="status status--warning">2 stale</span></article>
+        <article class="metric"><span>Open deficiencies</span><strong>3</strong><span class="status status--danger">1 blocked</span></article>
+      </div>
+    </section>
+
+    <div class="two-column">
+      <section class="panel" aria-labelledby="trace-title">
+        <p class="eyebrow">Traceable claim</p>
+        <h2 id="trace-title">Requirement → control → test → evidence</h2>
+        <p>Follow every posture claim back to source records. A badge or percentage is never a second source of truth.</p>
+        <ol class="trace-list">
+          <li><span class="trace-kind">Applicable</span><span>Privacy retention obligation</span><span class="status status--success">Effective</span></li>
+          <li><span class="trace-kind">Control</span><span>Retention and legal-hold control</span><span class="status status--success">Effective</span></li>
+          <li><span class="trace-kind">Test</span><span>Quarterly operating-effectiveness test</span><span class="status status--neutral">Not assessed</span></li>
+          <li><span class="trace-kind">Evidence</span><span>Q3 retention rehearsal</span><span class="status status--warning">Stale</span></li>
+        </ol>
+        <div class="actions">
+          <button class="button button--primary" type="button">Request missing evidence</button>
+          <button class="button button--secondary" type="button">View exact values</button>
+        </div>
+      </section>
+
+      <aside class="panel" aria-labelledby="actions-title">
+        <p class="eyebrow">Prioritized by buyer impact</p>
+        <h2 id="actions-title">Next actions</h2>
+        <ul class="action-list">
+          <li><span>Review 2 stale evidence items</span><span class="status status--warning">Due today</span></li>
+          <li><span>Assign owner to 1 blocked deficiency</span><span class="status status--danger">Blocked</span></li>
+          <li><span>Confirm 3 unknown applicability decisions</span><span class="status status--neutral">Unknown</span></li>
+          <li><span>External-auditor package</span><span class="status status--danger">Access denied</span></li>
+        </ul>
+        <button class="button button--primary" type="button">Open evidence room</button>
+      </aside>
+    </div>
+
+    <section class="panel exact-values" aria-labelledby="exact-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Accessible alternative</p>
+          <h2 id="exact-title">Exact values</h2>
+        </div>
+        <span class="status status--neutral">Period: 2026 Q3</span>
+      </div>
+      <div class="table-scroll" tabindex="0" aria-label="Scrollable exact-value compliance table">
+        <table>
+          <caption>Exact compliance posture values with provenance, limitation, and next action</caption>
+          <thead><tr><th scope="col">Measure</th><th scope="col">Value</th><th scope="col">Status</th><th scope="col">Source version</th><th scope="col">Limitation</th><th scope="col">Next action</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Applicable obligations</th><td>18 obligations</td><td>3 unknown</td><td>applicability-2026-08-20</td><td>Three jurisdiction decisions await review.</td><td>Confirm applicability</td></tr>
+            <tr><th scope="row">Controls tested</th><td>12 of 16 controls</td><td>2 not assessed</td><td>control-test-2026-q3</td><td>No effectiveness claim is made for unassessed controls.</td><td>Schedule tests</td></tr>
+            <tr><th scope="row">Evidence fresh</th><td>21 of 24 items</td><td>2 stale</td><td>evidence-index-2026-08-20</td><td>Freshness does not imply control effectiveness.</td><td>Request refreshed evidence</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="limitation"><strong>Limitation:</strong> This local fixture demonstrates buyer-facing state semantics only. It does not authenticate a tenant, read protected GRC APIs, authorize exports, or certify compliance.</p>
+    </section>
+  </main>
+</body>
+</html>
