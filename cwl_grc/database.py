@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from ipaddress import ip_address
 
 from sqlalchemy import Engine, create_engine, inspect, text
-from sqlalchemy.engine import URL, make_url
+from sqlalchemy.engine import Connection, URL, make_url
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -178,13 +178,12 @@ def migrate_database(
 
 
 def _prepare_schema(engine: Engine) -> None:
-    """Apply DDL and bootstrap shared reference vocabulary under schema ownership."""
+    """Apply DDL and reference bootstrap under one migration-owner transaction."""
     _migrate_engine(engine)
-    _seed_reference_data(engine)
 
 
 def _migrate_engine(engine: Engine) -> None:
-    """Apply DDL in one transaction and use a PostgreSQL advisory migration lock."""
+    """Apply schema and reference writes under one PostgreSQL advisory lock."""
     with engine.begin() as connection:
         if connection.dialect.name == "postgresql":
             acquired = connection.execute(
@@ -198,15 +197,15 @@ def _migrate_engine(engine: Engine) -> None:
         Base.metadata.create_all(connection)
         apply_schema_migrations(connection)
         install_integrity_guards(connection)
+        _seed_reference_data(connection)
 
 
-def _seed_reference_data(engine: Engine) -> None:
-    """Insert shared catalog and purpose vocabulary only from a schema-owning path."""
-    factory = sessionmaker(bind=engine, expire_on_commit=False)
-    with factory() as session:
+def _seed_reference_data(connection: Connection) -> None:
+    """Insert shared vocabulary before the migration transaction releases its lock."""
+    with Session(bind=connection, expire_on_commit=False) as session:
         seed_control_catalog(session)
         seed_authorization_purposes(session)
-        session.commit()
+        session.flush()
 
 
 def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
