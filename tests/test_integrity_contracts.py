@@ -269,7 +269,52 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
         ).scalar_one()
     assert counter == 3
     assert finalized in {True, 1}
-    assert receipt_count == 1
+    assert receipt_count == 2
+
+
+def test_catalog_migration_adds_release_link_to_existing_framework(
+    tmp_path: Path,
+) -> None:
+    """The provenance migration upgrades a pre-provenance framework table."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'catalog-legacy.sqlite'}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE schema_migration ("
+                "migration_key VARCHAR(64) PRIMARY KEY, "
+                "applied_at TIMESTAMP NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO schema_migration VALUES "
+                "('0001_policy_integrity', CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE catalog_release ("
+                "catalog_release_id VARCHAR(64) PRIMARY KEY)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE control_framework ("
+                "framework_code VARCHAR(64) PRIMARY KEY)"
+            )
+        )
+    apply_schema_migrations(engine)
+    apply_schema_migrations(engine)
+    framework_columns = {
+        column["name"]
+        for column in inspect(engine).get_columns("control_framework")
+    }
+    assert "catalog_release_id" in framework_columns
+    with engine.connect() as connection:
+        receipt_count = connection.execute(
+            text("SELECT COUNT(*) FROM schema_migration")
+        ).scalar_one()
+    assert receipt_count == 2
 
 
 def test_integrity_guard_ddl_covers_supported_and_unknown_dialects() -> None:

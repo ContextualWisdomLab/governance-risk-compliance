@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Awaitable, Callable, Iterator
+from datetime import date
 from typing import Any
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Response
@@ -12,12 +13,27 @@ from sqlalchemy.orm import Session
 
 from cwl_grc.authorization import PurposeCode, require_purpose, seed_authorization_purposes
 from cwl_grc.catalog import FrameworkCode, list_control_items, seed_control_catalog
+from cwl_grc.catalog_provenance import (
+    publish_catalog_release,
+    record_catalog_import,
+    register_source_artifact,
+    register_source_artifact_version,
+    seed_source_license_policies,
+)
 from cwl_grc.coverage import list_uncovered_controls
 from cwl_grc.database import create_session_factory, session_dependency
 from cwl_grc.encryption import EvidenceCipher
 from cwl_grc.evidence import bind_control_evidence, create_evidence_record
 from cwl_grc.health import health_payload
-from cwl_grc.models import ControlItem, EvidenceRecord
+from cwl_grc.models import (
+    CatalogImportReceipt,
+    CatalogImportRun,
+    CatalogRelease,
+    ControlItem,
+    EvidenceRecord,
+    SourceArtifact,
+    SourceArtifactVersion,
+)
 from cwl_grc.officer_console import parse_control_ref, render_officer_home
 from cwl_grc.policy import (
     ControlRef,
@@ -40,6 +56,18 @@ def parse_framework(value: str | None) -> FrameworkCode | None:
         return FrameworkCode(value)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Unknown control framework.") from exc
+
+
+def parse_optional_date(value: Any, label: str) -> date | None:
+    """Parse an optional ISO calendar date for catalog source metadata."""
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str):
+        raise HTTPException(status_code=400, detail=f"{label} must be an ISO date.")
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"{label} must be an ISO date.") from exc
 
 
 def serialize_control(item: ControlItem, *, covered: bool | None = None) -> dict[str, Any]:
@@ -75,6 +103,7 @@ def create_app(
     )
     with factory() as session:
         seed_control_catalog(session)
+        seed_source_license_policies(session)
         seed_authorization_purposes(session)
         session.commit()
 
@@ -134,6 +163,106 @@ def create_app(
             "next_action": "Attach the next evidence on an uncovered control.",
             "controls": [serialize_control(item, covered=False) for item in items],
         }
+
+    @app.post("/catalog/source-artifacts", status_code=201)
+    def post_source_artifact(
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Register an allowlisted catalog source pointer for governed acquisition."""
+        decision = require_purpose(x_actor_id, x_purpose, PurposeCode.CATALOG_GOVERNANCE)
+        hosts = body.get("allowed_source_hosts")
+        if not isinstance(hosts, list) or not all(isinstance(item, str) for item in hosts):
+            raise HTTPException(status_code=400, detail="Name the exact allowlisted source hosts.")
+        try:
+            artifact = register_source_artifact(
+                session,
+                decision,
+                publisher_name=body.get("publisher_name", ""),
+                source_reference=body.get("source_reference", ""),
+                source_url=body.get("source_url", ""),
+                artifact_content_class=body.get("artifact_content_class", ""),
+                license_policy_code=body.get("license_policy_code", ""),
+                allowed_source_hosts=set(hosts),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return _serialize_source_artifact(artifact)
+
+    @app.post("/catalog/source-artifacts/{source_artifact_id}/versions", status_code=201)
+    def post_source_artifact_version(
+        source_artifact_id: str,
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Register one exact digest and edition without retaining raw source bytes."""
+        decision = require_purpose(x_actor_id, x_purpose, PurposeCode.CATALOG_GOVERNANCE)
+        try:
+            version = register_source_artifact_version(
+                session,
+                decision,
+                source_artifact_id,
+                edition_label=body.get("edition_label", ""),
+                content_digest=body.get("content_digest", ""),
+                media_type=body.get("media_type", ""),
+                byte_length=body.get("byte_length", 0),
+                publication_date=parse_optional_date(body.get("publication_date"), "publication date"),
+                effective_date=parse_optional_date(body.get("effective_date"), "effective date"),
+                withdrawal_date=parse_optional_date(body.get("withdrawal_date"), "withdrawal date"),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return _serialize_source_artifact_version(version)
+
+    @app.post("/catalog/import-runs", status_code=201)
+    def post_catalog_import(
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Record an idempotent parser run and its deterministic import receipt."""
+        decision = require_purpose(x_actor_id, x_purpose, PurposeCode.CATALOG_GOVERNANCE)
+        try:
+            result = record_catalog_import(
+                session,
+                decision,
+                body.get("source_artifact_version_id", ""),
+                parser_version=body.get("parser_version", ""),
+                importer_commit=body.get("importer_commit", ""),
+                run_status=body.get("run_status", ""),
+                requirement_count=body.get("requirement_count", 0),
+                changed_requirement_count=body.get("changed_requirement_count", 0),
+                warning_count=body.get("warning_count", 0),
+                failure_code=body.get("failure_code"),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return _serialize_import_result(result.run, result.receipt, result.created)
+
+    @app.post("/catalog/releases", status_code=201)
+    def post_catalog_release(
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Publish a catalog release only after a successful import receipt."""
+        decision = require_purpose(x_actor_id, x_purpose, PurposeCode.CATALOG_GOVERNANCE)
+        try:
+            release = publish_catalog_release(
+                session,
+                decision,
+                body.get("source_artifact_version_id", ""),
+                release_key=body.get("release_key", ""),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return _serialize_catalog_release(release)
 
     @app.post("/policy-documents", status_code=201)
     def post_policy_document(
@@ -337,4 +466,69 @@ def _serialize_evidence(record: EvidenceRecord, cipher: EvidenceCipher) -> dict[
         "collector_actor": record.collector_actor,
         "payload_text": cipher.decrypt(record.ciphertext_payload),
         "next_action": "Bind this evidence to the uncovered control.",
+    }
+
+
+def _serialize_source_artifact(artifact: SourceArtifact) -> dict[str, Any]:
+    """Return source metadata without exposing or implying stored source bytes."""
+    return {
+        "source_artifact_id": artifact.source_artifact_id,
+        "publisher_name": artifact.publisher_name,
+        "source_reference": artifact.source_reference,
+        "source_url": artifact.source_url,
+        "source_host": artifact.source_host,
+        "artifact_content_class": artifact.artifact_content_class,
+        "license_policy_code": artifact.license_policy_code,
+        "next_action": "Acquire the allowlisted artifact and register its exact digest.",
+    }
+
+
+def _serialize_source_artifact_version(version: SourceArtifactVersion) -> dict[str, Any]:
+    """Return immutable source-version identity and lawful storage boundary."""
+    return {
+        "source_artifact_version_id": version.source_artifact_version_id,
+        "source_artifact_id": version.source_artifact_id,
+        "edition_label": version.edition_label,
+        "publication_date": version.publication_date.isoformat() if version.publication_date else None,
+        "effective_date": version.effective_date.isoformat() if version.effective_date else None,
+        "withdrawal_date": version.withdrawal_date.isoformat() if version.withdrawal_date else None,
+        "content_digest": version.content_digest,
+        "media_type": version.media_type,
+        "byte_length": version.byte_length,
+        "version_status": version.version_status,
+        "next_action": "Record the parser receipt before publishing a catalog release.",
+    }
+
+
+def _serialize_import_result(
+    run: CatalogImportRun,
+    receipt: CatalogImportReceipt,
+    created: bool,
+) -> dict[str, Any]:
+    """Return a deterministic import receipt and whether this request created it."""
+    return {
+        "catalog_import_run_id": run.catalog_import_run_id,
+        "source_artifact_version_id": run.source_artifact_version_id,
+        "parser_version": run.parser_version,
+        "importer_commit": run.importer_commit,
+        "run_status": run.run_status,
+        "catalog_import_receipt_id": receipt.catalog_import_receipt_id,
+        "requirement_count": receipt.requirement_count,
+        "changed_requirement_count": receipt.changed_requirement_count,
+        "warning_count": receipt.warning_count,
+        "receipt_digest": receipt.receipt_digest,
+        "created": created,
+        "next_action": "Review the receipt and publish the release when the import is accepted.",
+    }
+
+
+def _serialize_catalog_release(release: CatalogRelease) -> dict[str, Any]:
+    """Return a published release identity without copying source content."""
+    return {
+        "catalog_release_id": release.catalog_release_id,
+        "source_artifact_version_id": release.source_artifact_version_id,
+        "release_key": release.release_key,
+        "release_status": release.release_status,
+        "published_at": release.published_at.isoformat() if release.published_at else None,
+        "next_action": "Review the release change set before using it in compliance decisions.",
     }

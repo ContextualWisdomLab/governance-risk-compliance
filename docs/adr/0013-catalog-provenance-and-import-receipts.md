@@ -1,0 +1,32 @@
+# ADR 0013: Catalog provenance and import receipts
+
+## Status
+
+Accepted for the Issue #29 first vertical slice.
+
+## Context
+
+Official control catalogs change by publisher, edition, and parser. A catalog row without a source pointer, exact digest, parser identity, or import outcome cannot support an audit explanation or a safe re-import. The repository also must not claim that a remote page was fetched or that requirements were imported when no byte-level acquisition and parser evidence exists.
+
+OSCAL provides machine-readable control and mapping models, and NIST's OLIR program provides a structured way to relate informative references to authoritative sources. Those formats inform the later importer; they are not a reason to duplicate source text or invent control identifiers in this slice.
+
+## Decision
+
+Add a global, tenant-neutral provenance chain:
+
+`source_license_policy` → `source_artifact` → `source_artifact_version` → `catalog_import_run` + `catalog_import_receipt` → `catalog_release`
+
+- Register only explicit HTTPS pointers whose host is in the caller-supplied exact allowlist. The service does not follow redirects or fetch bytes.
+- Require an externally computed lowercase SHA-256 digest, edition metadata, inert JSON/XML/YAML/plain media type, and bounded byte length. Raw source bytes are not stored.
+- Make source versions, parser runs/receipts, and releases append-only at the SQLite and PostgreSQL database boundary.
+- Make import identity idempotent by source version plus parser version; release publication requires a successful receipt.
+- Require the declared `catalog_governance` purpose. It is an audit-purpose declaration in the local preview, not authentication.
+- Keep provenance separate from `control_framework` and `control_item`. A later importer may create or update an official framework edition only after verified source bytes, parser output, official identifiers, mapping evidence, and independent review exist.
+
+## Consequences
+
+The current API can explain which source edition and parser receipt produced a candidate release without overstating acquisition or catalog completeness. It cannot yet retrieve a catalog, parse OSCAL/OLIR, bind imported requirements to a framework, or answer impact/diff questions. Those remain explicit follow-on work.
+
+## References
+
+See `docs/doctoring/REFERENCES.md` for the APA 7 references to NIST OSCAL and OLIR materials.

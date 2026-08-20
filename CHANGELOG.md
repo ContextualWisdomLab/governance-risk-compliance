@@ -16,6 +16,7 @@
 - Product CI for lint, docstring coverage, and 100% statement/branch test coverage.
 - Hash-locked `uv.lock` dependency graph for runtime and development dependencies.
 - Versioned schema-upgrade receipts for existing first-slice stores.
+- Catalog provenance first slice for Issue #29: allowlisted source pointers, immutable SHA-256 edition metadata, parser receipts, and post-success release records; no raw source bytes or remote fetching.
 
 ### Security
 
@@ -28,8 +29,10 @@
 - Pin the CSAP 2026.07 catalog provenance to the official KISA resource notice rather than a generic product page.
 - Pin every Product workflow action to an immutable commit and verify the exact pull-request head before testing.
 - Replace mutable `pip install` resolution with `uv sync --locked`, verify lock freshness, and reject any tracked or untracked dirty tree on every Product run.
+- Require the explicit `catalog_governance` purpose for catalog provenance writes and protect historical provenance rows with SQLite and PostgreSQL immutability triggers.
 
 ### ADR
 
 - `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
+- `docs/adr/0013-catalog-provenance-and-import-receipts.md` — source identity, digest receipts, and release gating before catalog requirement import.
