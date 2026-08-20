@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from cryptography.fernet import Fernet
 from sqlalchemy import inspect, text
 
 from cwl_grc import create_app
@@ -110,7 +111,11 @@ def test_database_cli_migrates_then_checks_exact_schema(
 def test_application_runtime_mode_refuses_missing_schema(tmp_path: Path) -> None:
     """The API process cannot silently create production tables at startup."""
     with pytest.raises(SchemaCompatibilityError, match="not initialized"):
-        create_app(database_url=_database_url(tmp_path), schema_mode="runtime")
+        create_app(
+            database_url=_database_url(tmp_path),
+            evidence_key=Fernet.generate_key().decode("ascii"),
+            schema_mode="runtime",
+        )
 
 
 def test_postgresql_requires_psycopg_and_verified_tls() -> None:
