@@ -13,13 +13,31 @@ from cwl_grc.migrations import apply_schema_migrations, install_integrity_guards
 from cwl_grc.models import Base
 
 
-def build_engine(database_url: str) -> Engine:
+DEFAULT_CONNECT_TIMEOUT_SECONDS = 3
+
+
+def build_engine(
+    database_url: str,
+    *,
+    connect_timeout_seconds: int = DEFAULT_CONNECT_TIMEOUT_SECONDS,
+) -> Engine:
     """Build a SQLAlchemy engine, sharing one in-memory SQLite connection when asked."""
+    if (
+        isinstance(connect_timeout_seconds, bool)
+        or not isinstance(connect_timeout_seconds, int)
+        or connect_timeout_seconds <= 0
+    ):
+        raise ValueError("Database connect timeout must be a positive integer.")
     if database_url in {"sqlite://", "sqlite:///:memory:"}:
         return create_engine(
             "sqlite://",
             connect_args={"check_same_thread": False},
             poolclass=StaticPool,
+        )
+    if database_url.startswith("postgresql"):
+        return create_engine(
+            database_url,
+            connect_args={"connect_timeout": connect_timeout_seconds},
         )
     return create_engine(database_url)
 

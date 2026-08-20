@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import os
+import time
 from collections.abc import Awaitable, Callable, Iterator
 from datetime import datetime
 from typing import Any
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -28,13 +30,25 @@ from cwl_grc.evidence import (
     record_encryption_envelope,
     release_evidence_legal_hold,
 )
-from cwl_grc.health import health_payload
+from cwl_grc.health import (
+    LOCAL_PREVIEW_ENVIRONMENT,
+    LifecycleState,
+    ensure_startup_ready,
+    health_payload,
+    readiness_payload,
+)
 from cwl_grc.keyverse_authentication import (
     AccessTokenValidationError,
     KeyverseAccessTokenVerifier,
     require_access_scopes,
 )
 from cwl_grc.models import ControlItem, EvidenceRecord
+from cwl_grc.observability import (
+    build_request_context,
+    emit_request_log,
+    reset_verified_principal,
+    set_verified_principal,
+)
 from cwl_grc.officer_console import parse_control_ref, render_officer_home
 from cwl_grc.policy import (
     ControlRef,
@@ -47,6 +61,9 @@ from cwl_grc.policy import (
     serialize_policy,
 )
 from cwl_grc.remote_access import request_is_local
+
+
+MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
 def parse_framework(value: str | None) -> FrameworkCode | None:
@@ -96,6 +113,7 @@ def create_app(
         "CWL_GRC_DATABASE_URL",
         "sqlite:///grc_product.sqlite",
     )
+    environment = os.environ.get("CWL_GRC_ENVIRONMENT", LOCAL_PREVIEW_ENVIRONMENT)
     keyring = evidence_keyring
     key = evidence_key
     if keyring is None and key is None:
@@ -112,6 +130,12 @@ def create_app(
         seed_control_catalog(session)
         seed_authorization_purposes(session)
         session.commit()
+    startup_report = ensure_startup_ready(
+        factory,
+        cipher,
+        environment,
+        access_token_verifier,
+    )
 
     def get_session() -> Iterator[Session]:
         """Yield the request session."""
@@ -155,6 +179,7 @@ def create_app(
                 ) from exc
             actor_identifier = principal.actor_id
             tenant_id = principal.tenant_id
+            set_verified_principal(principal.tenant_id, principal.actor_id)
         return require_purpose(
             actor_identifier,
             purpose_value,
@@ -179,35 +204,137 @@ def create_app(
 
     app = FastAPI(title="CWL GRC", version="0.1.0")
     app.state.evidence_cipher = cipher
+    app.state.session_factory = factory
+    app.state.lifecycle = LifecycleState()
+    app.state.lifecycle.mark_ready()
+    app.state.startup_report = startup_report
+    app.router.add_event_handler("shutdown", app.state.lifecycle.begin_drain)
+
+    @app.exception_handler(HTTPException)
+    async def handle_http_exception(request: Request, exc: HTTPException) -> JSONResponse:
+        """Return a safe request reference with expected application errors."""
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "detail": exc.detail,
+                "request_reference": getattr(request.state, "request_reference", None),
+            },
+            headers={"X-Request-ID": getattr(request.state, "request_reference", "")},
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def handle_validation_exception(
+        request: Request,
+        exc: RequestValidationError,
+    ) -> JSONResponse:
+        """Return validation failures with a safe request reference and no request body."""
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": [
+                    {
+                        "loc": error.get("loc"),
+                        "msg": error.get("msg"),
+                        "type": error.get("type"),
+                    }
+                    for error in exc.errors()
+                ],
+                "request_reference": getattr(request.state, "request_reference", None),
+            },
+            headers={"X-Request-ID": getattr(request.state, "request_reference", "")},
+        )
 
     @app.middleware("http")
-    async def enforce_developer_preview_boundary(
+    async def enforce_request_boundary_and_observability(
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        """Reject every non-loopback or proxy-forwarded request until real auth exists."""
-        client_host = getattr(request.client, "host", None)
-        local_request = request_is_local(
-            client_host,
-            request.headers.get("x-forwarded-for"),
-            request.headers.get("forwarded"),
+        """Enforce the local boundary, drain contract, correlation, and safe request logs."""
+        context = build_request_context(
+            request.headers.get("x-request-id"),
+            request.headers.get("traceparent"),
         )
-        if not local_request:
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "detail": (
-                        "Remote preview is disabled. Configure Keyverse-backed identity and "
-                        "tenant authorization before exposing CWL GRC."
-                    )
-                },
+        request.state.request_reference = context.request_id
+        principal_token = set_verified_principal(None, None)
+        started_at = time.perf_counter()
+        status_code = 500
+        error_class: str | None = None
+        try:
+            client_host = getattr(request.client, "host", None)
+            local_request = request_is_local(
+                client_host,
+                request.headers.get("x-forwarded-for"),
+                request.headers.get("forwarded"),
             )
-        return await call_next(request)
+            if not local_request:
+                response = JSONResponse(
+                    status_code=503,
+                    content={
+                        "detail": (
+                            "Remote preview is disabled. Configure Keyverse-backed identity and "
+                            "tenant authorization before exposing CWL GRC."
+                        ),
+                        "request_reference": context.request_id,
+                    },
+                )
+            elif request.method in MUTATING_METHODS and app.state.lifecycle.is_draining:
+                response = JSONResponse(
+                    status_code=503,
+                    content={
+                        "detail": "The instance is draining; retry this mutation on a ready instance.",
+                        "request_reference": context.request_id,
+                    },
+                )
+            else:
+                response = await call_next(request)
+            status_code = response.status_code
+            response.headers["X-Request-ID"] = context.request_id
+            response.headers["traceparent"] = context.traceparent
+            return response
+        except Exception as exc:
+            error_class = type(exc).__name__
+            raise
+        finally:
+            emit_request_log(
+                context,
+                request.method,
+                getattr(request.scope.get("route"), "path", request.url.path),
+                status_code,
+                (time.perf_counter() - started_at) * 1000,
+                environment,
+                error_class,
+            )
+            reset_verified_principal(principal_token)
 
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:
         """Return the liveness probe used by orchestrators."""
         return health_payload()
+
+    @app.get("/readyz")
+    def readyz() -> JSONResponse:
+        """Report dependency readiness with stable reason codes and a truthful status code."""
+        report = readiness_payload(
+            factory,
+            cipher,
+            environment,
+            access_token_verifier,
+            app.state.lifecycle,
+        )
+        return JSONResponse(
+            status_code=200 if report["status"] == "ready" else 503,
+            content=report,
+        )
+
+    @app.get("/startupz")
+    def startupz() -> dict[str, Any]:
+        """Report the immutable startup checks that admitted this process."""
+        return {
+            "status": "started",
+            "service": startup_report["service"],
+            "environment": startup_report["environment"],
+            "checks": startup_report["checks"],
+        }
 
     @app.get("/controls")
     def list_controls(
