@@ -32,6 +32,9 @@ from cwl_grc.policy import (
 from cwl_grc.remote_access import request_is_local
 
 
+SCHEMA_MODES = frozenset({"development", "runtime"})
+
+
 def parse_framework(value: str | None) -> FrameworkCode | None:
     """Parse an optional official framework key."""
     if value is None or value == "":
@@ -59,16 +62,21 @@ def create_app(
     *,
     database_url: str | None = None,
     evidence_key: str | None = None,
+    schema_mode: str | None = None,
 ) -> FastAPI:
-    """Build a local-only GRC app with durable-key enforcement."""
+    """Build a loopback-only GRC app under an explicit schema-ownership profile."""
     url = database_url or os.environ.get(
         "CWL_GRC_DATABASE_URL",
         "sqlite:///grc_product.sqlite",
     )
+    mode = schema_mode or os.environ.get("CWL_GRC_SCHEMA_MODE", "development")
+    if mode not in SCHEMA_MODES:
+        allowed = ", ".join(sorted(SCHEMA_MODES))
+        raise ValueError(f"CWL GRC schema mode must be one of: {allowed}.")
     key = evidence_key if evidence_key is not None else os.environ.get(
         "CWL_GRC_EVIDENCE_KEY"
     )
-    factory = create_session_factory(url)
+    factory = create_session_factory(url, manage_schema=mode == "development")
     cipher = EvidenceCipher(
         key,
         allow_ephemeral=url in {"sqlite://", "sqlite:///:memory:"},
@@ -84,6 +92,7 @@ def create_app(
 
     app = FastAPI(title="CWL GRC", version="0.1.0")
     app.state.evidence_cipher = cipher
+    app.state.schema_mode = mode
 
     @app.middleware("http")
     async def enforce_developer_preview_boundary(
