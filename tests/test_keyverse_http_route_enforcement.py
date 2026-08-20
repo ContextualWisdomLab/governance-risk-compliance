@@ -165,6 +165,25 @@ def test_verified_bearer_requires_action_scope_before_mutation() -> None:
     assert response.status_code == 403
 
 
+def test_coverage_reads_require_verified_identity_when_keyverse_is_enabled() -> None:
+    """Coverage reads use the signed tenant instead of the local fallback tenant."""
+    private_key, public_jwk = _material()
+    client = _client(_verifier(public_jwk))
+    denied = client.get(
+        "/controls",
+        headers={"X-Purpose": "coverage_review"},
+    )
+    assert denied.status_code == 401
+    allowed = client.get(
+        "/controls",
+        headers={
+            "Authorization": f"Bearer {_token(private_key, scope='grc.control.read')}",
+            "X-Purpose": "coverage_review",
+        },
+    )
+    assert allowed.status_code == 200
+
+
 def test_legal_hold_requires_verified_retention_scope() -> None:
     """Legal-hold changes require the signed retention scope, not evidence-write scope."""
     private_key, public_jwk = _material()
