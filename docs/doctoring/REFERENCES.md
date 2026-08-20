@@ -24,7 +24,9 @@ National Institute of Standards and Technology. (n.d.). *National Online Informa
 
 National Institute of Standards and Technology. (n.d.). *Open Security Controls Assessment Language model documentation* (Version 1.2.3). https://pages.nist.gov/OSCAL-Reference/models/
 
-National Institute of Standards and Technology. (2025, August 27). *Security and privacy controls for information systems and organizations (NIST SP 800-53 Rev. 5, update 1).* https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final
+National Institute of Standards and Technology. (2025, August 27). *Security and privacy controls for information systems and organizations: Release 5.2.0* (NIST SP 800-53 Rev. 5). https://csrc.nist.gov/pubs/sp/800/53/r5/upd1/final
+
+National Institute of Standards and Technology. (2025, August 27). *Summary of changes: NIST SP 800-53 Release 5.2.0*. https://csrc.nist.gov/files/projects/Risk-Management/800-53%20Comment%20Site/SP800-53-r5.2.0-changes.pdf
 
 Open Policy Agent. (n.d.). *Policy language*. https://www.openpolicyagent.org/docs/latest/policy-language/
 
@@ -33,6 +35,8 @@ Ross, R., & Pillitteri, V. (2020). *Security and privacy controls for informatio
 Policy authoring in the first slice follows ISO/IEC 27001:2022 clause 5.2 (information security policy as documented information) and Annex A control A.5.1 (policies for information security); COSO (2013) Principle 12 and AICPA (2022) SOC 2 CC5.3 (deploy control activities through policies and procedures); KISA (2023) ISMS-P 1.1.5; and KISA (2026) CSAP 1.1.1. Open Policy Agent Rego was reviewed and not adopted: it is an authorization PDP language, not a policy-document or evidence-binding store.
 
 The product-completion baseline uses ISO 37301:2021, confirmed current in 2026, for compliance-obligation and compliance-management-system framing. ISO 19011:2026 replaces the withdrawn ISO 19011:2018 baseline for management-system audit guidance; ISO 19011 provides guidance and does not itself provide certification. OSCAL 1.2.3 is the current machine-readable model baseline for catalog, profile, control mapping, component definition, system security plan, assessment plan, assessment results, and plan-of-action-and-milestones interoperability. OLIR mappings retain their own publisher, version, draft/final status, and provenance and are not automatically authoritative CWL decisions.
+
+The checked-in `nist_sp_800_53_r5` first-slice rows were authored against the 2020 Rev. 5 catalog and have not been refreshed or proven complete against final Release 5.2.0. NIST issued Release 5.2.0 on August 27, 2025 with new and revised controls, enhancements, discussions, related controls, references, and corresponding assessment-procedure updates. Issue #29 must ingest a lawfully acquired exact release artifact, preserve its digest and import receipt, compute a reviewed edition diff, and decide whether the framework key remains compatible or requires a new release-specific identity before the catalog baseline is described as 5.2.0.
 
 The CSAP catalog stores the edition-specific KISA resource notice rather than the generic CSAP introduction page. A content digest is not claimed in the first slice because the original attachment bytes were not independently captured and hashed in the repository; adding a digest requires an immutable source-artifact ingestion workflow and reviewable byte-level evidence.
 
