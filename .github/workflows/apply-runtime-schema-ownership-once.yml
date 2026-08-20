@@ -1,0 +1,232 @@
+name: Apply runtime schema ownership once
+
+on:
+  push:
+    paths:
+      - .github/workflows/apply-runtime-schema-ownership-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-grc-runtime-schema-ownership-once
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+      - name: Checkout lifecycle branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/postgresql-schema-lifecycle
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          prune-cache: true
+      - name: Apply exact runtime-ownership changes
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              contents = target.read_text(encoding="utf-8")
+              count = contents.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one replacement, found {count}")
+              target.write_text(contents.replace(old, new), encoding="utf-8")
+
+          replace_once(
+              "cwl_grc/app.py",
+              "from cwl_grc.authorization import PurposeCode, require_purpose, seed_authorization_purposes\n"
+              "from cwl_grc.catalog import FrameworkCode, list_control_items, seed_control_catalog\n",
+              "from cwl_grc.authorization import PurposeCode, require_purpose\n"
+              "from cwl_grc.catalog import FrameworkCode, list_control_items\n",
+          )
+          replace_once(
+              "cwl_grc/app.py",
+              "    with factory() as session:\n"
+              "        seed_control_catalog(session)\n"
+              "        seed_authorization_purposes(session)\n"
+              "        session.commit()\n\n",
+              "",
+          )
+          replace_once(
+              "cwl_grc/cli.py",
+              "from cwl_grc.app import create_app, parse_framework, serialize_control\n"
+              "from cwl_grc.authorization import (\n"
+              "    AuthorizationDecision,\n"
+              "    PurposeCode,\n"
+              "    seed_authorization_purposes,\n"
+              ")\n"
+              "from cwl_grc.catalog import seed_control_catalog\n",
+              "from cwl_grc.app import SCHEMA_MODES, create_app, parse_framework, serialize_control\n"
+              "from cwl_grc.authorization import AuthorizationDecision, PurposeCode\n",
+          )
+          replace_once(
+              "cwl_grc/cli.py",
+              "def _open_session() -> Session:\n"
+              "    \"\"\"Open a seeded development-profile session for a one-shot officer command.\"\"\"\n"
+              "    url = os.environ.get(\n"
+              "        \"CWL_GRC_DATABASE_URL\",\n"
+              "        \"sqlite:///grc_product.sqlite\",\n"
+              "    )\n"
+              "    factory = create_session_factory(url)\n"
+              "    session = factory()\n"
+              "    seed_control_catalog(session)\n"
+              "    seed_authorization_purposes(session)\n"
+              "    session.commit()\n"
+              "    return session\n",
+              "def _open_session() -> Session:\n"
+              "    \"\"\"Open one officer session under the configured schema-ownership profile.\"\"\"\n"
+              "    url = os.environ.get(\n"
+              "        \"CWL_GRC_DATABASE_URL\",\n"
+              "        \"sqlite:///grc_product.sqlite\",\n"
+              "    )\n"
+              "    mode = os.environ.get(\"CWL_GRC_SCHEMA_MODE\", \"development\")\n"
+              "    if mode not in SCHEMA_MODES:\n"
+              "        allowed = \", \".join(sorted(SCHEMA_MODES))\n"
+              "        raise ValueError(f\"CWL GRC schema mode must be one of: {allowed}.\")\n"
+              "    factory = create_session_factory(\n"
+              "        url,\n"
+              "        manage_schema=mode == \"development\",\n"
+              "    )\n"
+              "    return factory()\n",
+          )
+          replace_once(
+              "cwl_grc/database.py",
+              "from cwl_grc.authorization import PurposeCode, seed_authorization_purposes\n"
+              "from cwl_grc.catalog import FrameworkCode, _seed_rows, seed_control_catalog\n",
+              "from cwl_grc.authorization import (\n"
+              "    PurposeCode,\n"
+              "    purpose_label,\n"
+              "    seed_authorization_purposes,\n"
+              ")\n"
+              "from cwl_grc.catalog import (\n"
+              "    FrameworkCode,\n"
+              "    _seed_rows,\n"
+              "    framework_label,\n"
+              "    framework_source_url,\n"
+              "    seed_control_catalog,\n"
+              ")\n",
+          )
+          replace_once(
+              "cwl_grc/database.py",
+              "EXPECTED_FRAMEWORK_KEYS = frozenset(code.value for code in FrameworkCode)\n"
+              "EXPECTED_CONTROL_IDENTITIES = frozenset(\n"
+              "    (framework.value, catalog_identifier)\n"
+              "    for framework, _edition, catalog_identifier, _title, _statement in _seed_rows()\n"
+              ")\n"
+              "EXPECTED_PURPOSE_CODES = frozenset(code.value for code in PurposeCode)\n",
+              "CATALOG_SEED_ROWS = tuple(_seed_rows())\n"
+              "EXPECTED_FRAMEWORK_ROWS = frozenset(\n"
+              "    (\n"
+              "        framework.value,\n"
+              "        framework_label(framework),\n"
+              "        edition,\n"
+              "        framework_source_url(framework),\n"
+              "    )\n"
+              "    for framework, edition, _identifier, _title, _statement in CATALOG_SEED_ROWS\n"
+              ")\n"
+              "EXPECTED_CONTROL_ROWS = frozenset(\n"
+              "    (framework.value, catalog_identifier, title, statement)\n"
+              "    for framework, _edition, catalog_identifier, title, statement in CATALOG_SEED_ROWS\n"
+              ")\n"
+              "EXPECTED_PURPOSE_ROWS = frozenset(\n"
+              "    (code.value, purpose_label(code), purpose_label(code))\n"
+              "    for code in PurposeCode\n"
+              ")\n",
+          )
+          replace_once(
+              "cwl_grc/database.py",
+              "        framework_keys = frozenset(\n"
+              "            connection.execute(\n"
+              "                text(\"SELECT framework_key FROM control_framework\")\n"
+              "            ).scalars()\n"
+              "        )\n"
+              "        control_identities = frozenset(\n"
+              "            tuple(row)\n"
+              "            for row in connection.execute(\n"
+              "                text(\n"
+              "                    \"SELECT framework_key, catalog_identifier \"\n"
+              "                    \"FROM control_item\"\n"
+              "                )\n"
+              "            )\n"
+              "        )\n"
+              "        purpose_codes = frozenset(\n"
+              "            connection.execute(\n"
+              "                text(\"SELECT purpose_code FROM authorization_purpose\")\n"
+              "            ).scalars()\n"
+              "        )\n",
+              "        framework_rows = frozenset(\n"
+              "            tuple(row)\n"
+              "            for row in connection.execute(\n"
+              "                text(\n"
+              "                    \"SELECT framework_key, official_title, edition_label, source_url \"\n"
+              "                    \"FROM control_framework\"\n"
+              "                )\n"
+              "            )\n"
+              "        )\n"
+              "        control_rows = frozenset(\n"
+              "            tuple(row)\n"
+              "            for row in connection.execute(\n"
+              "                text(\n"
+              "                    \"SELECT framework_key, catalog_identifier, control_title, \"\n"
+              "                    \"control_statement FROM control_item\"\n"
+              "                )\n"
+              "            )\n"
+              "        )\n"
+              "        purpose_rows = frozenset(\n"
+              "            tuple(row)\n"
+              "            for row in connection.execute(\n"
+              "                text(\n"
+              "                    \"SELECT purpose_code, purpose_label, purpose_description \"\n"
+              "                    \"FROM authorization_purpose\"\n"
+              "                )\n"
+              "            )\n"
+              "        )\n",
+          )
+          replace_once(
+              "cwl_grc/database.py",
+              "        framework_keys != EXPECTED_FRAMEWORK_KEYS\n"
+              "        or control_identities != EXPECTED_CONTROL_IDENTITIES\n"
+              "        or purpose_codes != EXPECTED_PURPOSE_CODES\n",
+              "        framework_rows != EXPECTED_FRAMEWORK_ROWS\n"
+              "        or control_rows != EXPECTED_CONTROL_ROWS\n"
+              "        or purpose_rows != EXPECTED_PURPOSE_ROWS\n",
+          )
+          PY
+      - name: Install and verify focused regressions
+        run: |
+          set -euo pipefail
+          uv sync --locked --extra dev
+          uv run ruff check cwl_grc tests
+          uv run pytest -q \
+            tests/test_runtime_schema_ownership.py \
+            tests/test_schema_reference_bootstrap.py \
+            tests/test_schema_migration_lock_scope.py \
+            tests/test_schema_lifecycle.py \
+            tests/test_schema_lifecycle_edges.py
+      - name: Publish verified change and remove one-shot workflow
+        env:
+          BRANCH_NAME: feat/postgresql-schema-lifecycle
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/apply-runtime-schema-ownership-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cwl_grc/app.py cwl_grc/cli.py cwl_grc/database.py tests
+          git commit -m "fix: keep GRC runtime schema and reference data read-only"
+          git push origin "HEAD:${BRANCH_NAME}"
