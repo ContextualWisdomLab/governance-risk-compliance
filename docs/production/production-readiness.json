@@ -38,8 +38,8 @@
       ],
       "blockers": [
         "Issue #8 is open.",
-        "No supported PostgreSQL DBAPI dependency or PostgreSQL integration lane exists.",
-        "Application startup still owns create_all and migration DDL."
+        "No supported PostgreSQL DBAPI dependency or PostgreSQL integration lane exists on the integrated develop head.",
+        "Application startup on the integrated develop head still owns create_all and migration DDL."
       ],
       "evidence": []
     },
@@ -178,23 +178,8 @@
       "evidence": [
         {
           "kind": "repository_file",
-          "path": "cwl_grc/production_readiness.py",
-          "git_blob_sha": "b0286f5ce87f4c469d8bfc97f200c7fed9357deb"
-        },
-        {
-          "kind": "repository_file",
-          "path": "tests/test_production_readiness.py",
-          "git_blob_sha": "7057272255b669f3a38f9c19184fc0393c41ccca"
-        },
-        {
-          "kind": "repository_file",
-          "path": "tests/test_production_readiness_evidence_binding.py",
-          "git_blob_sha": "5186efa5a0fd56e30ff20509da6a28acb807f227"
-        },
-        {
-          "kind": "repository_file",
-          "path": ".github/workflows/production-readiness.yml",
-          "git_blob_sha": "4bfddd08963f782eb4b62ec3612e89f8cbad1ce8"
+          "path": "docs/production/readiness-evidence-index.json",
+          "sha256": "27cc06151bc967b48b2a772072faea6bc31e917f26b5b0ee94e3c327e455e789"
         }
       ]
     }
