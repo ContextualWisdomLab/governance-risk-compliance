@@ -189,7 +189,7 @@
         {
           "kind": "repository_file",
           "path": "tests/test_production_readiness_evidence_binding.py",
-          "git_blob_sha": "a3a46b53ff28c4ce446392be87507a953aa9ba46"
+          "git_blob_sha": "5186efa5a0fd56e30ff20509da6a28acb807f227"
         },
         {
           "kind": "repository_file",
