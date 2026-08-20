@@ -11,8 +11,18 @@ from sqlalchemy.engine import Connection, URL, make_url
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from cwl_grc.authorization import PurposeCode, seed_authorization_purposes
-from cwl_grc.catalog import FrameworkCode, _seed_rows, seed_control_catalog
+from cwl_grc.authorization import (
+    PurposeCode,
+    purpose_label,
+    seed_authorization_purposes,
+)
+from cwl_grc.catalog import (
+    FrameworkCode,
+    _seed_rows,
+    framework_label,
+    framework_source_url,
+    seed_control_catalog,
+)
 from cwl_grc.migrations import (
     POLICY_INTEGRITY_MIGRATION,
     apply_schema_migrations,
@@ -24,12 +34,24 @@ from cwl_grc.models import Base
 POSTGRESQL_DRIVER = "postgresql+psycopg"
 POSTGRESQL_MIGRATION_LOCK_KEY = 0x43574C475243
 EXPECTED_MIGRATION_KEYS = frozenset({POLICY_INTEGRITY_MIGRATION})
-EXPECTED_FRAMEWORK_KEYS = frozenset(code.value for code in FrameworkCode)
-EXPECTED_CONTROL_IDENTITIES = frozenset(
-    (framework.value, catalog_identifier)
-    for framework, _edition, catalog_identifier, _title, _statement in _seed_rows()
+CATALOG_SEED_ROWS = tuple(_seed_rows())
+EXPECTED_FRAMEWORK_ROWS = frozenset(
+    (
+        framework.value,
+        framework_label(framework),
+        edition,
+        framework_source_url(framework),
+    )
+    for framework, edition, _identifier, _title, _statement in CATALOG_SEED_ROWS
 )
-EXPECTED_PURPOSE_CODES = frozenset(code.value for code in PurposeCode)
+EXPECTED_CONTROL_ROWS = frozenset(
+    (framework.value, catalog_identifier, title, statement)
+    for framework, _edition, catalog_identifier, title, statement in CATALOG_SEED_ROWS
+)
+EXPECTED_PURPOSE_ROWS = frozenset(
+    (code.value, purpose_label(code), purpose_label(code))
+    for code in PurposeCode
+)
 
 
 class SchemaCompatibilityError(RuntimeError):
@@ -209,7 +231,7 @@ def _seed_reference_data(connection: Connection) -> None:
 
 
 def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
-    """Reject missing, older, newer, or reference-incomplete schemas before runtime."""
+    """Reject missing, older, newer, or reference-incompatible schemas before runtime."""
     inspector = inspect(engine)
     if not inspector.has_table("schema_migration"):
         raise SchemaCompatibilityError(
@@ -227,24 +249,32 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
                 text("SELECT migration_key FROM schema_migration ORDER BY migration_key")
             ).scalars()
         )
-        framework_keys = frozenset(
-            connection.execute(
-                text("SELECT framework_key FROM control_framework")
-            ).scalars()
-        )
-        control_identities = frozenset(
+        framework_rows = frozenset(
             tuple(row)
             for row in connection.execute(
                 text(
-                    "SELECT framework_key, catalog_identifier "
-                    "FROM control_item"
+                    "SELECT framework_key, official_title, edition_label, source_url "
+                    "FROM control_framework"
                 )
             )
         )
-        purpose_codes = frozenset(
-            connection.execute(
-                text("SELECT purpose_code FROM authorization_purpose")
-            ).scalars()
+        control_rows = frozenset(
+            tuple(row)
+            for row in connection.execute(
+                text(
+                    "SELECT framework_key, catalog_identifier, control_title, "
+                    "control_statement FROM control_item"
+                )
+            )
+        )
+        purpose_rows = frozenset(
+            tuple(row)
+            for row in connection.execute(
+                text(
+                    "SELECT purpose_code, purpose_label, purpose_description "
+                    "FROM authorization_purpose"
+                )
+            )
         )
     receipt_set = frozenset(receipts)
     missing_migrations = EXPECTED_MIGRATION_KEYS.difference(receipt_set)
@@ -258,9 +288,9 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
             "The GRC schema is ahead of this binary; deploy a compatible application."
         )
     if (
-        framework_keys != EXPECTED_FRAMEWORK_KEYS
-        or control_identities != EXPECTED_CONTROL_IDENTITIES
-        or purpose_codes != EXPECTED_PURPOSE_CODES
+        framework_rows != EXPECTED_FRAMEWORK_ROWS
+        or control_rows != EXPECTED_CONTROL_ROWS
+        or purpose_rows != EXPECTED_PURPOSE_ROWS
     ):
         raise SchemaCompatibilityError(
             "The GRC schema reference data is incomplete or incompatible; "
