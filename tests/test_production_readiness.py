@@ -25,17 +25,23 @@ MANIFEST_PATH = REPOSITORY_ROOT / "docs" / "production" / "production-readiness.
 DEFAULT_EVIDENCE_PATH = "tests/test_production_readiness.py"
 
 
+def _git_blob_sha(contents: bytes) -> str:
+    """Return the repository-native Git object identity for exact contents."""
+    header = f"blob {len(contents)}\0".encode("ascii")
+    return hashlib.sha1(header + contents, usedforsecurity=False).hexdigest()
+
+
 def _evidence(
     *,
     path: str = DEFAULT_EVIDENCE_PATH,
-    digest: str | None = None,
+    blob_sha: str | None = None,
 ) -> dict[str, str]:
     """Return one canonical repository-file evidence binding."""
     evidence_file = REPOSITORY_ROOT / path
     return {
         "kind": "repository_file",
         "path": path,
-        "sha256": digest or hashlib.sha256(evidence_file.read_bytes()).hexdigest(),
+        "git_blob_sha": blob_sha or _git_blob_sha(evidence_file.read_bytes()),
     }
 
 
@@ -200,12 +206,12 @@ def test_validate_manifest_rejects_invalid_gate_fields(
 @pytest.mark.parametrize(
     ("evidence", "expected"),
     [
-        ({}, "exactly kind, path, and sha256"),
+        ({}, "exactly kind, path, and git_blob_sha"),
         (
             {
                 "kind": "note",
                 "path": DEFAULT_EVIDENCE_PATH,
-                "sha256": "0" * 64,
+                "git_blob_sha": "0" * 40,
             },
             "kind must be repository_file",
         ),
@@ -213,7 +219,7 @@ def test_validate_manifest_rejects_invalid_gate_fields(
             {
                 "kind": "repository_file",
                 "path": "../outside.txt",
-                "sha256": "0" * 64,
+                "git_blob_sha": "0" * 40,
             },
             "canonical repository-relative path",
         ),
@@ -221,9 +227,9 @@ def test_validate_manifest_rejects_invalid_gate_fields(
             {
                 "kind": "repository_file",
                 "path": DEFAULT_EVIDENCE_PATH,
-                "sha256": "ABCDEF",
+                "git_blob_sha": "ABCDEF",
             },
-            "64 lowercase hexadecimal",
+            "40 lowercase hexadecimal",
         ),
     ],
 )
@@ -231,7 +237,7 @@ def test_validate_manifest_rejects_invalid_evidence_objects(
     evidence: dict[str, object],
     expected: str,
 ) -> None:
-    """Evidence objects are closed to exact repository paths and SHA-256 digests."""
+    """Evidence objects are closed to exact repository paths and Git blob IDs."""
     manifest = _manifest()
     gate = manifest["gates"][0]  # type: ignore[index]
     gate["evidence"] = [evidence]  # type: ignore[index]
@@ -277,7 +283,7 @@ def test_validate_manifest_rejects_ready_gate_with_blockers() -> None:
 
 
 def test_validate_manifest_rejects_ready_gate_without_evidence() -> None:
-    """A ready gate requires at least one hash-bound evidence file."""
+    """A ready gate requires at least one Git-bound evidence file."""
     gate = _gate(status="ready", blockers=[], evidence=[])
 
     with pytest.raises(ReadinessManifestError, match="ready gate must name concrete evidence"):
@@ -376,7 +382,7 @@ def test_main_require_ready_accepts_fully_evidenced_manifest(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Release mode succeeds only with hash-bound evidence for every gate."""
+    """Release mode succeeds only with Git-bound evidence for every gate."""
     path = tmp_path / "manifest.json"
     manifest = _manifest()
     gates = manifest["gates"]
