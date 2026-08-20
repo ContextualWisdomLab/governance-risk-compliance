@@ -17,6 +17,7 @@ from sqlalchemy import (
     UniqueConstraint,
     false,
     true,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -547,6 +548,15 @@ class ObligationRequirement(Base):
             "tenant_id", "compliance_obligation_id", "policy_version_id", "internal_control_definition_id",
             "control_implementation_id", name="obligation_requirement_target",
         ),
+        Index(
+            "obligation_requirement_target_identity",
+            "tenant_id",
+            "compliance_obligation_id",
+            text("COALESCE(policy_version_id, '')"),
+            text("COALESCE(internal_control_definition_id, '')"),
+            text("COALESCE(control_implementation_id, '')"),
+            unique=True,
+        ),
         ForeignKeyConstraint(
             ["tenant_id", "compliance_obligation_id"],
             ["compliance_obligation.tenant_id", "compliance_obligation.compliance_obligation_id"],
@@ -572,7 +582,7 @@ class ObligationRequirement(Base):
             name="obligation_requirement_target_present",
         ),
         CheckConstraint(
-            "review_status = 'approved'",
+            "review_status IN ('proposed', 'approved', 'rejected')",
             name="obligation_requirement_review",
         ),
     )
@@ -591,7 +601,7 @@ class ObligationRequirement(Base):
     requirement_code: Mapped[str] = mapped_column(String(64), nullable=False)
     requirement_title: Mapped[str] = mapped_column(String(255), nullable=False)
     source_locator: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    review_status: Mapped[str] = mapped_column(String(32), nullable=False, default="approved", server_default="approved")
+    review_status: Mapped[str] = mapped_column(String(32), nullable=False, default="proposed", server_default="proposed")
     mapping_rationale: Mapped[str] = mapped_column(Text, nullable=False)
     reviewed_by_actor: Mapped[str | None] = mapped_column(String(128), nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

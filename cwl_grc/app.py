@@ -587,7 +587,7 @@ def create_app(
         x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        """Link an obligation to an approved policy or internal control target."""
+        """Propose an obligation link for independent review."""
         decision = require_request_actor(
             authorization,
             x_actor_id,

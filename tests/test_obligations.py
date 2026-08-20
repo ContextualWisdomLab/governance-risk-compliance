@@ -24,6 +24,7 @@ from cwl_grc.models import (
     ApplicabilityDecision,
     ChangeImpactAssessment,
     ControlItem,
+    ObligationRequirement,
     PolicyDocument,
     PolicyVersion,
     RegulatorySource,
@@ -297,10 +298,68 @@ def test_obligation_lifecycle_preserves_applicability_and_change_history() -> No
         assert interpretation.interpretation_number == 1
         assert commitment.commitment_type == "contract"
         assert owner.owner_reference == "orgmetra:resilience-owner"
-        assert requirement.review_status == "approved"
+        assert requirement.review_status == "proposed"
         assert assessment.reapproval_status == ReapprovalCode.REQUIRED.value
         assert [item.queue for item in list_obligation_worklist(session, decision, as_of=FEBRUARY)] == ["upcoming"]
         assert list_obligation_worklist(session, decision, as_of=datetime(2026, 5, 1))[0].queue == "overdue"
+
+
+def test_obligation_requirement_target_is_unique_when_optional_targets_are_null() -> None:
+    """The database rejects duplicate policy targets despite nullable columns."""
+    factory = _factory()
+    decision = _decision()
+    with factory() as session:
+        _source_row, revision = _source(session, decision)
+        obligation = _obligation(session, decision, revision)
+        policy = author_policy(
+            session,
+            AuthorizationDecision("policy-officer", PurposeCode.POLICY_AUTHORING),
+            "Unique target policy",
+            "The organization maintains a unique obligation target.",
+            [],
+        )
+        policy_version_id = policy.policy_versions[0].policy_version_id
+        link_obligation_requirement(
+            session,
+            decision,
+            obligation.compliance_obligation_id,
+            "UNIQUE-REQ-1",
+            "Unique requirement",
+            "The target is linked once.",
+            policy_version_id=policy_version_id,
+        )
+        with pytest.raises(IntegrityError):
+            with session.begin_nested():
+                session.add(
+                    ObligationRequirement(
+                        obligation_requirement_id="duplicate-target",
+                        tenant_id=decision.tenant_id,
+                        compliance_obligation_id=obligation.compliance_obligation_id,
+                        policy_version_id=policy_version_id,
+                        requirement_code="UNIQUE-REQ-2",
+                        requirement_title="Duplicate requirement",
+                        review_status="proposed",
+                        mapping_rationale="The database must reject this duplicate target.",
+                        created_at=FEBRUARY,
+                    )
+                )
+                session.flush()
+        with pytest.raises(DBAPIError, match="start proposed"):
+            with session.begin_nested():
+                session.add(
+                    ObligationRequirement(
+                        obligation_requirement_id="self-approved-target",
+                        tenant_id=decision.tenant_id,
+                        compliance_obligation_id=obligation.compliance_obligation_id,
+                        policy_version_id=policy_version_id,
+                        requirement_code="UNIQUE-REQ-3",
+                        requirement_title="Self-approved requirement",
+                        review_status="approved",
+                        mapping_rationale="The database must reject self-asserted approval.",
+                        created_at=FEBRUARY,
+                    )
+                )
+                session.flush()
 
 
 def test_obligation_can_link_internal_control_and_worklist_unknown() -> None:
@@ -394,6 +453,37 @@ def test_obligation_version_number_conflict_is_client_error(monkeypatch: pytest.
         monkeypatch.setattr(session, "flush", fail_flush)
         with pytest.raises(HTTPException, match="legal interpretation version"):
             add_legal_interpretation(session, decision, obligation.compliance_obligation_id, "Interpretation", "authority://1")
+
+
+def test_unique_source_race_is_client_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A database uniqueness race is translated into the documented conflict."""
+    factory = _factory()
+    decision = _decision()
+    with factory() as session:
+        real_flush = session.flush
+        flush_calls = 0
+
+        def fail_flush(*_args: Any, **_kwargs: Any) -> None:
+            """Simulate a concurrent unique source insert."""
+            nonlocal flush_calls
+            flush_calls += 1
+            if flush_calls <= 2:
+                real_flush(*_args, **_kwargs)
+                return
+            raise IntegrityError("insert", {}, RuntimeError("duplicate source"))
+
+        monkeypatch.setattr(session, "flush", fail_flush)
+        with pytest.raises(HTTPException, match="source code already exists"):
+            create_regulatory_source(
+                session,
+                decision,
+                "RACE-SOURCE",
+                "regulation",
+                "Concurrent source",
+                "Authority",
+                "https://example.test/race",
+                "identifier_only",
+            )
 
 
 def test_obligation_rejects_wrong_purpose_bad_periods_and_cross_tenant_targets() -> None:
@@ -598,6 +688,7 @@ def test_obligation_http_workflow_uses_local_boundary() -> None:
         },
     )
     assert requirement.status_code == 201
+    assert requirement.json()["review_status"] == "proposed"
     change = client.post(
         "/obligations/changes",
         headers=headers,

@@ -24,6 +24,7 @@ from cwl_grc.catalog import (
 from cwl_grc.database import create_session_factory
 from cwl_grc.encryption import EvidenceCipher
 from cwl_grc.migrations import (
+    _apply_obligation_requirement_target_migration,
     apply_schema_migrations,
     integrity_guard_statements,
 )
@@ -239,6 +240,38 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
                 "'officer', CURRENT_TIMESTAMP)"
             )
         )
+        connection.execute(
+            text(
+                "CREATE TABLE obligation_requirement ("
+                "obligation_requirement_id VARCHAR(64) PRIMARY KEY, "
+                "tenant_id VARCHAR(128) NOT NULL, "
+                "compliance_obligation_id VARCHAR(64) NOT NULL, "
+                "policy_version_id VARCHAR(64), "
+                "internal_control_definition_id VARCHAR(64), "
+                "control_implementation_id VARCHAR(64), "
+                "control_item_id VARCHAR(64), "
+                "requirement_code VARCHAR(64) NOT NULL, "
+                "requirement_title VARCHAR(255) NOT NULL, "
+                "source_locator VARCHAR(255), "
+                "review_status VARCHAR(32) NOT NULL, "
+                "mapping_rationale TEXT NOT NULL, "
+                "reviewed_by_actor VARCHAR(128), "
+                "reviewed_at TIMESTAMP, "
+                "created_at TIMESTAMP NOT NULL, "
+                "CONSTRAINT obligation_requirement_review "
+                "CHECK (review_status = 'approved')"
+                ")"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO obligation_requirement VALUES "
+                "('requirement-1', 'local_development', 'obligation-1', "
+                "'policy-version-1', NULL, NULL, NULL, 'REQ-1', "
+                "'Legacy requirement', NULL, 'approved', 'Legacy mapping', "
+                "'legacy-officer', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            )
+        )
     apply_schema_migrations(engine)
     apply_schema_migrations(engine)
     policy_columns = {
@@ -285,7 +318,15 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
     assert finalized in {True, 1}
     assert policy_tenant == "local_development"
     assert version_tenant == "local_development"
-    assert receipt_count == 6
+    assert receipt_count == 7
+    with engine.connect() as connection:
+        requirement = connection.execute(
+            text(
+                "SELECT review_status FROM obligation_requirement "
+                "WHERE obligation_requirement_id = 'requirement-1'"
+            )
+        ).scalar_one()
+    assert requirement == "approved"
 
 
 def test_integrity_guard_ddl_covers_supported_and_unknown_dialects() -> None:
@@ -298,3 +339,29 @@ def test_integrity_guard_ddl_covers_supported_and_unknown_dialects() -> None:
     assert "prevent_policy_mapping_mutation" in postgres_ddl
     with pytest.raises(ValueError, match="Unsupported GRC database dialect"):
         integrity_guard_statements("mysql")
+
+
+def test_postgresql_obligation_target_migration_is_explicit() -> None:
+    """PostgreSQL upgrades the review check before adding null-safe uniqueness."""
+    class Dialect:
+        """Minimal dialect projection for migration DDL coverage."""
+
+        name = "postgresql"
+
+    class Connection:
+        """Minimal connection projection that records emitted DDL."""
+
+        dialect = Dialect()
+
+        def __init__(self) -> None:
+            self.statements: list[str] = []
+
+        def execute(self, statement: object) -> None:
+            """Record one SQL statement."""
+            self.statements.append(str(statement))
+
+    connection = Connection()
+    _apply_obligation_requirement_target_migration(connection)  # type: ignore[arg-type]
+    sql = "\n".join(connection.statements)
+    assert "DROP CONSTRAINT IF EXISTS obligation_requirement_review" in sql
+    assert "COALESCE(policy_version_id, '')" in sql

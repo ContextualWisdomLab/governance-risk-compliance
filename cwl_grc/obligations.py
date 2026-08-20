@@ -138,6 +138,16 @@ def _flush_versioned_row(session: Session, row: ModelT, conflict_detail: str) ->
         raise HTTPException(status_code=409, detail=conflict_detail) from exc
 
 
+def _flush_unique_row(session: Session, row: ModelT, conflict_detail: str) -> None:
+    """Flush one uniquely keyed row inside a savepoint for race-safe conflicts."""
+    try:
+        with session.begin_nested():
+            session.add(row)
+            session.flush()
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail=conflict_detail) from exc
+
+
 def create_jurisdiction(
     session: Session,
     decision: AuthorizationDecision,
@@ -161,8 +171,7 @@ def create_jurisdiction(
         created_by_actor=decision.actor_identifier,
         created_at=_utc(),
     )
-    session.add(jurisdiction)
-    session.flush()
+    _flush_unique_row(session, jurisdiction, "That jurisdiction code already exists.")
     record_audit_event(session, decision, "create_jurisdiction", "jurisdiction_record", jurisdiction.jurisdiction_id)
     return jurisdiction
 
@@ -197,8 +206,7 @@ def create_regulatory_source(
         created_by_actor=decision.actor_identifier,
         created_at=_utc(),
     )
-    session.add(source)
-    session.flush()
+    _flush_unique_row(session, source, "That source code already exists.")
     record_audit_event(session, decision, "create_regulatory_source", "regulatory_source", source.regulatory_source_id)
     return source
 
@@ -240,8 +248,7 @@ def create_source_revision(
         created_by_actor=decision.actor_identifier,
         created_at=_utc(),
     )
-    session.add(revision)
-    session.flush()
+    _flush_unique_row(session, revision, "That source revision already exists.")
     record_audit_event(session, decision, "create_source_revision", "source_revision", revision.source_revision_id)
     return revision
 
@@ -289,8 +296,7 @@ def create_compliance_obligation(
         created_by_actor=decision.actor_identifier,
         created_at=_utc(),
     )
-    session.add(obligation)
-    session.flush()
+    _flush_unique_row(session, obligation, "That obligation code already exists.")
     record_audit_event(session, decision, "create_compliance_obligation", "compliance_obligation", obligation.compliance_obligation_id)
     return obligation
 
@@ -435,8 +441,7 @@ def register_compliance_commitment(
         created_by_actor=decision.actor_identifier,
         created_at=_utc(),
     )
-    session.add(commitment)
-    session.flush()
+    _flush_unique_row(session, commitment, "That commitment code already exists.")
     record_audit_event(session, decision, "register_compliance_commitment", "compliance_commitment", commitment.compliance_commitment_id)
     return commitment
 
@@ -488,7 +493,7 @@ def link_obligation_requirement(
     control_item_id: str | None = None,
     source_locator: str | None = None,
 ) -> ObligationRequirement:
-    """Create a reviewed obligation link to a finalized policy or internal control."""
+    """Create a proposed obligation link for a finalized policy or internal control."""
     _require_compliance_purpose(decision)
     obligation = _same_tenant(session, ComplianceObligation, compliance_obligation_id, decision.tenant_id)
     if not policy_version_id and not internal_control_definition_id and not control_implementation_id:
@@ -533,14 +538,11 @@ def link_obligation_requirement(
         requirement_code=_text(requirement_code, "obligation requirement code"),
         requirement_title=_text(requirement_title, "obligation requirement title"),
         source_locator=source_locator.strip() if isinstance(source_locator, str) and source_locator.strip() else None,
-        review_status="approved",
+        review_status="proposed",
         mapping_rationale=_text(mapping_rationale, "obligation mapping rationale"),
-        reviewed_by_actor=decision.actor_identifier,
-        reviewed_at=_utc(),
         created_at=_utc(),
     )
-    session.add(requirement)
-    session.flush()
+    _flush_unique_row(session, requirement, "That obligation requirement target already exists.")
     record_audit_event(session, decision, "link_obligation_requirement", "obligation_requirement", requirement.obligation_requirement_id)
     return requirement
 
@@ -573,8 +575,7 @@ def record_regulatory_change(
         created_by_actor=decision.actor_identifier,
         created_at=_utc(),
     )
-    session.add(change)
-    session.flush()
+    _flush_unique_row(session, change, "That regulatory change code already exists.")
     record_audit_event(session, decision, "record_regulatory_change", "regulatory_change", change.regulatory_change_id)
     return change
 
@@ -624,7 +625,7 @@ def assess_change_impact(
 def obligation_next_action(code: str) -> str:
     """Return the officer action implied by one applicability state."""
     return {
-        ApplicabilityCode.APPLICABLE.value: "Link the obligation to the approved policy and internal control test.",
+        ApplicabilityCode.APPLICABLE.value: "Propose the obligation link and request independent review.",
         ApplicabilityCode.NOT_APPLICABLE.value: "Re-review the authorized not-applicable rationale by the next review date.",
         ApplicabilityCode.PARTIALLY_APPLICABLE.value: "Document the remaining scope and link compensating controls.",
         ApplicabilityCode.INHERITED.value: "Verify the inherited service boundary and supporting assurance.",

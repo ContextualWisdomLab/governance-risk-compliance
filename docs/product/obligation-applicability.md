@@ -4,8 +4,8 @@
 
 An authorized compliance officer can register an authoritative source and exact
 edition, create an obligation for a precise tenant scope, record an evidenced
-applicability decision, connect the approved obligation to policy and internal
-control truth, and triage a later source change without losing history.
+applicability decision, propose a policy or internal-control link for independent
+review, and triage a later source change without losing history.
 
 ### In scope
 
@@ -15,7 +15,7 @@ control truth, and triage a later source change without losing history.
   `legal_interpretation` history;
 - separate contractual/voluntary `compliance_commitment` records and temporal
   `obligation_owner_assignment` records;
-- reviewed `obligation_requirement` links to finalized policy revisions and
+- proposed `obligation_requirement` links to finalized policy revisions and
   internal controls/implementations;
 - `regulatory_change`, immutable impact assessment, overdue/upcoming worklist,
   and local JSON officer routes.
@@ -43,7 +43,7 @@ The workflow is:
 ```text
 source pointer → exact revision → obligation + scope
 → applicability rule/decision + evidence + review date
-→ approved policy/internal-control link
+→ proposed policy/internal-control link → independent review
 → source change + diff reference → impact owner/plan/re-approval
 ```
 
@@ -74,8 +74,9 @@ classDiagram
     compliance_obligation "1" --> "many" change_impact_assessment
 ```
 
-`obligation_requirement` is a reviewed relationship row; it does not turn a
-policy or control into proof that the obligation is satisfied. The internal
+`obligation_requirement` is an append-only proposed relationship row; creation
+does not self-approve it or turn a policy or control into proof that the
+obligation is satisfied. The internal
 control coverage projection remains the authority for design/operating
 effectiveness.
 

@@ -33,8 +33,10 @@ decisions; it does not copy protected legal or standards text.
    Every decision carries rationale, evidence reference, effective period, and
    next review; `not_applicable` is never represented by deletion.
 5. Store `compliance_commitment` separately for contracts and voluntary
-   commitments, then use `obligation_requirement` to link an approved policy or
-   reviewed internal control/implementation.
+   commitments, then use `obligation_requirement` to propose a link to a
+   finalized policy or internal control/implementation. Requirement creation
+   remains `proposed`; independent approval is a separate follow-up boundary and
+   is never self-asserted by the creating actor.
 6. Store immutable `regulatory_change` intake and versioned
    `change_impact_assessment` rows with owner, due date, implementation plan,
    and re-approval state. New source revisions do not mutate prior decisions.
@@ -62,6 +64,7 @@ decisions; it does not copy protected legal or standards text.
   worklist, protected route, rejection, tenant, and immutable-history paths.
 - The local suite reports 100% production statement and branch coverage and
   100% public docstring coverage.
-- A PostgreSQL 18 probe creates the schema, runs source/obligation/applicability/
-  change/impact data, rejects a cross-tenant obligation, and rejects immutable
-  source-revision mutation.
+- A local PostgreSQL 18 probe creates the schema, runs source/obligation/
+  applicability/change/impact data, rejects a cross-tenant obligation, and
+  rejects immutable source-revision mutation; the product workflow currently
+  executes the SQLite contract suite, not a PostgreSQL service job.
