@@ -480,6 +480,37 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
         END
         """,
         """
+        CREATE TRIGGER IF NOT EXISTS control_owner_assignment_require_matching_foundation
+        BEFORE INSERT ON control_owner_assignment
+        WHEN NEW.control_implementation_id IS NOT NULL
+         AND NOT EXISTS (
+            SELECT 1
+            FROM control_implementation
+            WHERE control_implementation_id = NEW.control_implementation_id
+              AND tenant_id = NEW.tenant_id
+              AND internal_control_definition_id = NEW.internal_control_definition_id
+         )
+        BEGIN
+            SELECT RAISE(ABORT, 'control owner assignment foundation mismatch');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_owner_assignment_require_matching_foundation_update
+        BEFORE UPDATE OF tenant_id, internal_control_definition_id, control_implementation_id
+        ON control_owner_assignment
+        WHEN NEW.control_implementation_id IS NOT NULL
+         AND NOT EXISTS (
+            SELECT 1
+            FROM control_implementation
+            WHERE control_implementation_id = NEW.control_implementation_id
+              AND tenant_id = NEW.tenant_id
+              AND internal_control_definition_id = NEW.internal_control_definition_id
+         )
+        BEGIN
+            SELECT RAISE(ABORT, 'control owner assignment foundation mismatch');
+        END
+        """,
+        """
         CREATE TRIGGER IF NOT EXISTS control_test_execution_require_plan_implementation
         BEFORE INSERT ON control_test_execution
         WHEN (
@@ -748,6 +779,16 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
                 ) THEN
                     RAISE EXCEPTION 'control deficiency implementation mismatch';
                 END IF;
+            ELSIF TG_TABLE_NAME = 'control_owner_assignment' THEN
+                IF NEW.control_implementation_id IS NOT NULL AND NOT EXISTS (
+                    SELECT 1
+                    FROM control_implementation
+                    WHERE tenant_id = NEW.tenant_id
+                      AND control_implementation_id = NEW.control_implementation_id
+                      AND internal_control_definition_id = NEW.internal_control_definition_id
+                ) THEN
+                    RAISE EXCEPTION 'control owner assignment foundation mismatch';
+                END IF;
             END IF;
             RETURN NEW;
         END;
@@ -765,6 +806,13 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
         CREATE TRIGGER control_test_execution_graph_consistency
         BEFORE INSERT OR UPDATE OF tenant_id, test_plan_id, control_implementation_id
         ON control_test_execution
+        FOR EACH ROW EXECUTE FUNCTION enforce_control_graph_consistency()
+        """,
+        "DROP TRIGGER IF EXISTS control_owner_assignment_graph_consistency ON control_owner_assignment",
+        """
+        CREATE TRIGGER control_owner_assignment_graph_consistency
+        BEFORE INSERT OR UPDATE OF tenant_id, internal_control_definition_id, control_implementation_id
+        ON control_owner_assignment
         FOR EACH ROW EXECUTE FUNCTION enforce_control_graph_consistency()
         """,
         "DROP TRIGGER IF EXISTS control_deficiency_graph_consistency ON control_deficiency",
