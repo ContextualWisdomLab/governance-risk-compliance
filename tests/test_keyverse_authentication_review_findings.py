@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Any
 
 import jwt
@@ -23,6 +23,22 @@ NOW = datetime(2026, 8, 19, 6, 0, tzinfo=timezone.utc)
 ISSUER = "https://identity.example.test/realms/cwl"
 AUDIENCE = "cwl-grc-api"
 CLIENT_ID = "cwl-grc-web"
+
+
+class _UndefinedOffsetTimeZone(tzinfo):
+    """Expose a tzinfo object that does not define an actual UTC offset."""
+
+    def utcoffset(self, _value: datetime | None) -> None:
+        """Return no offset so the attached datetime remains logically naive."""
+        return None
+
+    def dst(self, _value: datetime | None) -> None:
+        """Return no daylight-saving offset for the undefined timezone."""
+        return None
+
+    def tzname(self, _value: datetime | None) -> str:
+        """Return a diagnostic name for the undefined-offset timezone."""
+        return "undefined-offset"
 
 
 def _material() -> tuple[Any, dict[str, Any]]:
@@ -70,17 +86,23 @@ def _token(
     )
 
 
+def _settings(**overrides: Any) -> KeyverseAccessTokenSettings:
+    """Return one reviewed resource-server policy with focused overrides."""
+    values: dict[str, Any] = {
+        "issuer": ISSUER,
+        "audience": AUDIENCE,
+        "allowed_client_ids": frozenset({CLIENT_ID}),
+        "allowed_roles": frozenset({"compliance_officer"}),
+        "clock_skew_seconds": 60,
+    }
+    values.update(overrides)
+    return KeyverseAccessTokenSettings(**values)
+
+
 def _verifier(jwk: dict[str, Any]) -> KeyverseAccessTokenVerifier:
     """Build the closed verifier with a deterministic UTC clock."""
     key_set = parse_keyverse_jwks(json.dumps({"keys": [jwk]}).encode())
-    settings = KeyverseAccessTokenSettings(
-        issuer=ISSUER,
-        audience=AUDIENCE,
-        allowed_client_ids=frozenset({CLIENT_ID}),
-        allowed_roles=frozenset({"compliance_officer"}),
-        clock_skew_seconds=60,
-    )
-    return KeyverseAccessTokenVerifier(settings, key_set, now=lambda: NOW)
+    return KeyverseAccessTokenVerifier(_settings(), key_set, now=lambda: NOW)
 
 
 def test_impossible_access_token_time_windows_are_rejected_before_clock_skew() -> None:
@@ -194,6 +216,27 @@ def test_resource_server_settings_reject_edge_whitespace_without_normalizing() -
     for values in invalid_settings:
         with pytest.raises(ValueError, match="exact"):
             KeyverseAccessTokenSettings(**values)
+
+
+@pytest.mark.parametrize("invalid_skew", [True, False, 0.5, 60.0])
+def test_clock_skew_requires_a_non_boolean_integer(invalid_skew: object) -> None:
+    """Clock tolerance cannot acquire implicit boolean or fractional semantics."""
+    with pytest.raises(ValueError, match="clock skew"):
+        _settings(clock_skew_seconds=invalid_skew)
+
+
+def test_verification_clock_with_undefined_utc_offset_is_rejected() -> None:
+    """A tzinfo object without an offset does not make a verification clock aware."""
+    private_key, jwk = _material()
+    key_set = parse_keyverse_jwks(json.dumps({"keys": [jwk]}).encode())
+    undefined_clock = NOW.replace(tzinfo=_UndefinedOffsetTimeZone())
+    verifier = KeyverseAccessTokenVerifier(
+        _settings(),
+        key_set,
+        now=lambda: undefined_clock,
+    )
+    with pytest.raises(AccessTokenValidationError, match="timezone-aware"):
+        verifier.verify(_token(private_key, _claims()))
 
 
 def test_jwk_and_token_key_identifiers_reject_edge_whitespace() -> None:
