@@ -10,89 +10,99 @@
   <main class="workspace" aria-labelledby="workspace-title">
     <header class="workspace__header">
       <div>
-        <p class="eyebrow">Acme Korea · Compliance officer · Evidence review purpose</p>
-        <h1 id="workspace-title">Compliance workspace</h1>
-        <p class="lede">Understand what applies, what is proven, and what needs action before anything is shared.</p>
+        <p class="eyebrow" data-i18n="header.context">Acme Korea · Compliance officer · Evidence review purpose</p>
+        <h1 id="workspace-title" data-i18n="header.title">Compliance workspace</h1>
+        <p class="lede" data-i18n="header.lede">Understand what applies, what is proven, and what needs action before anything is shared.</p>
       </div>
-      <a class="button button--primary" href="#action-feedback">Request evidence</a>
+      <div class="header-actions">
+        <label class="locale-picker" for="locale-select"><span data-i18n="locale.label">Language</span>
+          <select id="locale-select" name="locale" aria-describedby="locale-help">
+            <option value="en" data-i18n="locale.en">English</option>
+            <option value="ko" data-i18n="locale.ko">한국어</option>
+          </select>
+        </label>
+        <span id="locale-help" class="sr-only" data-i18n="locale.help">Choose the language for this preview.</span>
+        <a class="button button--primary" href="#action-feedback" data-i18n="action.requestEvidence">Request evidence</a>
+      </div>
     </header>
 
     <section class="notice notice--warning" aria-labelledby="freshness-title">
       <div>
-        <h2 id="freshness-title">Evidence needs review</h2>
-        <p>2 evidence items are stale. Review source versions before sharing with an auditor.</p>
+        <h2 id="freshness-title" data-i18n="notice.title">Evidence needs review</h2>
+        <p data-i18n="notice.description">2 evidence items are stale. Review source versions before sharing with an auditor.</p>
       </div>
-      <a class="button button--secondary" href="#trace-title">Review stale evidence</a>
+      <a class="button button--secondary" href="#trace-title" data-i18n="action.reviewStaleEvidence">Review stale evidence</a>
     </section>
 
     <section aria-labelledby="posture-title">
       <div class="section-heading">
         <div>
-          <p class="eyebrow">Projection from authoritative records</p>
-          <h2 id="posture-title">Current posture</h2>
+          <p class="eyebrow" data-i18n="posture.eyebrow">Projection from authoritative records</p>
+          <h2 id="posture-title" data-i18n="posture.title">Current posture</h2>
         </div>
-        <a class="button button--secondary" href="#exact-title">View exact values</a>
+        <a class="button button--secondary" href="#exact-title" data-i18n="action.viewExactValues">View exact values</a>
       </div>
       <div class="metric-grid">
-        <article class="metric"><span>Applicable obligations</span><strong>18</strong><span class="status status--neutral">3 unknown</span></article>
-        <article class="metric"><span>Controls tested</span><strong>12 / 16</strong><span class="status status--neutral">2 not assessed</span></article>
-        <article class="metric"><span>Evidence fresh</span><strong>21 / 24</strong><span class="status status--warning">2 stale</span></article>
-        <article class="metric"><span>Open deficiencies</span><strong>3</strong><span class="status status--danger">1 blocked</span></article>
+        <article class="metric"><span data-i18n="metric.applicable">Applicable obligations</span><strong>18</strong><span class="status status--neutral" data-state="unknown" data-i18n="status.unknown3">3 unknown</span></article>
+        <article class="metric"><span data-i18n="metric.controlsTested">Controls tested</span><strong>12 / 16</strong><span class="status status--neutral" data-state="not_assessed" data-i18n="status.notAssessed2">2 not assessed</span></article>
+        <article class="metric"><span data-i18n="metric.evidenceFresh">Evidence fresh</span><strong>21 / 24</strong><span class="status status--warning" data-state="stale" data-i18n="status.stale2">2 stale</span></article>
+        <article class="metric"><span data-i18n="metric.deficiencies">Open deficiencies</span><strong>3</strong><span class="status status--danger" data-state="blocked" data-i18n="status.blocked1">1 blocked</span></article>
       </div>
     </section>
 
     <div class="two-column">
       <section class="panel" aria-labelledby="trace-title">
-        <p class="eyebrow">Traceable claim</p>
-        <h2 id="trace-title">Requirement → control → test → evidence</h2>
-        <p>Follow every posture claim back to source records. A badge or percentage is never a second source of truth.</p>
+        <p class="eyebrow" data-i18n="trace.eyebrow">Traceable claim</p>
+        <h2 id="trace-title" data-i18n="trace.title">Requirement → control → test → evidence</h2>
+        <p data-i18n="trace.description">Follow every posture claim back to source records. A badge or percentage is never a second source of truth.</p>
         <ol class="trace-list">
-          <li><span class="trace-kind">Applicable</span><span>Privacy retention obligation</span><span class="status status--success">Effective</span></li>
-          <li><span class="trace-kind">Control</span><span>Retention and legal-hold control</span><span class="status status--success">Effective</span></li>
-          <li><span class="trace-kind">Test</span><span>Quarterly operating-effectiveness test</span><span class="status status--neutral">Not assessed</span></li>
-          <li><span class="trace-kind">Evidence</span><span>Q3 retention rehearsal</span><span class="status status--warning">Stale</span></li>
+          <li><span class="trace-kind" data-i18n="trace.applicable">Applicable</span><span data-i18n="trace.obligation">Privacy retention obligation</span><span class="status status--success" data-state="effective" data-i18n="status.effective">Effective</span></li>
+          <li><span class="trace-kind" data-i18n="trace.control">Control</span><span data-i18n="trace.controlName">Retention and legal-hold control</span><span class="status status--success" data-state="effective" data-i18n="status.effective">Effective</span></li>
+          <li><span class="trace-kind" data-i18n="trace.test">Test</span><span data-i18n="trace.testName">Quarterly operating-effectiveness test</span><span class="status status--neutral" data-state="not_assessed" data-i18n="status.notAssessed">Not assessed</span></li>
+          <li><span class="trace-kind" data-i18n="trace.evidence">Evidence</span><span data-i18n="trace.evidenceName">Q3 retention rehearsal</span><span class="status status--warning" data-state="stale" data-i18n="status.stale">Stale</span></li>
         </ol>
         <div class="actions">
-          <a class="button button--primary" href="#action-feedback">Request missing evidence</a>
-          <a class="button button--secondary" href="#exact-title">View exact values</a>
+          <a class="button button--primary" href="#action-feedback" data-i18n="action.requestMissingEvidence">Request missing evidence</a>
+          <a class="button button--secondary" href="#exact-title" data-i18n="action.viewExactValues">View exact values</a>
         </div>
       </section>
 
       <aside class="panel" aria-labelledby="actions-title">
-        <p class="eyebrow">Prioritized by buyer impact</p>
-        <h2 id="actions-title">Next actions</h2>
+        <p class="eyebrow" data-i18n="actions.eyebrow">Prioritized by buyer impact</p>
+        <h2 id="actions-title" data-i18n="actions.title">Next actions</h2>
         <ul class="action-list">
-          <li><span>Review 2 stale evidence items</span><span class="status status--warning">Due today</span></li>
-          <li><span>Assign owner to 1 blocked deficiency</span><span class="status status--danger">Blocked</span></li>
-          <li><span>Confirm 3 unknown applicability decisions</span><span class="status status--neutral">Unknown</span></li>
-          <li><span>External-auditor package</span><span class="status status--danger">Access denied</span></li>
+          <li><span data-i18n="action.reviewStaleItems">Review 2 stale evidence items</span><span class="status status--warning" data-state="due_today" data-i18n="status.dueToday">Due today</span></li>
+          <li><span data-i18n="action.assignBlocked">Assign owner to 1 blocked deficiency</span><span class="status status--danger" data-state="blocked" data-i18n="status.blocked">Blocked</span></li>
+          <li><span data-i18n="action.confirmApplicability">Confirm 3 unknown applicability decisions</span><span class="status status--neutral" data-state="unknown" data-i18n="status.unknown">Unknown</span></li>
+          <li><span data-i18n="action.externalPackage">External-auditor package</span><span class="status status--danger" data-state="access_denied" data-i18n="status.accessDenied">Access denied</span></li>
         </ul>
-        <a class="button button--primary" href="#action-feedback">Open evidence room</a>
+        <a class="button button--primary" href="#action-feedback" data-i18n="action.openEvidenceRoom">Open evidence room</a>
       </aside>
     </div>
 
     <section class="panel exact-values" aria-labelledby="exact-title">
       <div class="section-heading">
         <div>
-          <p class="eyebrow">Accessible alternative</p>
-          <h2 id="exact-title">Exact values</h2>
+          <p class="eyebrow" data-i18n="exact.eyebrow">Accessible alternative</p>
+          <h2 id="exact-title" data-i18n="exact.title">Exact values</h2>
         </div>
-        <span class="status status--neutral">Period: 2026 Q3</span>
+        <span class="status status--neutral" data-i18n="exact.period">Period: 2026 Q3</span>
       </div>
-      <div class="table-scroll" tabindex="0" aria-label="Scrollable exact-value compliance table">
+      <div class="table-scroll" tabindex="0" aria-label="Scrollable exact-value compliance table" data-i18n-attr="aria-label:exact.caption">
         <table>
-          <caption>Exact compliance posture values with provenance, limitation, and next action</caption>
-          <thead><tr><th scope="col">Measure</th><th scope="col">Value</th><th scope="col">Status</th><th scope="col">Source version</th><th scope="col">Limitation</th><th scope="col">Next action</th></tr></thead>
+          <caption data-i18n="exact.caption">Exact compliance posture values with provenance, limitation, and next action</caption>
+          <thead><tr><th scope="col" data-i18n="table.measure">Measure</th><th scope="col" data-i18n="table.value">Value</th><th scope="col" data-i18n="table.status">Status</th><th scope="col" data-i18n="table.sourceVersion">Source version</th><th scope="col" data-i18n="table.limitation">Limitation</th><th scope="col" data-i18n="table.nextAction">Next action</th></tr></thead>
           <tbody>
-            <tr><th scope="row">Applicable obligations</th><td>18 obligations</td><td>3 unknown</td><td>applicability-2026-08-20</td><td>Three jurisdiction decisions await review.</td><td>Confirm applicability</td></tr>
-            <tr><th scope="row">Controls tested</th><td>12 of 16 controls</td><td>2 not assessed</td><td>control-test-2026-q3</td><td>No effectiveness claim is made for unassessed controls.</td><td>Schedule tests</td></tr>
-            <tr><th scope="row">Evidence fresh</th><td>21 of 24 items</td><td>2 stale</td><td>evidence-index-2026-08-20</td><td>Freshness does not imply control effectiveness.</td><td>Request refreshed evidence</td></tr>
+            <tr><th scope="row" data-i18n="metric.applicable">Applicable obligations</th><td data-i18n="table.applicableValue">18 obligations</td><td data-i18n="table.applicableStatus">3 unknown</td><td data-i18n="table.applicableSource">applicability-2026-08-20</td><td data-i18n="table.applicableLimitation">Three jurisdiction decisions await review.</td><td data-i18n="table.applicableAction">Confirm applicability</td></tr>
+            <tr><th scope="row" data-i18n="metric.controlsTested">Controls tested</th><td data-i18n="table.controlsValue">12 of 16 controls</td><td data-i18n="table.controlsStatus">2 not assessed</td><td data-i18n="table.controlsSource">control-test-2026-q3</td><td data-i18n="table.controlsLimitation">No effectiveness claim is made for unassessed controls.</td><td data-i18n="table.controlsAction">Schedule tests</td></tr>
+            <tr><th scope="row" data-i18n="metric.evidenceFresh">Evidence fresh</th><td data-i18n="table.evidenceValue">21 of 24 items</td><td data-i18n="table.evidenceStatus">2 stale</td><td data-i18n="table.evidenceSource">evidence-index-2026-08-20</td><td data-i18n="table.evidenceLimitation">Freshness does not imply control effectiveness.</td><td data-i18n="table.evidenceAction">Request refreshed evidence</td></tr>
           </tbody>
         </table>
       </div>
-      <p id="action-feedback" class="limitation" role="status"><strong>Preview action:</strong> Connect the verified GRC workflow before requesting or sharing evidence.</p>
-      <p class="limitation"><strong>Limitation:</strong> This local fixture demonstrates buyer-facing state semantics only. It does not authenticate a tenant, read protected GRC APIs, authorize exports, or certify compliance.</p>
+      <p id="action-feedback" class="limitation" role="status"><strong data-i18n="feedback.preview">Preview action:</strong> <span data-i18n="feedback.connect">Connect the verified GRC workflow before requesting or sharing evidence.</span></p>
+      <p class="limitation"><strong data-i18n="feedback.limitation">Limitation:</strong> <span data-i18n="feedback.fixture">This local fixture demonstrates buyer-facing state semantics only. It does not authenticate a tenant, read protected GRC APIs, authorize exports, or certify compliance.</span></p>
     </section>
   </main>
+  <script type="module" src="./i18n-bootstrap.mjs"></script>
 </body>
 </html>

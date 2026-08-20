@@ -30,7 +30,9 @@ Storybook 10.5.10 uses the official Web Components + Vite framework and `@storyb
 
 The accessibility target is WCAG 2.2 AA for supported journeys. The fixture therefore requires keyboard operation, visible focus, text-equivalent status, a minimum 44 px action height, reduced-motion handling, forced-colors resilience, responsive stacking, print behavior, and an exact-value table for projected summary values. The 44 px target is an intentional product-system margin above WCAG 2.2 AA Success Criterion 2.5.8's 24 CSS pixel minimum.
 
-The i18n contract for subsequent connected work is message-key based with English and Korean as the first verified locales. Status identifiers remain stable machine values; localized labels must not change authorization, evidence, or export semantics.
+On 2026-08-21, metadata and rendered screenshots of frames `1:72` and `1:150` found collapsed desktop main-content columns and mobile overflow in the freshness alert and requirement trace. The existing Figma nodes were repaired in place: desktop content now uses the intended 2:1 fill layout, while mobile text wraps, trace rows stack, and actions remain inside the 358 px content column. This is design-authority evidence only; the repository Storybook and Chromium checks remain the executable implementation evidence.
+
+The local preview now uses a dependency-free message-key catalog with English and Korean as the first verified locales, including a browser-tested locale selector and Storybook Korean story. Status identifiers remain stable machine values; localized labels must not change authorization, evidence, or export semantics. Connected work must carry the same key-based contract into authenticated APIs and exports.
 
 ## Ownership boundary
 

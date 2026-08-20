@@ -30,3 +30,19 @@ test('mobile and print fallbacks keep the page usable without false overflow', a
   await expect(page.locator('.button').first()).toBeHidden();
   await expect(page.getByRole('table')).toBeVisible();
 });
+
+test('locale switching translates labels without changing state identifiers', async ({ page }) => {
+  await page.goto('/apps/grc-workspace/index.html');
+
+  await page.locator('#locale-select').selectOption('ko');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ko');
+  await expect(page.getByRole('heading', { name: '컴플라이언스 워크스페이스' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '증적 요청', exact: true })).toBeVisible();
+  await expect(page.locator('[data-state="unknown"]').first()).toHaveText('미확정 3건');
+  await expect(page.getByRole('columnheader', { name: '측정 항목' })).toBeVisible();
+
+  await page.locator('#locale-select').selectOption('en');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.getByRole('heading', { name: 'Compliance workspace' })).toBeVisible();
+  await expect(page.locator('[data-state="access_denied"]')).toHaveText('Access denied');
+});
