@@ -18,7 +18,7 @@ Open Policy Agent. (n.d.). *Policy language*. https://www.openpolicyagent.org/do
 
 Microsoft. (n.d.). *Playwright documentation*. Retrieved August 21, 2026, from https://playwright.dev/docs/intro
 
-Ross, R., & Pillitteri, V. (2020). *Security and privacy controls for information systems and organizations* (NIST Special Publication 800-53 Rev. 5). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-53r5
+Joint Task Force. (2025). *Security and privacy controls for information systems and organizations* (NIST Special Publication 800-53, Revision 5, Release 5.2.0). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-53r5
 
 Storybook. (n.d.). *Accessibility testing*. Retrieved August 21, 2026, from https://storybook.js.org/docs/writing-tests/accessibility-testing
 
