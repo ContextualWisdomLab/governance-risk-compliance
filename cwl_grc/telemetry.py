@@ -78,6 +78,11 @@ class RequestTelemetry:
             unit="s",
             description="Database session transaction duration in seconds.",
         )
+        self._audit_write_count: Counter = meter.create_counter(
+            "cwl_grc.audit.write.count",
+            unit="{write}",
+            description="Audit events committed or rejected by the database transaction.",
+        )
 
     @property
     def metric_reader(self) -> InMemoryMetricReader:
@@ -140,6 +145,18 @@ class RequestTelemetry:
         attributes = {"db.system.name": database_system, "cwl_grc.outcome": outcome}
         self._transaction_count.add(1, attributes)
         self._transaction_duration.record(duration_seconds, {"db.system.name": database_system})
+
+    def record_audit_write(
+        self,
+        database_system: str,
+        outcome: str,
+        event_count: int,
+    ) -> None:
+        """Record the bounded count and outcome of one audit write batch."""
+        self._audit_write_count.add(
+            event_count,
+            {"db.system.name": database_system, "cwl_grc.outcome": outcome},
+        )
 
     def shutdown(self) -> None:
         """Flush configured exporters and release provider resources."""

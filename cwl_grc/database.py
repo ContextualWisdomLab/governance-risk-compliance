@@ -11,6 +11,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from cwl_grc.audit import AUDIT_EVENT_COUNT_INFO_KEY
 from cwl_grc.migrations import apply_schema_migrations, install_integrity_guards
 from cwl_grc.models import Base
 
@@ -61,18 +62,28 @@ def session_dependency(
     session = factory()
     started_at = time.perf_counter()
     outcome = "commit"
+    audit_event_count = 0
     try:
         yield session
+        audit_event_count = session.info.get(AUDIT_EVENT_COUNT_INFO_KEY, 0)
         session.commit()
     except Exception:
         outcome = "rollback"
+        audit_event_count = session.info.get(AUDIT_EVENT_COUNT_INFO_KEY, 0)
         session.rollback()
         raise
     finally:
         if telemetry is not None:
+            database_system = session.bind.dialect.name
             telemetry.record_database_transaction(
-                session.bind.dialect.name,
+                database_system,
                 outcome,
                 time.perf_counter() - started_at,
             )
+            if audit_event_count:
+                telemetry.record_audit_write(
+                    database_system,
+                    "success" if outcome == "commit" else "failure",
+                    audit_event_count,
+                )
         session.close()
