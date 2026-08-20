@@ -63,6 +63,12 @@ The current HTTP surface is an unauthenticated developer preview. `X-Actor-Id` a
 
 Production exposure requires Keyverse-backed OIDC signature, issuer, audience, token-type, tenant, actor, and purpose authorization, plus encrypted transport and deployment controls. Evidence payloads remain encrypted at rest. Every persistent store requires explicit Fernet key material; ephemeral keys exist only for explicitly selected in-memory tests. The product does not destructively mask operational evidence; authenticated views and exports must select only the fields required for the approved purpose and omit unrelated fields. SAST remains a CWL Security lane. OPA/Rego is not part of this kernel.
 
+## Buyer-workspace projection boundary
+
+Issue #30 introduces a bounded design authority at `apps/grc-workspace/`, paired with Figma file `ta1jjWSjmADz2BFxka9UPs` and repository Storybook. The fixture is intentionally outside the authoritative domain kernel: it demonstrates how a buyer sees `unknown`, `not assessed`, `stale`, `blocked`, and `access denied`, how a posture claim leads to the next action, and how projected summaries expose exact-value tables.
+
+The workspace must consume authenticated GRC contracts when those dependencies integrate; it must not query persistence tables directly or invent a parallel source of truth. Figma/Storybook states are design evidence only. Authentication, tenant/purpose authorization, evidence requests, exports, and data-room grants remain owned by their corresponding GRC/Keyverse contracts. ADR 0012 records the token, accessibility, i18n, component, and ownership decision.
+
 ## Service extraction
 
 The kernel is already a separately importable package. Extracting the process onto its own host must preserve `/healthz`, `/policy-documents`, `/policy-gaps`, `/controls`, `/controls/uncovered`, and the evidence bind contract while replacing the preview boundary with the authenticated Keyverse and tenant-authorization adapter.
