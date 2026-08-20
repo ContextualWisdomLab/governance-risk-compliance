@@ -136,3 +136,17 @@ def test_policy_create_and_revision_accept_verified_policy_writer() -> None:
     )
     assert revised.status_code == 201
     assert revised.json()["current_version"]["version_number"] == 2
+
+
+def test_officer_policy_form_requires_keyverse_bearer_when_verifier_is_enabled() -> None:
+    """The browser mutation cannot bypass Keyverse with a submitted actor field."""
+    _private_key, public_jwk = _material()
+    response = _client(public_jwk).post(
+        "/officer/policy",
+        data={
+            "policy_title": "Denied policy",
+            "policy_body": "The submitted actor is not authentication.",
+            "actor_identifier": "spoofed-officer",
+        },
+    )
+    assert response.status_code == 401

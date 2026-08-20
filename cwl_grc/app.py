@@ -331,12 +331,15 @@ def create_app(
         policy_body: str = Form(),
         actor_identifier: str = Form(),
         control_refs: list[str] = Form(default=[]),
+        authorization: str | None = Header(default=None),
     ) -> RedirectResponse:
         """Author a policy from the officer home and return to the gap list."""
-        decision = require_purpose(
+        decision = require_request_actor(
+            authorization,
             actor_identifier,
             PurposeCode.POLICY_AUTHORING.value,
             PurposeCode.POLICY_AUTHORING,
+            "grc.policy.write",
         )
         refs: list[ControlRef] = []
         for raw in control_refs:
@@ -361,6 +364,7 @@ def create_app(
         framework: str | None = Form(default=None),
         catalog_identifier: str | None = Form(default=None),
         control_ref: str | None = Form(default=None),
+        authorization: str | None = Header(default=None),
     ) -> RedirectResponse:
         """Attach evidence from the officer home and return to the gap list."""
         if control_ref:
@@ -377,10 +381,12 @@ def create_app(
                 status_code=400,
                 detail="Name the official control to bind.",
             )
-        decision = require_purpose(
+        decision = require_request_actor(
+            authorization,
             actor_identifier,
             PurposeCode.EVIDENCE_BINDING.value,
             PurposeCode.EVIDENCE_BINDING,
+            "grc.evidence.write",
         )
         record = create_evidence_record(
             session,

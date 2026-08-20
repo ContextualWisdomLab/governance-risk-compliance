@@ -153,3 +153,19 @@ def test_verified_evidence_writer_can_bind_existing_evidence() -> None:
     )
     assert response.status_code == 201
     assert response.json()["evidence_record_id"] == evidence_record_id
+
+
+def test_officer_evidence_form_requires_keyverse_bearer_when_verifier_is_enabled() -> None:
+    """The browser evidence form cannot bypass Keyverse with a submitted actor field."""
+    _private_key, public_jwk = _material()
+    response = _client(public_jwk).post(
+        "/officer/evidence",
+        data={
+            "actor_identifier": "spoofed-officer",
+            "evidence_title": "Denied evidence",
+            "payload_text": "The submitted actor is not authentication.",
+            "framework": SOC2_FRAMEWORK,
+            "catalog_identifier": "CC1.1",
+        },
+    )
+    assert response.status_code == 401
