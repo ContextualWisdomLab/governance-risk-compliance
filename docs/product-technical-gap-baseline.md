@@ -157,7 +157,7 @@ issues and PRs.
 ## Current open-issue snapshot
 
 Snapshot inclusion rule: every GitHub issue returned as open for this repository
-on 2026-08-20. Pull requests are excluded and listed separately below. All 13
+on 2026-08-21. Pull requests are excluded and listed separately below. All 13
 entries were open at the snapshot; their state can change after this commit.
 
 | Issue | Snapshot state | Primary gap / purpose |
