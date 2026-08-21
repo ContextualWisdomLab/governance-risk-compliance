@@ -696,9 +696,10 @@ def control_coverage_status(
             saw_not_applicable = True
         elif result.result_code == ControlTestResultCode.EFFECTIVE.value:
             if plan.effectiveness_type == "operating":
-                saw_operating = True
-                if plan.next_test_due_at is not None and plan.next_test_due_at < current:
-                    return ControlCoverageStatus.STALE
+                if not saw_operating:
+                    saw_operating = True
+                    if plan.next_test_due_at is not None and plan.next_test_due_at < current:
+                        return ControlCoverageStatus.STALE
             elif plan.effectiveness_type == "design":  # pragma: no branch - database check constraint
                 saw_design = True
     if saw_operating:
