@@ -23,6 +23,7 @@
 ### Security
 
 - Reject malformed or internally inconsistent readiness evidence and prevent release certification while any required gate remains blocked.
+- Recompute readiness-index Git blob coordinates so stale reviewed component references cannot certify a release.
 - Keep structural readiness validation distinct from production certification so green CI cannot erase known blockers.
 - Always deny proxy-forwarded and non-loopback HTTP traffic while the runtime lacks Keyverse-backed identity and tenant authorization; remove the unauthenticated remote-preview bypass entirely.
 - Bind both standalone server entry points to `127.0.0.1`.

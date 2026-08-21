@@ -19,6 +19,7 @@ ALLOWED_PRIORITIES = frozenset({"P0", "P1", "P2"})
 ALLOWED_STATUSES = frozenset({"blocked", "in_progress", "ready"})
 REPOSITORY_FILE_EVIDENCE = "repository_file"
 REPOSITORY_FILE_FIELDS = frozenset({"kind", "path", "sha256"})
+READINESS_EVIDENCE_INDEX_PATH = "docs/production/readiness-evidence-index.json"
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 REQUIRED_GATE_CONTRACTS = {
     "identity-tenant-authorization": ("P0", 4),
@@ -190,6 +191,43 @@ def verify_repository_evidence(
                 raise ReadinessManifestError(
                     f"{path}.sha256 does not match the repository file."
                 )
+            if evidence["path"] == READINESS_EVIDENCE_INDEX_PATH:
+                _verify_readiness_evidence_index(contents, root, path)
+
+
+def _verify_readiness_evidence_index(
+    contents: bytes,
+    repository_root: Path,
+    evidence_path: str,
+) -> None:
+    """Verify the Git blob coordinates recorded by the readiness index."""
+    try:
+        index = json.loads(contents)
+        components = index["components"]
+        if not isinstance(components, list) or not components:
+            raise ValueError("components must be a non-empty list")
+        for component in components:
+            component_path = component["path"]
+            expected_oid = component["git_blob_oid"]
+            resolved = (repository_root / component_path).resolve(strict=True)
+            resolved.relative_to(repository_root)
+            actual_oid = _git_blob_oid(resolved.read_bytes())
+            if actual_oid != expected_oid:
+                raise ReadinessManifestError(
+                    f"{evidence_path} records a stale Git blob ID for {component_path}."
+                )
+    except ReadinessManifestError:
+        raise
+    except (json.JSONDecodeError, KeyError, OSError, TypeError, ValueError) as exc:
+        raise ReadinessManifestError(
+            f"{evidence_path} is not a valid readiness evidence index."
+        ) from exc
+
+
+def _git_blob_oid(contents: bytes) -> str:
+    """Return Git's SHA-1 content coordinate, not a security digest."""
+    header = f"blob {len(contents)}\0".encode("ascii")
+    return hashlib.new("sha1", header + contents, usedforsecurity=False).hexdigest()
 
 
 def readiness_summary(gates: Sequence[dict[str, Any]]) -> dict[str, Any]:

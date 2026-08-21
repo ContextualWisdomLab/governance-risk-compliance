@@ -48,7 +48,7 @@ The validator requires exactly those three fields.
 - The target must exist inside the supplied repository root, resolve to a regular readable file, and may not escape through a symlink.
 - `sha256` must equal the lowercase hexadecimal result of SHA-256 over the exact current file bytes.
 
-The readiness-contract gate cites `docs/production/readiness-evidence-index.json`. That index records the reviewed component paths and their Git blob object IDs as repository coordinates, while the manifest binds the exact index bytes with SHA-256. Git object IDs are not accepted as the cryptographic evidence field.
+The readiness-contract gate cites `docs/production/readiness-evidence-index.json`. That index records the reviewed component paths and their Git blob object IDs as repository coordinates; validation recomputes those coordinates from the supplied tree, while the manifest binds the exact index bytes with SHA-256. Git object IDs are not accepted as the cryptographic evidence field.
 
 This binds the claim to exact reviewed file content in the exact checked-out tree. It does **not** replace release-artifact digests, SBOMs, provenance attestations, or signatures; those remain separate issue #10 controls.
 

@@ -15,6 +15,7 @@ from cwl_grc.production_readiness import load_manifest, main
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = REPOSITORY_ROOT / "docs/production/production-readiness.json"
 EVIDENCE_PATH = "tests/test_production_readiness_evidence_binding.py"
+INDEX_PATH = "docs/production/readiness-evidence-index.json"
 
 
 def _all_ready_manifest(evidence: list[object]) -> dict[str, object]:
@@ -50,6 +51,16 @@ def _bound_repository_evidence(*, digest: str | None = None) -> dict[str, str]:
     }
 
 
+def _bound_index_evidence() -> dict[str, str]:
+    """Return the committed readiness index bound to its exact bytes."""
+    source = REPOSITORY_ROOT / INDEX_PATH
+    return {
+        "kind": "repository_file",
+        "path": INDEX_PATH,
+        "sha256": _sha256(source.read_bytes()),
+    }
+
+
 def _main_arguments(manifest_path: Path, repository_root: Path) -> list[str]:
     """Return release-mode CLI arguments for one manifest and repository tree."""
     return [
@@ -78,6 +89,64 @@ def test_release_mode_accepts_hash_bound_repository_file_evidence(
     _write_manifest(path, _all_ready_manifest([_bound_repository_evidence()]))
 
     assert main(_main_arguments(path, REPOSITORY_ROOT)) == 0
+
+
+def test_release_mode_accepts_current_readiness_index_component_oids(
+    tmp_path: Path,
+) -> None:
+    """The readiness index must point at the exact current component blobs."""
+    path = tmp_path / "manifest.json"
+    _write_manifest(path, _all_ready_manifest([_bound_index_evidence()]))
+
+    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 0
+
+
+def test_release_mode_rejects_stale_readiness_index_component_oid(
+    tmp_path: Path,
+) -> None:
+    """A stale component coordinate cannot certify the readiness index."""
+    path = tmp_path / "manifest.json"
+    root = tmp_path / "repository"
+    root.mkdir()
+    component = root / "component.py"
+    component.write_text("print('current')\n", encoding="utf-8")
+    index_path = root / INDEX_PATH
+    index_path.parent.mkdir(parents=True)
+    index_path.write_text(
+        json.dumps(
+            {
+                "components": [
+                    {"path": "component.py", "git_blob_oid": "0" * 40},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    evidence = {
+        "kind": "repository_file",
+        "path": INDEX_PATH,
+        "sha256": _sha256(index_path.read_bytes()),
+    }
+    _write_manifest(path, _all_ready_manifest([evidence]))
+
+    assert main(_main_arguments(path, root)) == 2
+
+
+def test_release_mode_rejects_malformed_readiness_index(tmp_path: Path) -> None:
+    """A malformed readiness index fails closed before it can certify components."""
+    root = tmp_path / "repository"
+    index_path = root / INDEX_PATH
+    index_path.parent.mkdir(parents=True)
+    index_path.write_text('{"components": []}', encoding="utf-8")
+    path = tmp_path / "manifest.json"
+    evidence = {
+        "kind": "repository_file",
+        "path": INDEX_PATH,
+        "sha256": _sha256(index_path.read_bytes()),
+    }
+    _write_manifest(path, _all_ready_manifest([evidence]))
+
+    assert main(_main_arguments(path, root)) == 2
 
 
 def test_release_mode_rejects_wrong_repository_file_digest(
