@@ -11,6 +11,7 @@
 - Checked-in npm lockfile, Node 24.18.0 pin, and exact-head Chromium interaction checks for keyboard, mobile overflow, print, and truthful preview action edges.
 - Repaired the existing Figma buyer-workspace authority frames after rendered desktop/mobile inspection: the desktop header and panels fill their intended layout, and mobile alert, trace rows, and actions fit the content column without horizontal clipping.
 - Added a dependency-free English/Korean message catalog, locale selector, stable `data-state` identifiers, and browser-tested Storybook/page i18n coverage for the buyer preview.
+- Added the missing exact-value, provenance, limitation, and next-action row for the `Open deficiencies` posture metric.
 - Versioned policy authoring: `policy_document`, `policy_version`, and `policy_control_mapping` mapped only to official catalog identifiers.
 - Policy-gap query that reuses `control_evidence_binding` (no second evidence model).
 - Officer home form to author a policy and see uncovered policy requirements.

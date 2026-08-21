@@ -24,6 +24,7 @@ def test_workspace_exposes_truthful_buyer_states_and_next_actions() -> None:
     assert '<html lang="en">' in html
     assert '<table' in html
     assert '<caption' in html
+    assert 'data-i18n="table.deficienciesValue"' in html
     assert 'id="action-feedback"' in html
     assert 'href="#exact-title"' in html
 
