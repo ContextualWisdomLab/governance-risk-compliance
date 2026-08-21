@@ -286,23 +286,23 @@ def _apply_internal_control_model_migration(connection: Connection) -> None:
     from cwl_grc.models import Base
 
     inspector = inspect(connection)
-    for table_name, index_name, columns in (
+    for table_name, index_name, column_names in (
         (
             "evidence_record",
             "evidence_record_tenant_identity_compat",
-            "tenant_id, evidence_record_id",
+            ("tenant_id", "evidence_record_id"),
         ),
         (
             "control_evidence_binding",
             "control_evidence_binding_tenant_identity_compat",
-            "tenant_id, binding_id",
+            ("tenant_id", "binding_id"),
         ),
     ):
         if inspector.has_table(table_name):
             table = Table(table_name, MetaData(), autoload_with=connection)
             index = Index(
                 index_name,
-                *(table.c[column_name.strip()] for column_name in columns.split(",")),
+                *(table.c[column_name] for column_name in column_names),
                 unique=True,
             )
             connection.execute(
