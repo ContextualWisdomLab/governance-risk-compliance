@@ -126,8 +126,17 @@ internal control, implementation, or effectiveness result.
 - The simple uncovered-control query becomes a compatibility projection and
   requires explicit status semantics.
 - Migrations must preserve first-slice data without overstating assurance.
-- API and UI work must expose `unknown`, `unassessed`, `design_effective`,
-  `operating_effective`, `ineffective`, `exception`, and `stale` accurately.
+- API and UI work must expose `unknown`, `unassessed`, `implemented_not_tested`,
+  `design_effective`, `operating_effective`, `ineffective`, `exception`,
+  `stale`, and `not_applicable` accurately. `not_applicable` is emitted only
+  when the authorized applicability decision result is exactly
+  `not_applicable`; an authorized `applicable` result without implementation or
+  evidence is `unknown`. Applicability facts and display tokens are validated
+  separately. These are projections over separate implementation,
+  effectiveness, freshness, exception, and applicability facts; the projection
+  records `projection_rule_version` (`posture-projection-v1`), input fact
+  versions and identifiers, precedence, as-of time, and recalculation history
+  rather than replacing those facts.
 - Risk, audit, obligation, and buyer-workspace work must depend on this model.
 
 ## Rejected alternatives

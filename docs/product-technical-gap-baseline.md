@@ -1,7 +1,8 @@
 # Product and technical gap baseline
 
-Snapshot: 2026-08-21, Asia/Seoul
+Snapshot (document generation date): 2026-08-21, Asia/Seoul
 Repository: `ContextualWisdomLab/governance-risk-compliance`  
+Baseline parent branch head: `de571802239ba819b0fd5201993f2e20ddad5645` (PR #19)
 Baseline source head: `78770c63d16a6124dbb1d647c3ac482624f1745a`
 Develop-based buyer-workspace head: `30db69b4bf0ef39654cfaba460c7d4ba66ecc91d`
 Active reviewed security/model/catalog/obligation fix heads: PR #32 `2e5daf62f82ee7873cb947390f50f161c173729d`, PR #33 `7922d9be1aca16a0ffbd59d44e0183dd2ef7155b`, PR #37 `6a312a189cadec192c50b4cc5b09804d3a0e97e5`, PR #38 `0c4084705b4f86913acdefa1ada3d17aa2d1e6f7`, PR #40 `4daab149d364f6117e31df22e14e11ad35d230b2`, PR #41 `246297082431aefc8281f3c6e1947b961298638f`, PR #42 `7f464d9ff3019477c7db81ebee240fb8d722a091`, and PR #43 `f41c387c62998de2d136ce8f4a110b4cb22906ac`. This baseline follow-up is PR #39.
@@ -366,7 +367,8 @@ release evidence.
 2. Fix valid findings at the shared root and add a realistic regression test for
    every non-trivial security, parser, concurrency, data-integrity, temporal,
    authorization, or workflow rule.
-3. Run `git diff --check` against the entire exact-head PR diff, then run locked
+3. Run `git diff --check` against the entire exact-head PR diff and review every
+   changed-document link and referenced Markdown anchor, then run locked
    Product, docstring, compile, PostgreSQL, contract, SAST, Security,
    semantic-review, accessibility, and applicable end-to-end gates on that same
    unchanged head.
