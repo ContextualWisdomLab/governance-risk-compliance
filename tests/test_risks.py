@@ -379,12 +379,20 @@ def test_risk_http_workspace_and_input_boundaries() -> None:
         },
     )
     assert closure.status_code == 201
-    closed = next(
-        item for item in client.get("/risks", headers=_headers("reader")).json()["risks"]
-        if item["risk_id"] == second_risk.json()["risk_id"]
-    )
+    risks_after_close = client.get("/risks", headers=_headers("reader")).json()["risks"]
+    assert [item["risk_id"] for item in risks_after_close] == [
+        risk.json()["risk_id"],
+        second_risk.json()["risk_id"],
+    ]
+    closed = next(item for item in risks_after_close if item["risk_id"] == second_risk.json()["risk_id"])
     assert closed["risk_status"] == "closed"
     assert closed["closure"]["risk_closure_id"] == closure.json()["risk_closure_id"]
+    workspace_after_close = client.get("/compliance-workspace", headers=_headers("reader")).json()
+    assert second_risk.json()["risk_code"] not in {
+        action["reference"]
+        for action in workspace_after_close["next_actions"]
+        if action["kind"] == "risk"
+    }
     reassessment = client.post(
         f"/risks/{risk.json()['risk_id']}/assessments",
         headers=headers,
