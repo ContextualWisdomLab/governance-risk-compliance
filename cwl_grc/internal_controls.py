@@ -559,6 +559,57 @@ def record_evidence_usage(
     return usage
 
 
+def _derive_control_coverage_status(
+    *,
+    legacy: bool,
+    definition_ids: set[str],
+    implementations: list[ControlImplementation],
+    exception_implementation_ids: set[str],
+    latest_results: list[tuple[ControlTestPlan, ControlTestResult]],
+    current: datetime,
+) -> ControlCoverageStatus:
+    """Derive one status from preloaded tenant records without issuing queries."""
+    if not definition_ids:
+        return ControlCoverageStatus.UNASSESSED if legacy else ControlCoverageStatus.UNKNOWN
+    if not implementations:
+        return ControlCoverageStatus.UNASSESSED if legacy else ControlCoverageStatus.UNKNOWN
+    implementation_ids = {item.control_implementation_id for item in implementations}
+    if exception_implementation_ids.intersection(implementation_ids):
+        return ControlCoverageStatus.EXCEPTION
+    latest_results_by_plan: dict[str, tuple[ControlTestPlan, ControlTestResult]] = {}
+    for plan, result in latest_results:
+        latest_results_by_plan.setdefault(plan.test_plan_id, (plan, result))
+    results = tuple(latest_results_by_plan.values())
+    if any(
+        result.result_code == ControlTestResultCode.INEFFECTIVE.value
+        for _, result in results
+    ):
+        return ControlCoverageStatus.INEFFECTIVE
+    saw_operating = False
+    saw_design = False
+    saw_not_applicable = False
+    for plan, result in results:
+        if result.result_code == ControlTestResultCode.NOT_APPLICABLE.value:
+            saw_not_applicable = True
+        elif result.result_code == ControlTestResultCode.EFFECTIVE.value:
+            if plan.effectiveness_type == "operating":
+                if not saw_operating:
+                    saw_operating = True
+                    if plan.next_test_due_at is not None and plan.next_test_due_at < current:
+                        return ControlCoverageStatus.STALE
+            elif plan.effectiveness_type == "design":  # pragma: no branch - database check constraint
+                saw_design = True
+    if saw_operating:
+        return ControlCoverageStatus.OPERATING_EFFECTIVE
+    if saw_design:
+        return ControlCoverageStatus.DESIGN_EFFECTIVE
+    if saw_not_applicable:
+        return ControlCoverageStatus.NOT_APPLICABLE
+    if any(item.implementation_status == "implemented" for item in implementations):
+        return ControlCoverageStatus.IMPLEMENTED_NOT_TESTED
+    return ControlCoverageStatus.UNASSESSED if legacy else ControlCoverageStatus.UNKNOWN
+
+
 def list_control_coverage(
     session: Session,
     framework: FrameworkCode | None,
@@ -566,14 +617,134 @@ def list_control_coverage(
     tenant_id: str,
     now: datetime | None = None,
 ) -> list[ControlCoverage]:
-    """Return every external requirement with an explicit effectiveness status."""
+    """Return every external requirement with explicit status using bounded queries."""
     query = session.query(ControlItem)
     if framework is not None:
         query = query.filter(ControlItem.framework_key == framework.value)
+    items = query.order_by(ControlItem.framework_key, ControlItem.catalog_identifier).all()
     current = _normalize_utc(now or datetime.now(timezone.utc))
+    control_ids = {item.control_item_id for item in items}
+    legacy_ids = {
+        row[0]
+        for row in session.query(ControlEvidenceBinding.control_item_id)
+        .filter(
+            ControlEvidenceBinding.tenant_id == tenant_id,
+            ControlEvidenceBinding.control_item_id.in_(control_ids),
+        )
+        .all()
+    }
+    mappings = (
+        session.query(ControlRequirementMapping)
+        .filter(
+            ControlRequirementMapping.tenant_id == tenant_id,
+            ControlRequirementMapping.control_item_id.in_(control_ids),
+            ControlRequirementMapping.review_status == "approved",
+            ControlRequirementMapping.valid_from <= current,
+            or_(
+                ControlRequirementMapping.valid_to.is_(None),
+                ControlRequirementMapping.valid_to >= current,
+            ),
+        )
+        .all()
+    )
+    definition_ids_by_control: dict[str, set[str]] = {}
+    for mapping in mappings:
+        definition_ids_by_control.setdefault(mapping.control_item_id, set()).add(
+            mapping.internal_control_definition_id
+        )
+    definition_ids = {
+        definition_id
+        for control_definition_ids in definition_ids_by_control.values()
+        for definition_id in control_definition_ids
+    }
+    implementations = (
+        session.query(ControlImplementation)
+        .filter(
+            ControlImplementation.tenant_id == tenant_id,
+            ControlImplementation.internal_control_definition_id.in_(definition_ids),
+            ControlImplementation.implementation_status != "retired",
+        )
+        .all()
+    )
+    implementations_by_definition: dict[str, list[ControlImplementation]] = {}
+    for implementation in implementations:
+        implementations_by_definition.setdefault(
+            implementation.internal_control_definition_id, []
+        ).append(implementation)
+    implementation_ids = {item.control_implementation_id for item in implementations}
+    exception_implementation_ids = {
+        row[0]
+        for row in session.query(ControlException.control_implementation_id)
+        .filter(
+            ControlException.tenant_id == tenant_id,
+            ControlException.control_implementation_id.in_(implementation_ids),
+            ControlException.exception_status == "approved",
+            ControlException.valid_from <= current,
+            or_(ControlException.valid_to.is_(None), ControlException.valid_to >= current),
+        )
+        .all()
+    }
+    results = (
+        session.query(ControlTestPlan, ControlTestResult)
+        .join(
+            ControlTestExecution,
+            and_(
+                ControlTestExecution.test_plan_id == ControlTestPlan.test_plan_id,
+                ControlTestExecution.tenant_id == tenant_id,
+            ),
+        )
+        .join(
+            ControlTestResult,
+            and_(
+                ControlTestResult.test_execution_id == ControlTestExecution.test_execution_id,
+                ControlTestResult.tenant_id == tenant_id,
+            ),
+        )
+        .filter(
+            ControlTestPlan.tenant_id == tenant_id,
+            ControlTestPlan.control_implementation_id.in_(implementation_ids),
+            ControlTestPlan.active.is_(True),
+            ControlTestExecution.execution_status == "completed",
+        )
+        .order_by(
+            ControlTestResult.determined_at.desc(),
+            ControlTestResult.test_result_id.desc(),
+        )
+        .all()
+    )
+    latest_results_by_plan: dict[str, tuple[ControlTestPlan, ControlTestResult]] = {}
+    for plan, result in results:
+        latest_results_by_plan.setdefault(plan.test_plan_id, (plan, result))
+    control_ids_by_implementation: dict[str, set[str]] = {}
+    for control_id, control_definition_ids in definition_ids_by_control.items():
+        for definition_id in control_definition_ids:
+            for implementation in implementations_by_definition.get(definition_id, []):
+                control_ids_by_implementation.setdefault(
+                    implementation.control_implementation_id, set()
+                ).add(control_id)
+    latest_results_by_control: dict[
+        str, list[tuple[ControlTestPlan, ControlTestResult]]
+    ] = {}
+    for plan, result in latest_results_by_plan.values():
+        for control_id in control_ids_by_implementation.get(plan.control_implementation_id, set()):
+            latest_results_by_control.setdefault(control_id, []).append((plan, result))
     return [
-        ControlCoverage(item, control_coverage_status(session, item.control_item_id, tenant_id, current))
-        for item in query.order_by(ControlItem.framework_key, ControlItem.catalog_identifier).all()
+        ControlCoverage(
+            item,
+            _derive_control_coverage_status(
+                legacy=item.control_item_id in legacy_ids,
+                definition_ids=definition_ids_by_control.get(item.control_item_id, set()),
+                implementations=[
+                    implementation
+                    for definition_id in definition_ids_by_control.get(item.control_item_id, set())
+                    for implementation in implementations_by_definition.get(definition_id, [])
+                ],
+                exception_implementation_ids=exception_implementation_ids,
+                latest_results=latest_results_by_control.get(item.control_item_id, []),
+                current=current,
+            ),
+        )
+        for item in items
     ]
 
 
@@ -606,8 +777,6 @@ def control_coverage_status(
         .all()
     )
     definition_ids = {mapping.internal_control_definition_id for mapping in mappings}
-    if not definition_ids:
-        return ControlCoverageStatus.UNASSESSED if legacy else ControlCoverageStatus.UNKNOWN
     implementations = (
         session.query(ControlImplementation)
         .filter(
@@ -617,11 +786,10 @@ def control_coverage_status(
         )
         .all()
     )
-    if not implementations:
-        return ControlCoverageStatus.UNASSESSED if legacy else ControlCoverageStatus.UNKNOWN
     implementation_ids = {item.control_implementation_id for item in implementations}
-    exception = (
-        session.query(ControlException)
+    exception_implementation_ids = {
+        row[0]
+        for row in session.query(ControlException.control_implementation_id)
         .filter(
             ControlException.tenant_id == tenant_id,
             ControlException.control_implementation_id.in_(implementation_ids),
@@ -629,10 +797,8 @@ def control_coverage_status(
             ControlException.valid_from <= current,
             or_(ControlException.valid_to.is_(None), ControlException.valid_to >= current),
         )
-        .first()
-    )
-    if exception is not None:
-        return ControlCoverageStatus.EXCEPTION
+        .all()
+    }
     results = (
         session.query(ControlTestPlan, ControlTestResult)
         .join(
@@ -664,35 +830,14 @@ def control_coverage_status(
     latest_results_by_plan: dict[str, tuple[ControlTestPlan, ControlTestResult]] = {}
     for plan, result in results:
         latest_results_by_plan.setdefault(plan.test_plan_id, (plan, result))
-    latest_results = tuple(latest_results_by_plan.values())
-    if any(
-        result.result_code == ControlTestResultCode.INEFFECTIVE.value
-        for _, result in latest_results
-    ):
-        return ControlCoverageStatus.INEFFECTIVE
-    saw_operating = False
-    saw_design = False
-    saw_not_applicable = False
-    for plan, result in latest_results:
-        if result.result_code == ControlTestResultCode.NOT_APPLICABLE.value:
-            saw_not_applicable = True
-        elif result.result_code == ControlTestResultCode.EFFECTIVE.value:
-            if plan.effectiveness_type == "operating":
-                if not saw_operating:
-                    saw_operating = True
-                    if plan.next_test_due_at is not None and plan.next_test_due_at < current:
-                        return ControlCoverageStatus.STALE
-            elif plan.effectiveness_type == "design":  # pragma: no branch - database check constraint
-                saw_design = True
-    if saw_operating:
-        return ControlCoverageStatus.OPERATING_EFFECTIVE
-    if saw_design:
-        return ControlCoverageStatus.DESIGN_EFFECTIVE
-    if saw_not_applicable:
-        return ControlCoverageStatus.NOT_APPLICABLE
-    if any(item.implementation_status == "implemented" for item in implementations):
-        return ControlCoverageStatus.IMPLEMENTED_NOT_TESTED
-    return ControlCoverageStatus.UNASSESSED if legacy else ControlCoverageStatus.UNKNOWN
+    return _derive_control_coverage_status(
+        legacy=legacy,
+        definition_ids=definition_ids,
+        implementations=implementations,
+        exception_implementation_ids=exception_implementation_ids,
+        latest_results=list(latest_results_by_plan.values()),
+        current=current,
+    )
 
 
 def _get_definition(

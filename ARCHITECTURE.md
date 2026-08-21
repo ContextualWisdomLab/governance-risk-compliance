@@ -7,7 +7,7 @@ CWL GRC is a modular microservice that must run alone or be imported as `cwl_grc
 ```mermaid
 flowchart LR
     officer[Compliance officer] --> home[Local officer home /]
-    officer --> api[Policy, obligation, control, and evidence API]
+    officer --> api[Policy, obligation, control, evidence, and workspace API]
     officer --> cli[cwl-grc CLI]
     home --> preview[Loopback-only preview boundary]
     api --> preview
@@ -36,7 +36,7 @@ flowchart LR
 ## Runtime layers
 
 1. **Local officer home**: buyer-oriented HTML that authors a policy, lists explicit control statuses and policy gaps, and stores evidence for a future control test under the fixed `local_development` tenant.
-2. **HTTP API**: policy author/revise/list, obligation source/revision/register/decision/link/change/impact workflows, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, and dependency-separated `/healthz`, `/readyz`, and `/startupz` probes.
+2. **HTTP API**: policy author/revise/list, obligation source/revision/register/decision/link/change/impact workflows, tenant-scoped `/compliance-workspace` posture, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, and dependency-separated `/healthz`, `/readyz`, and `/startupz` probes.
 3. **Keyverse security adapter**: optional closed-profile JWT verification plus bounded OIDC Discovery/JWKS loading. When configured, protected policy and evidence routes derive actor and tenant from the signed principal and enforce action-specific scopes.
 4. **Preview network boundary**: always rejects proxy-forwarded and non-loopback traffic. Keyverse authentication inside the process does not enable customer or Internet exposure by itself.
 5. **CLI tools**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and the local Uvicorn `cwl-grc serve`.
@@ -125,4 +125,4 @@ Evidence payloads remain encrypted at rest. Every persistent store requires expl
 
 ## Service extraction
 
-The kernel is already a separately importable package. Extracting the process onto its own host must preserve `/healthz`, `/policy-documents`, `/policy-gaps`, `/controls`, `/controls/uncovered`, and the evidence bind contract while replacing the loopback preview boundary with the completed Keyverse authorization, deployment, and operator-control profile. The standalone and extracted service must enforce the same tenant-parent database invariants.
+The kernel is already a separately importable package. Extracting the process onto its own host must preserve `/healthz`, `/policy-documents`, `/policy-gaps`, `/controls`, `/controls/uncovered`, `/compliance-workspace`, and the evidence bind contract while replacing the loopback preview boundary with the completed Keyverse authorization, deployment, and operator-control profile. The standalone and extracted service must enforce the same tenant-parent database invariants.

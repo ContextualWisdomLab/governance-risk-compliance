@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.exc import ArgumentError, IntegrityError
 from sqlalchemy.orm import sessionmaker
 
@@ -219,6 +219,29 @@ def test_internal_control_full_lifecycle_separates_design_and_operating_effectiv
         assert control not in list_uncovered_controls(session, FrameworkCode.CSAP_2026)
         assert serialize_control(control, covered=False)["covered"] is False
         assert serialize_control(control, coverage_status="unknown")["coverage_status"] == "unknown"
+
+
+def test_catalog_coverage_preloads_tenant_records_in_bounded_queries() -> None:
+    """Catalog posture reads use batch tenant queries instead of one query per control."""
+    factory = _factory()
+    with factory() as session:
+        query_count = [0]
+
+        def count_query(*_args: object, **_kwargs: object) -> None:
+            query_count[0] += 1
+
+        event.listen(session.bind, "before_cursor_execute", count_query)
+        try:
+            coverage = list_control_coverage(
+                session,
+                None,
+                tenant_id="local_development",
+            )
+        finally:
+            event.remove(session.bind, "before_cursor_execute", count_query)
+
+        assert coverage
+        assert query_count[0] == 6
 
 
 def test_internal_control_status_projection_covers_failure_exception_stale_and_not_applicable() -> None:

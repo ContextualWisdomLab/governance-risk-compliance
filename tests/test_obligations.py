@@ -109,7 +109,7 @@ def _source(session, decision):  # noqa: ANN001
     return source, revision
 
 
-def _obligation(session, decision, revision):  # noqa: ANN001
+def _obligation(session, decision, revision, scope_reference: str = "tenant-1"):  # noqa: ANN001
     """Create one jurisdiction-scoped regulatory obligation."""
     jurisdiction = create_jurisdiction(
         session,
@@ -128,7 +128,7 @@ def _obligation(session, decision, revision):  # noqa: ANN001
         "Maintain a documented and tested ICT resilience program.",
         "regulatory",
         "organization",
-        "tenant-1",
+        scope_reference,
         FEBRUARY,
         jurisdiction_id=jurisdiction.jurisdiction_id,
     )
@@ -152,7 +152,11 @@ def _protected_client() -> tuple[TestClient, Any]:
     return TestClient(create_app(database_url="sqlite://", evidence_key=None, access_token_verifier=verifier)), private_key
 
 
-def _protected_token(private_key: Any, scope: str = "grc.compliance.read") -> str:
+def _protected_token(
+    private_key: Any,
+    scope: str = "grc.compliance.read",
+    tenant_id: str = "tenant-1",
+) -> str:
     """Sign one valid compliance-read access token for the protected route."""
     return jwt.encode(
         {
@@ -162,12 +166,12 @@ def _protected_token(private_key: Any, scope: str = "grc.compliance.read") -> st
             "exp": int((AUTH_NOW + timedelta(minutes=5)).timestamp()),
             "nbf": int((AUTH_NOW - timedelta(seconds=1)).timestamp()),
             "iat": int((AUTH_NOW - timedelta(seconds=1)).timestamp()),
-            "jti": "obligation-route-token",
+            "jti": f"obligation-route-token-{tenant_id}-{scope}",
             "client_id": "cwl-grc-web",
             "scope": scope,
             "role": "compliance_officer",
-            "org": "tenant-1",
-            "workspace": "workspace-1",
+            "org": tenant_id,
+            "workspace": f"workspace-{tenant_id}",
             "principal_kind": "human",
         },
         private_key,
@@ -780,6 +784,91 @@ def test_obligation_read_uses_verified_keyverse_tenant() -> None:
     )
     assert response.status_code == 200
     assert response.json()["obligations"] == []
+
+
+def test_compliance_workspace_read_model_is_tenant_scoped() -> None:
+    """The workspace combines existing projections without crossing tenant boundaries."""
+    client, private_key = _protected_client()
+    with client.app.state.session_factory() as session:
+        obligations = {}
+        for tenant_id in ("tenant-1", "tenant-2"):
+            decision = _decision(tenant_id=tenant_id)
+            _source_row, revision = _source(session, decision)
+            obligations[tenant_id] = _obligation(
+                session,
+                decision,
+                revision,
+                scope_reference=tenant_id,
+            )
+        tenant_one_decision = _decision(tenant_id="tenant-1")
+        for scope_reference in ("tenant-1", "application-1"):
+            decide_applicability(
+                session,
+                tenant_one_decision,
+                obligations["tenant-1"].compliance_obligation_id,
+                ApplicabilityCode.APPLICABLE.value,
+                "organization" if scope_reference == "tenant-1" else "application",
+                scope_reference,
+                "The tenant has documented this exact applicability scope.",
+                f"evidence://applicability-{scope_reference}",
+                FEBRUARY,
+                MARCH,
+            )
+        author_policy(
+            session,
+            AuthorizationDecision("policy-officer", PurposeCode.POLICY_AUTHORING, "tenant-1"),
+            "Tenant one access policy",
+            "Review privileged access quarterly.",
+            [ControlRef(FrameworkCode.SOC2_TSC_2017, "CC1.1")],
+        )
+        session.commit()
+
+    missing = client.get("/compliance-workspace")
+    wrong_scope = client.get(
+        "/compliance-workspace",
+        headers={
+            "Authorization": f"Bearer {_protected_token(private_key, 'grc.policy.read')}",
+            "X-Purpose": PurposeCode.COMPLIANCE_GOVERNANCE.value,
+        },
+    )
+    tenant_one = client.get(
+        "/compliance-workspace",
+        headers={
+            "Authorization": f"Bearer {_protected_token(private_key)}",
+            "X-Purpose": PurposeCode.COMPLIANCE_GOVERNANCE.value,
+        },
+    )
+    tenant_two = client.get(
+        "/compliance-workspace",
+        headers={
+            "Authorization": f"Bearer {_protected_token(private_key, tenant_id='tenant-2')}",
+            "X-Purpose": PurposeCode.COMPLIANCE_GOVERNANCE.value,
+        },
+    )
+
+    assert missing.status_code == 401
+    assert wrong_scope.status_code == 403
+    assert tenant_one.status_code == 200
+    assert tenant_two.status_code == 200
+    first = tenant_one.json()
+    second = tenant_two.json()
+    assert first["projection"] == "controls_obligations_policy_gaps"
+    assert first["posture"]["obligation_total"] == 1
+    assert first["posture"]["obligation_work_item_total"] == 2
+    assert first["posture"]["applicability_work_item_counts"]["applicable"] == 2
+    assert first["posture"]["review_queue_work_item_counts"]["overdue"] == 2
+    assert first["posture"]["policy_gap_total"] == 1
+    assert {item["scope_reference"] for item in first["obligations"]} == {
+        "tenant-1",
+        "application-1",
+    }
+    assert first["policy_gaps"][0]["policy_title"] == "Tenant one access policy"
+    assert first["next_actions"]
+    assert "evidence_requests" in first["not_yet_projected"]
+    assert second["posture"]["obligation_total"] == 1
+    assert second["posture"]["policy_gap_total"] == 0
+    assert second["policy_gaps"] == []
+    assert second["obligations"][0]["scope_reference"] == "tenant-2"
 
 
 def test_obligation_write_routes_require_write_scope_and_bind_identity() -> None:
