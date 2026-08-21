@@ -4,7 +4,7 @@ Snapshot: 2026-08-21, Asia/Seoul
 Repository: `ContextualWisdomLab/governance-risk-compliance`  
 Baseline source head: `78770c63d16a6124dbb1d647c3ac482624f1745a`
 Develop-based buyer-workspace head: `30db69b4bf0ef39654cfaba460c7d4ba66ecc91d`
-Active reviewed security/model/catalog/obligation fix heads: PR #32 `2e5daf62f82ee7873cb947390f50f161c173729d`, PR #33 `7922d9be1aca16a0ffbd59d44e0183dd2ef7155b`, PR #37 `6a312a189cadec192c50b4cc5b09804d3a0e97e5`, PR #38 `0c4084705b4f86913acdefa1ada3d17aa2d1e6f7`, PR #40 `4daab149d364f6117e31df22e14e11ad35d230b2`, PR #41 `246297082431aefc8281f3c6e1947b961298638f`, and PR #42 `7f464d9ff3019477c7db81ebee240fb8d722a091`. This baseline follow-up is PR #39.
+Active reviewed security/model/catalog/obligation fix heads: PR #32 `2e5daf62f82ee7873cb947390f50f161c173729d`, PR #33 `7922d9be1aca16a0ffbd59d44e0183dd2ef7155b`, PR #37 `6a312a189cadec192c50b4cc5b09804d3a0e97e5`, PR #38 `0c4084705b4f86913acdefa1ada3d17aa2d1e6f7`, PR #40 `4daab149d364f6117e31df22e14e11ad35d230b2`, PR #41 `246297082431aefc8281f3c6e1947b961298638f`, PR #42 `7f464d9ff3019477c7db81ebee240fb8d722a091`, and PR #43 `f41c387c62998de2d136ce8f4a110b4cb22906ac`. This baseline follow-up is PR #39.
 
 This document is the current product and technical truth baseline. It separates
 observed runtime or GitHub evidence from inferred gaps and proposed acceptance
@@ -85,6 +85,18 @@ Product is successful on this exact head; CodeQL, SAST, Security, Strix, and
 required review workflows remain queued; it remains unmerged and has no
 independent formal approval.
 
+PR #43 stages the repository-owned caller for the central hourly review-repair
+workflow. Its exact head `f41c387c62998de2d136ce8f4a110b4cb22906ac` schedules
+one dispatch per hour against `develop`, pins the central reusable workflow to
+`55a8b576725451dfe0a21a57d36a2f1a41619b24`, grants only `contents: read` and
+`id-token: write`, and passes no model or mutation secret. Local evidence is
+48 passing tests with 100% statement/branch coverage, 100% docstring coverage,
+Ruff, compile, lock, actionlint, and Semgrep zero blocking findings. The
+organization allowlist now includes this public repository with `all`
+visibility; that external setting is observed configuration, not merge or
+approval evidence. PR #43 remains Draft with hosted checks queued and no
+independent approval.
+
 PR #37 stages the Issue #29 catalog-provenance slice directly on `develop`.
 Its current exact head `6a312a189cadec192c50b4cc5b09804d3a0e97e5` adds the
 governed bounded published-release review list, metadata-only release detail
@@ -140,12 +152,16 @@ The complete domain sequence is defined in
 
 ## Automation status
 
-No repository workflow on `develop` currently declares an hourly `schedule`
-trigger, and no authenticated contextual-orchestrator scheduler executor is
-available in this environment. No placeholder automation was added. The next
-automation action is to use an approved central scheduler identity for the
-protected PR queue, exact-head checks, independent review, and safe handoff
-evidence rather than duplicating a privileged loop in this repository.
+PR #43 now declares the repository-owned hourly caller on `develop`; the
+privileged review/repair implementation remains centrally owned by
+`.github`'s reusable workflow pinned to exact main commit
+`55a8b576725451dfe0a21a57d36a2f1a41619b24`. The caller dispatches at minute 53,
+allows one target dispatch, retries transient work for two hours, and has no
+write permission or optional mutation secret. The organization variable
+`OPENCODE_REPOSITORY_DISPATCH_TARGETS` has been observed to include
+`ContextualWisdomLab/governance-risk-compliance` with `all` visibility. Hosted
+execution, independent review, exact-head required checks, and protected merge
+remain separate gates; no local schedule is evidence that those gates passed.
 
 ## Current product contract
 
@@ -251,6 +267,7 @@ self-approval, admin merge, force-push, or predecessor-head evidence is valid.
 | [#40](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/40) | `4daab149d364f6117e31df22e14e11ad35d230b2` | Draft, stacked, review-required | Scorecard Pinned-Dependencies fix for PR #34. A normal merge commit brings the current PR34 base into the child; the stacked diff remains one workflow-line change. Local Python 53-test/100% coverage, Interrogate 100%, Storybook, actionlint, and three browser tests pass; Product #570, Scorecard, Semgrep, Trivy, OSV, dependency review, and required workflow checks are successful, while `coverage-evidence` is queued and independent approval is absent. |
 | [#41](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/41) | `246297082431aefc8281f3c6e1947b961298638f` (2026-08-21) | Draft, stacked, review-required | Replacement for closed PR #36 on the current PR #32 head. The two exact-head Semgrep findings in migration SQL are replaced with SQLAlchemy `DDL`/`Index` constructs; the branch also carries the owner-graph, race, and coverage review fixes, and removes local HTTP/form actor input in favor of fixed `local_development_actor`. Local 160-test 100% statement/branch/docstring, full lint/compile/lock/actionlint/diff checks, and Semgrep zero-findings evidence pass. New-head Product jobs are successful; SAST/Security/Strix and required workflows are queued, and independent approval remains outstanding. |
 | [#42](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/42) | `7f464d9ff3019477c7db81ebee240fb8d722a091` (2026-08-21) | Ready, stacked, merge-blocked | Organization OpenTelemetry acceptance-evidence boundary on the current PR #32 head. The exact docs-only head fixes the ADR sequence to 0012 and passes the inherited 155-test 100% statement/branch/docstring suite, Ruff, lock, compile, actionlint, diff, and Semgrep zero-findings checks. Product is successful on this exact head; CodeQL, SAST, Security, Strix, and required review workflows remain queued; independent approval remains outstanding. |
+| [#43](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/43) | `f41c387c62998de2d136ce8f4a110b4cb22906ac` (2026-08-21) | Draft, merge-blocked | Hourly central review-repair caller targeting `develop`, pinned to central workflow commit `55a8b576725451dfe0a21a57d36a2f1a41619b24`. Local 48-test 100% statement/branch/docstring, Ruff, compile, lock, actionlint, and Semgrep zero-blocking evidence pass; hosted Product is partly in progress and the remaining central checks are queued. The organization target allowlist is observed configured, but hosted execution, two approving reviews, last-push approval, and protected merge remain outstanding. |
 | [#19](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/19) | `de571802239ba819b0fd5201993f2e20ddad5645` (2026-08-21) | Ready, review-required | Documentation baseline and GRC roadmap review fixes. The current head makes `not_applicable` require an exact authorized decision, maps applicable-without-implementation/evidence to `unknown`, records `posture-projection-v1` and input fact versions, and enumerates the complete release-gate token set. Prior checks do not transfer; Product #576 and SAST/Security #186 are queued, and independent approval remains outstanding. |
 | [#16](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/16) | `c1496be499473befc273ff55ea284ac9f5582b73` (2026-08-21) | Draft, mergeable | Tenant isolation remains stacked behind #7; Product #398 is terminal-success, and local 118-test coverage is 100% across 1,307 statements and 330 branches with Interrogate/Ruff/compile/lock/diff checks passing. Preserve the shared official catalog outside tenant-owned records and regenerate all current-head gates after parent integration. |
 | [#7](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/7) | `ebac50ccbb9cf528044cc53d4832ceec176b50c9` (2026-08-21) | Draft, mergeable | Route enforcement remains stacked behind #6; Product #396 is terminal-success, and local 109-test coverage is 100% across 1,267 statements and 318 branches with Interrogate/Ruff/compile/lock/diff checks passing. Revalidate every protected route and scope on the integrated parent. |
