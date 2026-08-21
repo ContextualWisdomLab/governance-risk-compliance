@@ -201,6 +201,36 @@ def test_source_registration_rejects_wrong_policy_and_purpose() -> None:
             )
 
 
+@pytest.mark.parametrize(
+    ("content_class", "license_policy_code"),
+    [
+        ("source_text", "lawful_source_text"),
+        ("licensed_text", "licensed_no_redistribution"),
+        ("organization_summary", "organization_summary"),
+        ("translated_summary", "translated_summary"),
+    ],
+)
+def test_source_registration_accepts_explicit_content_policy_pairs(
+    content_class: str,
+    license_policy_code: str,
+) -> None:
+    """Lawful source classifications use their explicit reviewed policy codes."""
+    factory = _factory()
+    with factory() as session:
+        artifact = register_source_artifact(
+            session,
+            _DECISION,
+            publisher_name="NIST",
+            source_reference=f"{content_class}-fixture",
+            source_url="https://pages.nist.gov/OSCAL/",
+            artifact_content_class=content_class,
+            license_policy_code=license_policy_code,
+            allowed_source_hosts={"pages.nist.gov"},
+        )
+        assert artifact.artifact_content_class == content_class
+        assert artifact.license_policy_code == license_policy_code
+
+
 def test_version_digest_is_idempotent_and_immutable_metadata() -> None:
     """The same digest returns one row and a metadata collision is rejected."""
     factory = _factory()

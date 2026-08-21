@@ -4,7 +4,7 @@
 
 ### Added
 
-- Bounded catalog release review pages with deterministic ordering, status filtering, explicit pagination state, governed detail snapshots, license/export policy flags, and published-only comparison guards.
+- Bounded catalog release review pages with deterministic ordering, status filtering, explicit pagination state, governed detail snapshots, license/export policy flags, explicit content-policy mapping, and published-only comparison guards.
 - Versioned policy authoring: `policy_document`, `policy_version`, and `policy_control_mapping` mapped only to official catalog identifiers.
 - Policy-gap query that reuses `control_evidence_binding` (no second evidence model).
 - Officer home form to author a policy and see uncovered policy requirements.

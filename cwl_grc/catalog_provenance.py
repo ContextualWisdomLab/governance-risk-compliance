@@ -55,6 +55,13 @@ _CONTENT_CLASSES = frozenset(
         "identifier_only",
     }
 )
+_CONTENT_CLASS_POLICIES = {
+    "source_text": frozenset({"lawful_source_text"}),
+    "licensed_text": frozenset({"licensed_no_redistribution"}),
+    "organization_summary": frozenset({"organization_summary"}),
+    "translated_summary": frozenset({"translated_summary"}),
+    "identifier_only": frozenset({"identifier_only"}),
+}
 
 
 @dataclass(frozen=True)
@@ -145,10 +152,10 @@ def register_source_artifact(
     policy = session.get(SourceLicensePolicy, license_policy_code)
     if policy is None:
         raise HTTPException(status_code=422, detail="The license policy is not registered.")
-    if content_class != license_policy_code:
+    if license_policy_code not in _CONTENT_CLASS_POLICIES[content_class]:
         raise HTTPException(
             status_code=422,
-            detail="The artifact content class must match its license policy.",
+            detail="The license policy must match the artifact content class.",
         )
     existing = (
         session.query(SourceArtifact)
