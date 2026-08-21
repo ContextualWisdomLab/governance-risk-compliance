@@ -144,10 +144,13 @@ def test_loader_settings_reject_ambiguous_or_unbounded_configuration() -> None:
         ({"issuer": f"{ISSUER}#fragment"}, "HTTPS issuer"),
         ({"allowed_jwks_hosts": frozenset()}, "JWK host"),
         ({"allowed_jwks_hosts": frozenset({""})}, "JWK host"),
+        ({"timeout_seconds": True}, "timeout"),
         ({"timeout_seconds": 0}, "timeout"),
         ({"timeout_seconds": 31}, "timeout"),
+        ({"metadata_maximum_bytes": True}, "metadata size"),
         ({"metadata_maximum_bytes": 0}, "metadata size"),
         ({"metadata_maximum_bytes": 1024 * 1024 + 1}, "metadata size"),
+        ({"jwks_maximum_bytes": True}, "JWK size"),
         ({"jwks_maximum_bytes": 0}, "JWK size"),
         ({"jwks_maximum_bytes": 4 * 1024 * 1024 + 1}, "JWK size"),
     )
