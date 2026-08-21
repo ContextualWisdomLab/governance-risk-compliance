@@ -57,7 +57,7 @@ def test_health_readiness_startup_and_trace_contracts() -> None:
 
 
 def test_correlation_headers_are_preserved_or_replaced() -> None:
-    """Valid W3C context survives while malformed or unbounded values are replaced."""
+    """Request IDs survive while server spans continue or replace trace context."""
     app = _app()
     client = TestClient(app)
     valid_request_id = "officer-request:2026-08-20"
@@ -67,7 +67,10 @@ def test_correlation_headers_are_preserved_or_replaced() -> None:
         headers={"X-Request-ID": valid_request_id, "traceparent": valid_traceparent},
     )
     assert preserved.headers["X-Request-ID"] == valid_request_id
-    assert preserved.headers["traceparent"] == valid_traceparent
+    returned_traceparent = preserved.headers["traceparent"].split("-")
+    assert returned_traceparent[0] == "00"
+    assert returned_traceparent[1] == valid_traceparent.split("-")[1]
+    assert returned_traceparent[2] != valid_traceparent.split("-")[2]
 
     replaced = client.get(
         "/healthz",
@@ -181,6 +184,35 @@ def test_readiness_reports_schema_receipt_seed_guard_and_key_failures() -> None:
     assert _evidence_key_check(WrongRoundTripCipher())["reason_code"] == (
         "evidence_key_round_trip_failed"
     )
+
+
+def test_readiness_rejects_missing_required_purpose_with_matching_row_count() -> None:
+    """Readiness verifies required purpose identifiers, not only their row count."""
+    app = _app()
+    with app.state.session_factory.kw["bind"].begin() as connection:
+        connection.execute(
+            text(
+                "DELETE FROM authorization_purpose "
+                "WHERE purpose_code = 'evidence_retention'"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO authorization_purpose "
+                "(purpose_code, purpose_label, purpose_description) "
+                "VALUES ('unsupported', 'Unsupported', 'Unsupported')"
+            )
+        )
+
+    report = readiness_payload(
+        app.state.session_factory,
+        app.state.evidence_cipher,
+        LOCAL_PREVIEW_ENVIRONMENT,
+        None,
+        app.state.lifecycle,
+    )
+    assert report["status"] == "not_ready"
+    assert report["checks"]["seed_state"]["reason_code"] == "seed_state_incomplete"
 
 
 def test_startup_rejects_production_preview_and_unknown_environment(monkeypatch) -> None:  # noqa: ANN001

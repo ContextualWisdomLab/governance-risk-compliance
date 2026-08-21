@@ -155,10 +155,11 @@ def _database_checks(factory: sessionmaker[Session]) -> dict[str, dict[str, str]
                     "integrity_guards": _fail("schema_migration_incomplete"),
                 }
             control_count = session.execute(text("SELECT COUNT(*) FROM control_item")).scalar_one()
-            purpose_count = session.execute(
-                text("SELECT COUNT(*) FROM authorization_purpose")
-            ).scalar_one()
-            if control_count < 1 or purpose_count < len(PurposeCode):
+            purpose_codes = set(
+                session.execute(text("SELECT purpose_code FROM authorization_purpose")).scalars()
+            )
+            required_purposes = {purpose.value for purpose in PurposeCode}
+            if control_count < 1 or not required_purposes <= purpose_codes:
                 return {
                     "database": _ok("database_reachable"),
                     "schema": _ok("schema_compatible"),
