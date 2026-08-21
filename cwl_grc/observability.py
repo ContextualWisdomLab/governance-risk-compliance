@@ -107,7 +107,11 @@ def emit_request_log(
         "principal_reference": principal_reference(),
         "error_class": error_class,
     }
-    request_logger.info(json.dumps(payload, sort_keys=True))
+    message = json.dumps(payload, sort_keys=True)
+    if status_code >= 500:
+        request_logger.error(message)
+    else:
+        request_logger.info(message)
 
 
 def route_template(scope: Mapping[str, Any]) -> str:

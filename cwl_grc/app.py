@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy.orm import Session
 
 from cwl_grc.authorization import (
@@ -216,16 +217,18 @@ def create_app(
     app.router.add_event_handler("shutdown", app.state.lifecycle.begin_drain)
     app.router.add_event_handler("shutdown", app.state.telemetry.shutdown)
 
-    @app.exception_handler(HTTPException)
-    async def handle_http_exception(request: Request, exc: HTTPException) -> JSONResponse:
-        """Return a safe request reference with expected application errors."""
+    @app.exception_handler(StarletteHTTPException)
+    async def handle_http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        """Return a safe request reference for application and router errors."""
+        headers = dict(exc.headers or {})
+        headers["X-Request-ID"] = getattr(request.state, "request_reference", "")
         return JSONResponse(
             status_code=exc.status_code,
             content={
                 "detail": exc.detail,
                 "request_reference": getattr(request.state, "request_reference", None),
             },
-            headers={"X-Request-ID": getattr(request.state, "request_reference", "")},
+            headers=headers,
         )
 
     @app.exception_handler(RequestValidationError)
