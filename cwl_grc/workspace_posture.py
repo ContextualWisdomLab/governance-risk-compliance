@@ -58,7 +58,9 @@ def build_preview_posture(session: Session) -> dict[str, Any]:
         },
         "metrics": {
             "official_control_count": len(controls),
-            "legacy_evidence_only_count": len(controls) - len(uncovered),
+            "legacy_evidence_only_count": sum(
+                row["status"] == "unknown" for row in status_rows
+            ),
             "not_assessed_control_count": len(uncovered),
             "effective_control_count": 0,
             "policy_gap_count": len(policy_gaps),
