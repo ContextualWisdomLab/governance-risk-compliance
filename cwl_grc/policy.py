@@ -362,6 +362,7 @@ def serialize_policy(session: Session, document: PolicyDocument) -> dict[str, An
     mappings = (
         session.query(PolicyControlMapping)
         .filter_by(policy_version_id=version.policy_version_id)
+        .order_by(PolicyControlMapping.control_item_id)
         .all()
     )
     mapped: list[dict[str, str]] = []
