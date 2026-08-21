@@ -21,8 +21,12 @@ from cwl_grc.authorization import (
 )
 from cwl_grc.catalog import seed_control_catalog
 from cwl_grc.database import create_session_factory
-from cwl_grc.encryption import EvidenceCipher
-from cwl_grc.evidence import bind_control_evidence, create_evidence_record
+from cwl_grc.encryption import EvidenceCipher, EvidenceKeyring, make_evidence_context
+from cwl_grc.evidence import (
+    bind_control_evidence,
+    create_evidence_record,
+    record_encryption_envelope,
+)
 from cwl_grc.policy import (
     author_policy,
     list_policy_documents,
@@ -189,7 +193,11 @@ def _gaps_command(policy_document_id: str | None) -> int:
 def _bind_command(namespace: argparse.Namespace) -> int:
     """Store one evidence artifact and bind it to an official control."""
     session = _open_session()
-    cipher = EvidenceCipher(os.environ.get("CWL_GRC_EVIDENCE_KEY"))
+    keyring = EvidenceKeyring.from_environment()
+    cipher = EvidenceCipher(
+        None if keyring is not None else os.environ.get("CWL_GRC_EVIDENCE_KEY"),
+        keyring=keyring,
+    )
     try:
         decision = AuthorizationDecision(
             namespace.actor,
@@ -222,7 +230,13 @@ def _bind_command(namespace: argparse.Namespace) -> int:
                     "binding_id": binding.binding_id,
                     "control_item_id": binding.control_item_id,
                     "evidence_record_id": record.evidence_record_id,
-                    "payload_text": cipher.decrypt(record.ciphertext_payload),
+                    "payload_text": cipher.decrypt_record(
+                        record_encryption_envelope(record),
+                        context=make_evidence_context(
+                            record.tenant_id,
+                            record.evidence_record_id,
+                        ),
+                    ),
                     "control": serialize_control(binding.control_item),
                     "next_action": (
                         "Review remaining uncovered policy controls and attach the next "

@@ -18,9 +18,10 @@ def record_audit_event(
     resource_kind: str,
     resource_identifier: str,
 ) -> AuditEvent:
-    """Append one audit event for an authorized action."""
+    """Append one audit event for an authorized tenant-scoped action."""
     event = AuditEvent(
         audit_event_id=uuid4().hex,
+        tenant_id=decision.tenant_id,
         actor_identifier=decision.actor_identifier,
         purpose_code=decision.purpose_code.value,
         action_name=action_name,

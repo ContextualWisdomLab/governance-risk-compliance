@@ -10,12 +10,21 @@ from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Resp
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from cwl_grc.authorization import PurposeCode, require_purpose, seed_authorization_purposes
+from cwl_grc.authorization import (
+    LOCAL_DEVELOPMENT_TENANT,
+    PurposeCode,
+    require_purpose,
+    seed_authorization_purposes,
+)
 from cwl_grc.catalog import FrameworkCode, list_control_items, seed_control_catalog
 from cwl_grc.coverage import list_uncovered_controls
 from cwl_grc.database import create_session_factory, session_dependency
-from cwl_grc.encryption import EvidenceCipher
-from cwl_grc.evidence import bind_control_evidence, create_evidence_record
+from cwl_grc.encryption import EvidenceCipher, EvidenceKeyring, make_evidence_context
+from cwl_grc.evidence import (
+    bind_control_evidence,
+    create_evidence_record,
+    record_encryption_envelope,
+)
 from cwl_grc.health import health_payload
 from cwl_grc.keyverse_authentication import (
     AccessTokenValidationError,
@@ -64,6 +73,7 @@ def create_app(
     *,
     database_url: str | None = None,
     evidence_key: str | None = None,
+    evidence_keyring: EvidenceKeyring | None = None,
     access_token_verifier: KeyverseAccessTokenVerifier | None = None,
 ) -> FastAPI:
     """Build a local-only GRC app with optional Keyverse route authentication."""
@@ -71,13 +81,17 @@ def create_app(
         "CWL_GRC_DATABASE_URL",
         "sqlite:///grc_product.sqlite",
     )
-    key = evidence_key if evidence_key is not None else os.environ.get(
-        "CWL_GRC_EVIDENCE_KEY"
-    )
+    keyring = evidence_keyring
+    key = evidence_key
+    if keyring is None and key is None:
+        keyring = EvidenceKeyring.from_environment()
+    if keyring is None and key is None:
+        key = os.environ.get("CWL_GRC_EVIDENCE_KEY")
     factory = create_session_factory(url)
     cipher = EvidenceCipher(
         key,
         allow_ephemeral=url in {"sqlite://", "sqlite:///:memory:"},
+        keyring=keyring,
     )
     with factory() as session:
         seed_control_catalog(session)
@@ -95,8 +109,9 @@ def create_app(
         required_purpose: PurposeCode,
         required_scope: str,
     ):
-        """Return a purpose decision using signed identity when Keyverse is enabled."""
+        """Return a tenant-bound purpose decision from signed identity when enabled."""
         actor_identifier = declared_actor
+        tenant_id = LOCAL_DEVELOPMENT_TENANT
         if access_token_verifier is not None:
             if authorization is None:
                 raise HTTPException(
@@ -124,7 +139,28 @@ def create_app(
                     detail=f"This action requires the {required_scope} scope.",
                 ) from exc
             actor_identifier = principal.actor_id
-        return require_purpose(actor_identifier, purpose_value, required_purpose)
+            tenant_id = principal.tenant_id
+        return require_purpose(
+            actor_identifier,
+            purpose_value,
+            required_purpose,
+            tenant_id=tenant_id,
+        )
+
+    def tenant_for_policy_read(
+        authorization: str | None,
+        purpose_value: str | None,
+    ) -> str:
+        """Resolve a tenant for protected policy reads while preserving local mode."""
+        if access_token_verifier is None:
+            return LOCAL_DEVELOPMENT_TENANT
+        return require_request_actor(
+            authorization,
+            None,
+            purpose_value,
+            PurposeCode.COVERAGE_REVIEW,
+            "grc.policy.read",
+        ).tenant_id
 
     app = FastAPI(title="CWL GRC", version="0.1.0")
     app.state.evidence_cipher = cipher
@@ -171,9 +207,16 @@ def create_app(
     def uncovered_controls(
         session: Session = Depends(get_session),
         framework: str | None = None,
+        authorization: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        """List official controls that still need evidence."""
-        items = list_uncovered_controls(session, parse_framework(framework))
+        """List official controls still needing evidence for the verified tenant."""
+        tenant_id = tenant_for_policy_read(authorization, x_purpose)
+        items = list_uncovered_controls(
+            session,
+            parse_framework(framework),
+            tenant_id=tenant_id,
+        )
         return {
             "next_action": "Attach the next evidence on an uncovered control.",
             "controls": [serialize_control(item, covered=False) for item in items],
@@ -231,13 +274,18 @@ def create_app(
         return serialize_policy(session, document)
 
     @app.get("/policy-documents")
-    def get_policy_documents(session: Session = Depends(get_session)) -> dict[str, Any]:
-        """List authored policies and their latest official mappings."""
+    def get_policy_documents(
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """List only policies visible to the verified tenant."""
+        tenant_id = tenant_for_policy_read(authorization, x_purpose)
         return {
             "next_action": "Review policy gaps and attach the next evidence.",
             "policies": [
                 serialize_policy(session, document)
-                for document in list_policy_documents(session)
+                for document in list_policy_documents(session, tenant_id)
             ],
         }
 
@@ -245,13 +293,20 @@ def create_app(
     def get_policy_gaps(
         session: Session = Depends(get_session),
         policy_document_id: str | None = None,
+        authorization: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        """List latest-version policy mappings that still lack evidence."""
+        """List only uncovered policy mappings visible to the verified tenant."""
+        tenant_id = tenant_for_policy_read(authorization, x_purpose)
         return {
             "next_action": "Attach the next evidence on an uncovered policy control.",
             "gaps": [
                 serialize_gap(gap)
-                for gap in list_policy_gaps(session, policy_document_id)
+                for gap in list_policy_gaps(
+                    session,
+                    policy_document_id,
+                    tenant_id=tenant_id,
+                )
             ],
         }
 
@@ -288,7 +343,7 @@ def create_app(
         x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        """Bind stored evidence to one official control identifier."""
+        """Bind same-tenant stored evidence to one official control identifier."""
         decision = require_request_actor(
             authorization,
             x_actor_id,
@@ -316,11 +371,16 @@ def create_app(
         }
 
     @app.get("/", response_class=HTMLResponse)
-    def officer_home(session: Session = Depends(get_session)) -> str:
-        """Show policy authoring, policy gaps, and the next evidence action."""
+    def officer_home(
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> str:
+        """Show tenant policy authoring, policy gaps, and the next evidence action."""
+        tenant_id = tenant_for_policy_read(authorization, x_purpose)
         return render_officer_home(
-            list_uncovered_controls(session, None),
-            policy_gaps=list_policy_gaps(session, None),
+            list_uncovered_controls(session, None, tenant_id=tenant_id),
+            policy_gaps=list_policy_gaps(session, None, tenant_id=tenant_id),
             catalog_items=list_control_items(session, None),
         )
 
@@ -333,7 +393,7 @@ def create_app(
         control_refs: list[str] = Form(default=[]),
         authorization: str | None = Header(default=None),
     ) -> RedirectResponse:
-        """Author a policy from the officer home and return to the gap list."""
+        """Author a local-development policy from the officer home."""
         decision = require_request_actor(
             authorization,
             actor_identifier,
@@ -366,7 +426,7 @@ def create_app(
         control_ref: str | None = Form(default=None),
         authorization: str | None = Header(default=None),
     ) -> RedirectResponse:
-        """Attach evidence from the officer home and return to the gap list."""
+        """Attach local-development evidence from the officer home."""
         if control_ref:
             try:
                 framework, catalog_identifier = parse_control_ref(control_ref)
@@ -409,10 +469,14 @@ def create_app(
 
 def _serialize_evidence(record: EvidenceRecord, cipher: EvidenceCipher) -> dict[str, Any]:
     """Return stored evidence with usable, unmasked payload text."""
+    payload_text = cipher.decrypt_record(
+        record_encryption_envelope(record),
+        context=make_evidence_context(record.tenant_id, record.evidence_record_id),
+    )
     return {
         "evidence_record_id": record.evidence_record_id,
         "evidence_title": record.evidence_title,
         "collector_actor": record.collector_actor,
-        "payload_text": cipher.decrypt(record.ciphertext_payload),
+        "payload_text": payload_text,
         "next_action": "Bind this evidence to the uncovered control.",
     }

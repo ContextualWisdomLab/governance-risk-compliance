@@ -12,7 +12,7 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from cwl_grc.audit import record_audit_event
-from cwl_grc.authorization import AuthorizationDecision
+from cwl_grc.authorization import AuthorizationDecision, LOCAL_DEVELOPMENT_TENANT
 from cwl_grc.catalog import FrameworkCode, get_control_item
 from cwl_grc.models import (
     ControlEvidenceBinding,
@@ -33,7 +33,7 @@ class ControlRef:
 
 @dataclass(frozen=True)
 class PolicyGap:
-    """A latest-version policy mapping that still lacks evidence."""
+    """A latest-version policy mapping that still lacks same-tenant evidence."""
 
     policy_document_id: str
     policy_title: str
@@ -94,7 +94,7 @@ def author_policy(
     policy_body: str,
     refs: list[ControlRef],
 ) -> PolicyDocument:
-    """Create a policy document and its first finalized edition."""
+    """Create a tenant-owned policy document and its first finalized edition."""
     title = policy_title.strip()
     body = policy_body.strip()
     if not title or not body:
@@ -102,6 +102,7 @@ def author_policy(
     controls = resolve_control_refs(session, refs)
     document = PolicyDocument(
         policy_document_id=uuid4().hex,
+        tenant_id=decision.tenant_id,
         policy_title=title,
         created_by_actor=decision.actor_identifier,
         created_at=datetime.now(timezone.utc).replace(tzinfo=None),
@@ -128,8 +129,15 @@ def revise_policy(
     policy_body: str,
     refs: list[ControlRef],
 ) -> PolicyDocument:
-    """Atomically allocate and append the next immutable policy edition."""
-    document = session.get(PolicyDocument, policy_document_id)
+    """Append the next immutable edition only to a policy owned by the tenant."""
+    document = (
+        session.query(PolicyDocument)
+        .filter_by(
+            policy_document_id=policy_document_id,
+            tenant_id=decision.tenant_id,
+        )
+        .one_or_none()
+    )
     if document is None:
         raise HTTPException(status_code=404, detail="That policy document is not on file.")
     body = policy_body.strip()
@@ -150,11 +158,12 @@ def revise_policy(
 
 
 def current_version(session: Session, document: PolicyDocument) -> PolicyVersion:
-    """Return the latest finalized edition of a policy document."""
+    """Return the latest finalized edition inside the document's tenant boundary."""
     version = (
         session.query(PolicyVersion)
         .filter_by(
             policy_document_id=document.policy_document_id,
+            tenant_id=document.tenant_id,
             is_finalized=True,
         )
         .order_by(PolicyVersion.version_number.desc())
@@ -165,29 +174,55 @@ def current_version(session: Session, document: PolicyDocument) -> PolicyVersion
     return version
 
 
-def list_policy_documents(session: Session) -> list[PolicyDocument]:
-    """List authored policy documents, newest first."""
-    return list(session.query(PolicyDocument).order_by(PolicyDocument.created_at.desc()).all())
+def list_policy_documents(
+    session: Session,
+    tenant_id: str = LOCAL_DEVELOPMENT_TENANT,
+) -> list[PolicyDocument]:
+    """List only policy documents owned by the exact tenant, newest first."""
+    return list(
+        session.query(PolicyDocument)
+        .filter_by(tenant_id=tenant_id)
+        .order_by(PolicyDocument.created_at.desc())
+        .all()
+    )
 
 
-def list_policy_gaps(session: Session, policy_document_id: str | None) -> list[PolicyGap]:
-    """Return latest-version mappings that have no control-evidence binding."""
+def list_policy_gaps(
+    session: Session,
+    policy_document_id: str | None,
+    *,
+    tenant_id: str = LOCAL_DEVELOPMENT_TENANT,
+) -> list[PolicyGap]:
+    """Return same-tenant latest-version mappings that still lack evidence."""
     if policy_document_id:
-        document = session.get(PolicyDocument, policy_document_id)
+        document = (
+            session.query(PolicyDocument)
+            .filter_by(
+                policy_document_id=policy_document_id,
+                tenant_id=tenant_id,
+            )
+            .one_or_none()
+        )
         if document is None:
             raise HTTPException(status_code=404, detail="That policy document is not on file.")
         documents = [document]
     else:
-        documents = list(session.query(PolicyDocument).order_by(PolicyDocument.created_at.desc()).all())
+        documents = list_policy_documents(session, tenant_id)
     bound_ids = {
-        row[0] for row in session.query(ControlEvidenceBinding.control_item_id).all()
+        row[0]
+        for row in session.query(ControlEvidenceBinding.control_item_id)
+        .filter_by(tenant_id=tenant_id)
+        .all()
     }
     gaps: list[PolicyGap] = []
     for document in documents:
         version = current_version(session, document)
         mappings = (
             session.query(PolicyControlMapping)
-            .filter_by(policy_version_id=version.policy_version_id)
+            .filter_by(
+                policy_version_id=version.policy_version_id,
+                tenant_id=tenant_id,
+            )
             .all()
         )
         for mapping in mappings:
@@ -210,11 +245,14 @@ def list_policy_gaps(session: Session, policy_document_id: str | None) -> list[P
 
 
 def serialize_policy(session: Session, document: PolicyDocument) -> dict[str, Any]:
-    """Serialize a policy document with its latest edition and official mappings."""
+    """Serialize a policy document with its same-tenant latest edition and mappings."""
     version = current_version(session, document)
     mappings = (
         session.query(PolicyControlMapping)
-        .filter_by(policy_version_id=version.policy_version_id)
+        .filter_by(
+            policy_version_id=version.policy_version_id,
+            tenant_id=document.tenant_id,
+        )
         .all()
     )
     mapped: list[dict[str, str]] = []
@@ -258,13 +296,14 @@ def _allocate_next_version_number(
     session: Session,
     document: PolicyDocument,
 ) -> int:
-    """Advance a policy revision counter only when the caller holds the current value."""
+    """Advance a tenant-owned policy revision counter only from its current value."""
     expected_number = document.current_version_number
     next_number = expected_number + 1
     result = session.execute(
         update(PolicyDocument)
         .where(
             PolicyDocument.policy_document_id == document.policy_document_id,
+            PolicyDocument.tenant_id == document.tenant_id,
             PolicyDocument.current_version_number == expected_number,
         )
         .values(current_version_number=next_number)
@@ -288,9 +327,10 @@ def _write_version(
     policy_body: str,
     controls: list[ControlItem],
 ) -> PolicyVersion:
-    """Persist mappings while an edition is open, then finalize it once."""
+    """Persist same-tenant mappings while an edition is open, then finalize it once."""
     version = PolicyVersion(
         policy_version_id=uuid4().hex,
+        tenant_id=decision.tenant_id,
         policy_document_id=document.policy_document_id,
         version_number=version_number,
         policy_body=policy_body,
@@ -308,6 +348,7 @@ def _write_version(
         session.add(
             PolicyControlMapping(
                 mapping_id=uuid4().hex,
+                tenant_id=decision.tenant_id,
                 policy_version_id=version.policy_version_id,
                 control_item_id=control.control_item_id,
             )
