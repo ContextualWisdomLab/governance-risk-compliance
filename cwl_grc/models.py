@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Integer,
     Index,
     LargeBinary,
     String,
@@ -247,6 +248,252 @@ class EvidenceRequest(Base):
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class RiskMethodology(Base):
+    """One immutable, versioned rule set for deterministic risk assessment."""
+
+    __tablename__ = "risk_methodology"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "methodology_code",
+            "methodology_version",
+            name="risk_methodology_version_identity",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "methodology_id",
+            name="risk_methodology_tenant_identity",
+        ),
+        CheckConstraint(
+            "likelihood_scale_max BETWEEN 2 AND 10",
+            name="risk_methodology_likelihood_scale",
+        ),
+        CheckConstraint(
+            "impact_scale_max BETWEEN 2 AND 10",
+            name="risk_methodology_impact_scale",
+        ),
+        CheckConstraint(
+            "effective_control_factor_percent BETWEEN 0 AND 100",
+            name="risk_methodology_effective_factor",
+        ),
+        CheckConstraint(
+            "appetite_threshold >= 0",
+            name="risk_methodology_appetite_threshold",
+        ),
+        CheckConstraint(
+            "tolerance_threshold >= appetite_threshold",
+            name="risk_methodology_tolerance_threshold",
+        ),
+    )
+
+    methodology_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
+    )
+    methodology_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    methodology_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    methodology_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    likelihood_scale_max: Mapped[int] = mapped_column(Integer, nullable=False)
+    impact_scale_max: Mapped[int] = mapped_column(Integer, nullable=False)
+    effective_control_factor_percent: Mapped[int] = mapped_column(Integer, nullable=False)
+    control_effectiveness_method: Mapped[str] = mapped_column(String(128), nullable=False)
+    appetite_threshold: Mapped[int] = mapped_column(Integer, nullable=False)
+    tolerance_threshold: Mapped[int] = mapped_column(Integer, nullable=False)
+    aggregation_rule: Mapped[str] = mapped_column(String(128), nullable=False)
+    rounding_policy: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class RiskRegister(Base):
+    """Stable tenant-owned risk identity and review obligation."""
+
+    __tablename__ = "risk_register"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "risk_id",
+            name="risk_register_tenant_identity",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "risk_code",
+            name="risk_register_tenant_code",
+        ),
+        CheckConstraint(
+            "risk_status IN ('identified', 'assessed', 'treating', 'accepted', 'closed')",
+            name="risk_register_status",
+        ),
+        CheckConstraint(
+            "review_cadence_days > 0",
+            name="risk_register_review_cadence",
+        ),
+        CheckConstraint(
+            "revision_number > 0",
+            name="risk_register_revision",
+        ),
+        Index("risk_register_tenant_review", "tenant_id", "next_review_at"),
+    )
+
+    risk_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
+    )
+    risk_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    risk_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    risk_scenario: Mapped[str] = mapped_column(Text, nullable=False)
+    risk_category: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    affected_scope_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    affected_scope_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    owner_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    risk_status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="identified",
+        server_default="identified",
+    )
+    review_cadence_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    revision_number: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
+    next_review_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class RiskAssessment(Base):
+    """Immutable inherent and residual risk assessment snapshot."""
+
+    __tablename__ = "risk_assessment"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "risk_assessment_id",
+            name="risk_assessment_tenant_identity",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "risk_id",
+            "assessment_number",
+            name="risk_assessment_number_identity",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "risk_id"],
+            ["risk_register.tenant_id", "risk_register.risk_id"],
+            name="risk_assessment_tenant_risk",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "methodology_id"],
+            ["risk_methodology.tenant_id", "risk_methodology.methodology_id"],
+            name="risk_assessment_tenant_methodology",
+        ),
+        CheckConstraint(
+            "likelihood >= 1 AND impact >= 1",
+            name="risk_assessment_scale_floor",
+        ),
+        CheckConstraint(
+            "inherent_score >= 0 AND residual_score >= 0",
+            name="risk_assessment_score_floor",
+        ),
+        CheckConstraint(
+            "control_effectiveness_factor_percent BETWEEN 0 AND 100",
+            name="risk_assessment_control_factor",
+        ),
+        CheckConstraint(
+            "appetite_status IN ('within_appetite', 'above_appetite')",
+            name="risk_assessment_appetite_status",
+        ),
+        Index("risk_assessment_tenant_review", "tenant_id", "next_review_at"),
+    )
+
+    risk_assessment_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
+    )
+    risk_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    methodology_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    assessment_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    likelihood: Mapped[int] = mapped_column(Integer, nullable=False)
+    impact: Mapped[int] = mapped_column(Integer, nullable=False)
+    inherent_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    control_effectiveness_factor_percent: Mapped[int] = mapped_column(Integer, nullable=False)
+    residual_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    appetite_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    aggregation_rule: Mapped[str] = mapped_column(String(128), nullable=False)
+    assessment_rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    decision_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    assessed_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    assessed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    next_review_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class RiskAssessmentControlLink(Base):
+    """One deduplicated, test-backed mitigation reference for an assessment."""
+
+    __tablename__ = "risk_assessment_control_link"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "risk_assessment_control_link_id",
+            name="risk_assessment_control_link_tenant_identity",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "risk_assessment_id",
+            "control_implementation_id",
+            name="risk_assessment_control_link_identity",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "risk_assessment_id"],
+            ["risk_assessment.tenant_id", "risk_assessment.risk_assessment_id"],
+            name="risk_assessment_control_link_tenant_assessment",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "control_implementation_id"],
+            ["control_implementation.tenant_id", "control_implementation.control_implementation_id"],
+            name="risk_assessment_control_link_tenant_implementation",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "control_test_result_id"],
+            ["control_test_result.tenant_id", "control_test_result.test_result_id"],
+            name="risk_assessment_control_link_tenant_result",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "evidence_usage_id"],
+            ["evidence_usage.tenant_id", "evidence_usage.evidence_usage_id"],
+            name="risk_assessment_control_link_tenant_usage",
+        ),
+    )
+
+    risk_assessment_control_link_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
+    )
+    risk_assessment_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    control_implementation_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    control_test_result_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    evidence_usage_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    result_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    effectiveness_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    linked_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
 class ControlEvidenceBinding(Base):
@@ -1481,6 +1728,11 @@ class ControlTestResult(Base):
     __table_args__ = (
         UniqueConstraint(
             "tenant_id",
+            "test_result_id",
+            name="control_test_result_tenant_identity",
+        ),
+        UniqueConstraint(
+            "tenant_id",
             "test_execution_id",
             name="control_test_result_execution_identity",
         ),
@@ -1615,6 +1867,11 @@ class EvidenceUsage(Base):
 
     __tablename__ = "evidence_usage"
     __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "evidence_usage_id",
+            name="evidence_usage_tenant_identity",
+        ),
         UniqueConstraint(
             "tenant_id",
             "evidence_record_id",

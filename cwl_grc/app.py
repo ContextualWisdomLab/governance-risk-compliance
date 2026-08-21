@@ -6,7 +6,7 @@ import os
 import time
 import json
 from collections.abc import Awaitable, Callable, Iterator
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Response
@@ -52,7 +52,13 @@ from cwl_grc.keyverse_authentication import (
     KeyverseAccessTokenVerifier,
     require_access_scopes,
 )
-from cwl_grc.models import AuditEvent, ComplianceObligation, ControlItem, EvidenceRecord
+from cwl_grc.models import (
+    AuditEvent,
+    ComplianceObligation,
+    ControlItem,
+    EvidenceRecord,
+    RiskRegister,
+)
 from cwl_grc.obligations import (
     ApplicabilityCode,
     ObligationWorkItem,
@@ -86,6 +92,14 @@ from cwl_grc.policy import (
     serialize_policy,
 )
 from cwl_grc.remote_access import request_is_local
+from cwl_grc.risks import (
+    assess_risk,
+    create_risk_methodology,
+    create_risk_register,
+    latest_risk_assessment,
+    list_risk_register,
+    next_action_for_risk,
+)
 from cwl_grc.telemetry import RequestTelemetry, span_traceparent
 
 
@@ -572,6 +586,7 @@ def create_app(
         )
         policy_gaps = list_policy_gaps(session, None, tenant_id=decision.tenant_id)
         evidence_requests = list_evidence_requests(session, decision)
+        risks = list_risk_register(session, decision)
         unresolved = {
             ControlCoverageStatus.UNKNOWN,
             ControlCoverageStatus.UNASSESSED,
@@ -597,6 +612,30 @@ def create_app(
             state: sum(item.request_state == state for item in evidence_requests)
             for state in ("requested", "submitted", "accepted", "rejected")
         }
+        risk_assessments = {
+            risk.risk_id: latest_risk_assessment(session, decision, risk.risk_id)
+            for risk in risks
+        }
+        risk_status_counts = {
+            status: sum(risk.risk_status == status for risk in risks)
+            for status in ("identified", "assessed", "treating", "accepted", "closed")
+        }
+        risk_actions = [
+            {
+                "kind": "risk",
+                "reference": risk.risk_code,
+                "status": (
+                    risk_assessments[risk.risk_id].appetite_status
+                    if risk_assessments[risk.risk_id] is not None
+                    else risk.risk_status
+                ),
+                "next_action": next_action_for_risk(risk, risk_assessments[risk.risk_id]),
+            }
+            for risk in risks
+            if risk_assessments[risk.risk_id] is None
+            or risk_assessments[risk.risk_id].appetite_status == "above_appetite"
+            or risk.next_review_at < datetime.now(timezone.utc).replace(tzinfo=None)
+        ]
         control_actions = [
             {
                 "kind": "control",
@@ -642,7 +681,7 @@ def create_app(
             if request.request_state != "accepted"
         ]
         return {
-            "projection": "controls_obligations_policy_gaps_evidence_requests",
+            "projection": "controls_obligations_policy_gaps_evidence_requests_risks",
             "posture": {
                 "control_total": len(coverage),
                 "control_unresolved": sum(item.status in unresolved for item in coverage),
@@ -656,6 +695,12 @@ def create_app(
                 "policy_gap_total": len(policy_gaps),
                 "evidence_request_total": len(evidence_requests),
                 "evidence_request_state_counts": evidence_request_state_counts,
+                "risk_total": len(risks),
+                "risk_status_counts": risk_status_counts,
+                "risk_above_appetite_total": sum(
+                    assessment is not None and assessment.appetite_status == "above_appetite"
+                    for assessment in risk_assessments.values()
+                ),
             },
             "controls": [
                 serialize_control(item.control_item, coverage_status=item.status)
@@ -667,13 +712,127 @@ def create_app(
                 _serialize_evidence_request(session, request)
                 for request in evidence_requests
             ],
-            "next_actions": control_actions + obligation_actions + gap_actions + evidence_request_actions,
+            "risks": [
+                _serialize_risk(risk, risk_assessments[risk.risk_id])
+                for risk in risks
+            ],
+            "next_actions": control_actions + obligation_actions + gap_actions + evidence_request_actions + risk_actions,
             "not_yet_projected": [
-                "risk_register",
+                "risk_treatments",
+                "risk_acceptances",
                 "audit_programs",
                 "controlled_exports",
             ],
         }
+
+    @app.post("/risk-methodologies", status_code=201)
+    def post_risk_methodology(
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Create one immutable, tenant-scoped risk calculation methodology."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.write",
+        )
+        methodology = create_risk_methodology(
+            session,
+            decision,
+            body.get("methodology_code"),
+            body.get("methodology_version"),
+            body.get("methodology_title"),
+            body.get("likelihood_scale_max"),
+            body.get("impact_scale_max"),
+            body.get("effective_control_factor_percent"),
+            body.get("appetite_threshold"),
+            body.get("tolerance_threshold"),
+        )
+        return _serialize_risk_methodology(methodology)
+
+    @app.post("/risks", status_code=201)
+    def post_risk(
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Create one stable tenant risk identity with a review cadence."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.write",
+        )
+        risk = create_risk_register(
+            session,
+            decision,
+            body.get("risk_code"),
+            body.get("risk_title"),
+            body.get("risk_scenario"),
+            body.get("risk_category"),
+            body.get("source_reference"),
+            body.get("affected_scope_type"),
+            body.get("affected_scope_reference"),
+            body.get("owner_reference"),
+            body.get("review_cadence_days"),
+        )
+        return _serialize_risk(risk, None)
+
+    @app.get("/risks")
+    def get_risks(
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """List the tenant risk register with its latest immutable assessment."""
+        decision = decision_for_compliance_read(authorization, x_purpose)
+        risks = list_risk_register(session, decision)
+        return {
+            "risks": [
+                _serialize_risk(risk, latest_risk_assessment(session, decision, risk.risk_id))
+                for risk in risks
+            ]
+        }
+
+    @app.post("/risks/{risk_id}/assessments", status_code=201)
+    def post_risk_assessment(
+        risk_id: str,
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Append one versioned inherent/residual risk assessment."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.write",
+        )
+        assessment = assess_risk(
+            session,
+            decision,
+            risk_id,
+            body.get("methodology_id"),
+            body.get("likelihood"),
+            body.get("impact"),
+            body.get("assessment_rationale"),
+            parse_required_timestamp(body, "next_review_at"),
+            body.get("control_links", []),
+            expected_revision_number=body.get("expected_revision_number"),
+            decision_reference=body.get("decision_reference"),
+        )
+        return _serialize_risk_assessment(assessment)
 
     @app.post("/obligations/{compliance_obligation_id}/applicability-decisions", status_code=201)
     def post_applicability_decision(
@@ -1317,6 +1476,69 @@ def _serialize_evidence_request(session: Session, request: Any) -> dict[str, Any
             for event in audit_history
         ],
         "next_action": next_action_for_evidence_request(request.request_state),
+    }
+
+
+def _serialize_risk_methodology(methodology: Any) -> dict[str, Any]:
+    """Serialize the calculation rule without exposing tenant internals."""
+    return {
+        "methodology_id": methodology.methodology_id,
+        "methodology_code": methodology.methodology_code,
+        "methodology_version": methodology.methodology_version,
+        "methodology_title": methodology.methodology_title,
+        "likelihood_scale_max": methodology.likelihood_scale_max,
+        "impact_scale_max": methodology.impact_scale_max,
+        "effective_control_factor_percent": methodology.effective_control_factor_percent,
+        "control_effectiveness_method": methodology.control_effectiveness_method,
+        "appetite_threshold": methodology.appetite_threshold,
+        "tolerance_threshold": methodology.tolerance_threshold,
+        "aggregation_rule": methodology.aggregation_rule,
+        "rounding_policy": methodology.rounding_policy,
+    }
+
+
+def _serialize_risk_assessment(assessment: Any) -> dict[str, Any]:
+    """Serialize one immutable risk assessment snapshot."""
+    return {
+        "risk_assessment_id": assessment.risk_assessment_id,
+        "assessment_number": assessment.assessment_number,
+        "methodology_id": assessment.methodology_id,
+        "likelihood": assessment.likelihood,
+        "impact": assessment.impact,
+        "inherent_score": assessment.inherent_score,
+        "control_effectiveness_factor_percent": assessment.control_effectiveness_factor_percent,
+        "residual_score": assessment.residual_score,
+        "appetite_status": assessment.appetite_status,
+        "aggregation_rule": assessment.aggregation_rule,
+        "assessment_rationale": assessment.assessment_rationale,
+        "decision_reference": assessment.decision_reference,
+        "assessed_by_actor": assessment.assessed_by_actor,
+        "assessed_at": assessment.assessed_at.isoformat(),
+        "next_review_at": assessment.next_review_at.isoformat(),
+    }
+
+
+def _serialize_risk(
+    risk: RiskRegister,
+    assessment: Any,
+) -> dict[str, Any]:
+    """Serialize tenant risk identity and latest immutable assessment."""
+    return {
+        "risk_id": risk.risk_id,
+        "risk_code": risk.risk_code,
+        "risk_title": risk.risk_title,
+        "risk_scenario": risk.risk_scenario,
+        "risk_category": risk.risk_category,
+        "source_reference": risk.source_reference,
+        "affected_scope_type": risk.affected_scope_type,
+        "affected_scope_reference": risk.affected_scope_reference,
+        "owner_reference": risk.owner_reference,
+        "risk_status": risk.risk_status,
+        "revision_number": risk.revision_number,
+        "review_cadence_days": risk.review_cadence_days,
+        "next_review_at": risk.next_review_at.isoformat(),
+        "assessment": _serialize_risk_assessment(assessment) if assessment is not None else None,
+        "next_action": next_action_for_risk(risk, assessment),
     }
 
 

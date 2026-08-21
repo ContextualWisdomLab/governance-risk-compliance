@@ -852,7 +852,7 @@ def test_compliance_workspace_read_model_is_tenant_scoped() -> None:
     assert tenant_two.status_code == 200
     first = tenant_one.json()
     second = tenant_two.json()
-    assert first["projection"] == "controls_obligations_policy_gaps_evidence_requests"
+    assert first["projection"] == "controls_obligations_policy_gaps_evidence_requests_risks"
     assert first["posture"]["obligation_total"] == 1
     assert first["posture"]["obligation_work_item_total"] == 2
     assert first["posture"]["applicability_work_item_counts"]["applicable"] == 2

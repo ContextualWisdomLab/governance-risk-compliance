@@ -7,7 +7,7 @@ CWL GRC is a modular microservice that must run alone or be imported as `cwl_grc
 ```mermaid
 flowchart LR
     officer[Compliance officer] --> home[Local officer home /]
-    officer --> api[Policy, obligation, control, evidence, and workspace API]
+    officer --> api[Policy, obligation, control, evidence, risk, and workspace API]
     officer --> cli[cwl-grc CLI]
     home --> preview[Loopback-only preview boundary]
     api --> preview
@@ -28,6 +28,7 @@ flowchart LR
     kernel --> binding[(legacy evidence bindings)]
     kernel --> controls[(internal control definitions, tests, and status projection)]
     kernel --> obligations[(sources, obligations, applicability, and change impact)]
+    kernel --> risks[(versioned risk methodologies, register, and immutable assessments)]
     kernel --> audit[(tenant-owned audit events)]
     consumers[Orgmetra / AIS / Billing / naruon / EA / SDP] -. future authenticated contracts .-> api
 ```
@@ -68,6 +69,10 @@ flowchart LR
 | `control_exception` | Time-bounded approved exception |
 | `control_deficiency` | Open or resolved failure requiring remediation |
 | `evidence_usage` | Purpose-approved evidence use for one implementation and completed test; legacy rows are `unassessed` |
+| `risk_methodology` | Immutable tenant methodology version with scales, appetite, factor, aggregation, and rounding rules |
+| `risk_register` | Stable tenant risk identity, scope, owner, status, revision, and next review obligation |
+| `risk_assessment` | Immutable inherent/residual snapshot tied to one methodology version |
+| `risk_assessment_control_link` | Immutable deduplicated link from an assessment to an internal implementation, test result, and evidence usage |
 | `audit_event` | Tenant-owned append-only action record protected at the database boundary |
 | `jurisdiction_record` | Tenant-scoped jurisdiction reference, not a copied legal body |
 | `regulatory_source` | Authoritative legal, contractual, voluntary, or internal source pointer |
@@ -104,12 +109,13 @@ Application filtering is not the sole control. New schemas pair tenant and paren
 - `control_definition_version(tenant_id, internal_control_definition_id)` → `internal_control_definition(tenant_id, internal_control_definition_id)`;
 - `control_implementation(tenant_id, internal_control_definition_id)` → `internal_control_definition(tenant_id, internal_control_definition_id)`;
 - test plans, executions, results, deficiencies, exceptions, and evidence usage pair every tenant key with their parent identifier.
+- `risk_assessment` pairs tenant, risk, and methodology identifiers; assessment links pair tenant, assessment, implemented control, test result, and evidence usage identifiers.
 
 Existing SQLite and PostgreSQL stores receive idempotent tenant-parent guards at startup, and SQLite foreign-key enforcement is enabled on every product connection. The guards fail closed on mismatched parent inserts or updates without destructively rewriting evidence.
 
 ## Integrity and concurrency
 
-Policy creation writes an unfinalized `policy_version`, writes its same-tenant official-control mappings, and then performs the only permitted transition to `is_finalized=true`. SQLite and PostgreSQL guards reject later policy-version mutation or deletion, mapping insertion after finalization, mapping update/delete, audit-event update/delete, and mutation of published internal-control or obligation history, reviewed mappings, test executions/results, or evidence usage.
+Policy creation writes an unfinalized `policy_version`, writes its same-tenant official-control mappings, and then performs the only permitted transition to `is_finalized=true`. SQLite and PostgreSQL guards reject later policy-version mutation or deletion, mapping insertion after finalization, mapping update/delete, audit-event update/delete, and mutation of published internal-control, risk-methodology, risk-assessment, or obligation history, reviewed mappings, test executions/results, or evidence usage. Risk assessment writes require the expected register revision and append a new snapshot rather than rewriting history.
 
 `policy_document.current_version_number` is the optimistic concurrency token. A revision advances it with a tenant-bound conditional SQL update. A stale writer receives `409 Conflict` and must reload the current edition; the service never guesses a replacement version number.
 
