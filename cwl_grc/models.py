@@ -496,6 +496,167 @@ class RiskAssessmentControlLink(Base):
     linked_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
+class RiskTreatmentPlan(Base):
+    """Immutable, versioned action plan for one tenant-owned risk."""
+
+    __tablename__ = "risk_treatment_plan"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "risk_treatment_plan_id",
+            name="risk_treatment_plan_tenant_identity",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "risk_id",
+            "plan_version",
+            name="risk_treatment_plan_version_identity",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "risk_id"],
+            ["risk_register.tenant_id", "risk_register.risk_id"],
+            name="risk_treatment_plan_tenant_risk",
+        ),
+        CheckConstraint(
+            "treatment_strategy IN ('avoid', 'reduce', 'transfer', 'accept')",
+            name="risk_treatment_plan_strategy",
+        ),
+        CheckConstraint(
+            "plan_status IN ('proposed', 'approved', 'in_progress', 'completed', 'cancelled')",
+            name="risk_treatment_plan_status",
+        ),
+        Index("risk_treatment_plan_tenant_due", "tenant_id", "due_at"),
+    )
+
+    risk_treatment_plan_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
+    )
+    risk_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    plan_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    treatment_strategy: Mapped[str] = mapped_column(String(32), nullable=False)
+    plan_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    plan_description: Mapped[str] = mapped_column(Text, nullable=False)
+    owner_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    due_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    plan_status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="proposed",
+        server_default="proposed",
+    )
+    created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class RiskAcceptance(Base):
+    """Immutable, independently approved, time-bounded appetite exception."""
+
+    __tablename__ = "risk_acceptance"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "risk_acceptance_id",
+            name="risk_acceptance_tenant_identity",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "risk_id",
+            "risk_assessment_id",
+            name="risk_acceptance_assessment_identity",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "risk_id"],
+            ["risk_register.tenant_id", "risk_register.risk_id"],
+            name="risk_acceptance_tenant_risk",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "risk_assessment_id"],
+            ["risk_assessment.tenant_id", "risk_assessment.risk_assessment_id"],
+            name="risk_acceptance_tenant_assessment",
+        ),
+        CheckConstraint(
+            "acceptance_status IN ('active', 'expired', 'revoked')",
+            name="risk_acceptance_status",
+        ),
+        CheckConstraint(
+            "valid_to > valid_from",
+            name="risk_acceptance_period",
+        ),
+        Index("risk_acceptance_tenant_expiry", "tenant_id", "valid_to"),
+    )
+
+    risk_acceptance_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
+    )
+    risk_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    risk_assessment_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    acceptance_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    acceptance_rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    escalation_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    accepted_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    accepted_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    valid_from: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    valid_to: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    acceptance_status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="active",
+        server_default="active",
+    )
+
+
+class RiskClosure(Base):
+    """Immutable independent closure approval tied to the latest assessment."""
+
+    __tablename__ = "risk_closure"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "risk_closure_id",
+            name="risk_closure_tenant_identity",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "risk_id",
+            "risk_assessment_id",
+            name="risk_closure_assessment_identity",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "risk_id"],
+            ["risk_register.tenant_id", "risk_register.risk_id"],
+            name="risk_closure_tenant_risk",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "risk_assessment_id"],
+            ["risk_assessment.tenant_id", "risk_assessment.risk_assessment_id"],
+            name="risk_closure_tenant_assessment",
+        ),
+    )
+
+    risk_closure_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
+    )
+    risk_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    risk_assessment_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    closure_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    closure_rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    closure_evidence_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    closed_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    closed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
 class ControlEvidenceBinding(Base):
     """Binds tenant-owned evidence to one official control identifier."""
 

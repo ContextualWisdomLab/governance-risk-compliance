@@ -41,9 +41,10 @@ and provenance decisions.
 
 `tests/test_obligations.py` verifies missing and wrong scopes, two verified
 tenants, exact obligation scope, policy-gap isolation, explicit posture counts,
-and the evidence-request projection ceiling. The risk projection adds only
-versioned methodology and immutable inherent/residual assessment state; risk
-treatments and time-bounded acceptances remain outside this read model.
+and the evidence-request projection ceiling. The risk projection adds
+versioned methodology, immutable inherent/residual assessment state, versioned
+treatment plans, and bounded time-limited acceptances; audit programs, exports,
+and data-room access remain outside this read model.
 `tests/test_evidence_requests.py`
 verifies the request, submission, independent review, rejection, audit, and
 tenant-parent contracts. The full product suite must retain 100% statement and
