@@ -67,4 +67,4 @@
 - `docs/adr/0009-opentelemetry-request-telemetry.md` — isolated OpenTelemetry request spans/metrics, standard OTLP export, and bounded route attributes.
 - `docs/adr/0010-slo-and-error-budget-contract.md` — proposed SLO, error-budget, and multi-window alert contract pending collector acceptance.
 - `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — separate external requirements, internal controls, scoped implementations, testing, evidence usage, and explicit effectiveness projection.
-- `docs/adr/0013-organization-opentelemetry-evidence-boundary.md` — GRC-owned aggregate OTel acceptance evidence with raw telemetry retained only in the approved observability platform.
+- `docs/adr/0012-organization-opentelemetry-evidence-boundary.md` — GRC-owned aggregate OTel acceptance evidence with raw telemetry retained only in the approved observability platform.

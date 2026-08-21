@@ -1,4 +1,4 @@
-# ADR 0013: Govern organization-wide OpenTelemetry evidence at GRC
+# ADR 0012: Govern organization-wide OpenTelemetry evidence at GRC
 
 ## Status
 
@@ -59,4 +59,3 @@ through the existing evidence workflow. Follow
 [`ADR 0009`](0009-opentelemetry-request-telemetry.md) for the GRC service's
 local telemetry implementation and [`ADR 0010`](0010-slo-and-error-budget-contract.md)
 for the proposed GRC SLO policy.
-
