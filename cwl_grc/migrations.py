@@ -182,6 +182,7 @@ def _apply_tenant_isolation_migration(connection: Connection) -> None:
         columns = {column["name"] for column in inspector.get_columns(table_name)}
         if "tenant_id" in columns:
             continue
+        table = Table(table_name, MetaData(), autoload_with=connection)
         connection.execute(
             DDL(
                 "ALTER TABLE %(table)s ADD COLUMN tenant_id VARCHAR(128) "
@@ -286,16 +287,16 @@ def _apply_internal_control_model_migration(connection: Connection) -> None:
     from cwl_grc.models import Base
 
     inspector = inspect(connection)
-    for table_name, index_name, columns in (
+    for table_name, index_name, column_names in (
         (
             "evidence_record",
             "evidence_record_tenant_identity_compat",
-            "tenant_id, evidence_record_id",
+            ("tenant_id", "evidence_record_id"),
         ),
         (
             "control_evidence_binding",
             "control_evidence_binding_tenant_identity_compat",
-            "tenant_id, binding_id",
+            ("tenant_id", "binding_id"),
         ),
     ):
         if inspector.has_table(table_name):
