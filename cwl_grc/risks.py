@@ -9,7 +9,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from cwl_grc.audit import record_audit_event
@@ -310,7 +310,11 @@ def list_risk_register(session: Session, decision: AuthorizationDecision) -> lis
     return (
         session.query(RiskRegister)
         .filter_by(tenant_id=decision.tenant_id)
-        .order_by(RiskRegister.next_review_at, RiskRegister.risk_id)
+        .order_by(
+            case((RiskRegister.risk_status == "closed", 1), else_=0),
+            RiskRegister.next_review_at,
+            RiskRegister.risk_id,
+        )
         .all()
     )
 
@@ -636,7 +640,7 @@ def create_risk_closure(
     session.add(closure)
     risk.revision_number += 1
     risk.risk_status = "closed"
-    risk.next_review_at = now
+    risk.next_review_at = assessment.next_review_at
     session.flush()
     record_audit_event(
         session,

@@ -382,20 +382,24 @@ def test_risk_http_workspace_and_input_boundaries() -> None:
         },
     )
     assert closure.status_code == 201
-    closed = next(
-        item for item in client.get("/risks", headers=_headers("reader")).json()["risks"]
-        if item["risk_id"] == second_risk.json()["risk_id"]
-    )
+    risks_after_close = client.get("/risks", headers=_headers("reader")).json()["risks"]
+    assert [item["risk_id"] for item in risks_after_close] == [
+        risk.json()["risk_id"],
+        second_risk.json()["risk_id"],
+    ]
+    closed = next(item for item in risks_after_close if item["risk_id"] == second_risk.json()["risk_id"])
     assert closed["risk_status"] == "closed"
     assert closed["closure"]["risk_closure_id"] == closure.json()["risk_closure_id"]
-    closed_portfolio = client.get("/compliance-workspace", headers=_headers("reader")).json()["posture"]["risk_portfolio"]
+    workspace_after_close = client.get("/compliance-workspace", headers=_headers("reader")).json()
+    closed_portfolio = workspace_after_close["posture"]["risk_portfolio"]
     assert closed_portfolio["risk_total"] == 2
     assert closed_portfolio["active_acceptance_total"] == 1
     assert closed_portfolio["closed_total"] == 1
-    assert not any(
-        action["kind"] == "risk" and action["reference"] == "RISK-CLOSURE-HTTP-001"
-        for action in client.get("/compliance-workspace", headers=_headers("reader")).json()["next_actions"]
-    )
+    assert second_risk.json()["risk_code"] not in {
+        action["reference"]
+        for action in workspace_after_close["next_actions"]
+        if action["kind"] == "risk"
+    }
     reassessment = client.post(
         f"/risks/{risk.json()['risk_id']}/assessments",
         headers=headers,
