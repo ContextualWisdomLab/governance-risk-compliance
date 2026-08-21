@@ -221,6 +221,28 @@ def test_optional_token_replay_guard_rejects_a_reused_jti() -> None:
         verifier.verify(token)
 
 
+def test_replay_guard_runs_after_required_scope_authorization() -> None:
+    """A denied action does not consume a one-time token before scope authorization."""
+    private_key, jwk = _material()
+    seen: set[str] = set()
+
+    def replay_guard(token_id: str) -> bool:
+        """Record only a token that reached the authorized action boundary."""
+        if token_id in seen:
+            return True
+        seen.add(token_id)
+        return False
+
+    verifier = _verifier(jwk, token_replay_guard=replay_guard)
+    token = _token(private_key, _claims())
+    with pytest.raises(AccessTokenValidationError, match="required scope"):
+        verifier.verify(token, required_scopes={"grc.policy.write"})
+    assert seen == set()
+    assert verifier.verify(token, required_scopes={"grc.policy.read"}).token_id == "token-1"
+    with pytest.raises(AccessTokenValidationError, match="replayed"):
+        verifier.verify(token, required_scopes={"grc.policy.read"})
+
+
 def test_resource_server_settings_reject_edge_whitespace_without_normalizing() -> None:
     """Configured issuer, audience, clients, and roles retain exact signed semantics."""
     invalid_settings = (

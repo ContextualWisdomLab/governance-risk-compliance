@@ -30,6 +30,7 @@
 - Pin every Product workflow action to an immutable commit and verify the exact pull-request head before testing.
 - Replace mutable `pip install` resolution with `uv sync --locked`, verify lock freshness, and reject any tracked or untracked dirty tree on every Product run.
 - Accept only explicitly typed, signed RS256 Keyverse access tokens with exact issuer, audience, client, role, tenant, workspace, principal-kind, time, token-ID, and action-scope validation.
+- Check required action scopes before consuming an optional one-time-use Keyverse token replay guard.
 - Reject ID-token/access-token confusion, unsigned or alternate-algorithm tokens, unsupported critical headers, unknown or duplicate keys, private/symmetric/encryption JWKs, stale/future tokens, and client/subject confusion.
 - Bound offline Keyverse JWK input to 1 MiB and support reviewed old/new public-key overlap without enabling network discovery or remote GRC traffic.
 

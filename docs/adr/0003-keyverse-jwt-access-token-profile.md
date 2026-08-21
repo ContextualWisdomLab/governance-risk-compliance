@@ -39,7 +39,7 @@ Keyverse currently uses closed relying-party profiles with an exact audience and
 9. Do not fetch discovery metadata or JWKs over the network in this slice. Offline key input cannot silently introduce SSRF, redirects, unbounded responses, or runtime issuer drift.
 10. Keep Keyverse as the issuer and relying-party authority. GRC stores no password, passkey, client secret, refresh token, raw bearer token, or Keyverse administrator credential.
 11. Add an explicit `require_access_scopes` policy primitive. Authentication alone never authorizes a GRC action.
-12. Accept an optional caller-owned atomic JTI replay guard. Without that guard, this offline kernel preserves normal reusable bearer-token semantics; it does not create an unsafe process-local replay cache.
+12. Accept an optional caller-owned atomic JTI replay guard. When action scopes are required, pass them to `verify` so scope authorization completes before the guard consumes the JTI. Without that guard, this offline kernel preserves normal reusable bearer-token semantics; it does not create an unsafe process-local replay cache.
 13. Keep remote traffic disabled until tenant-owned persistence, route dependencies, OpenAPI security, discovery/JWK refresh, service-principal handling, and deployment acceptance tests are complete.
 
 ## Consequences
@@ -50,7 +50,7 @@ Reviewed old and new public keys can coexist during a rotation window. Removing 
 
 The verifier is intentionally independent of FastAPI and SQLAlchemy. Later route and tenant-storage slices can consume the same typed principal without changing cryptographic validation semantics.
 
-The optional replay guard lets a route or durable authorization service enforce one-time use where its action contract requires it. The guard receives the verified `jti` and must perform an atomic check-and-record operation; the verifier does not retain token state itself.
+The optional replay guard lets a route or durable authorization service enforce one-time use where its action contract requires it. The route supplies required action scopes to `verify`, which checks them before the guard receives the verified `jti`; the guard must perform an atomic check-and-record operation, and the verifier does not retain token state itself.
 
 The strict RFC 9068 `client_id` requirement may require a Keyverse relying-party mapper or issuer configuration because vendor-native tokens often expose `azp` instead. GRC does not alias `azp` to `client_id`; the issuer profile must converge to the reviewed contract.
 

@@ -123,8 +123,13 @@ class KeyverseAccessTokenVerifier:
         self._now = now or (lambda: datetime.now(timezone.utc))
         self._token_replay_guard = token_replay_guard
 
-    def verify(self, token: str) -> AuthenticatedPrincipal:
-        """Return a principal only after type, key, signature, claim, and scope checks."""
+    def verify(
+        self,
+        token: str,
+        *,
+        required_scopes: Collection[str] = (),
+    ) -> AuthenticatedPrincipal:
+        """Return a principal after validation and action-scope checks before replay use."""
         header = _read_untrusted_header(token)
         key_id = _validated_header_key_id(header)
         signing_key = self._key_set.keys_by_id.get(key_id)
@@ -183,9 +188,7 @@ class KeyverseAccessTokenVerifier:
                 "This Keyverse profile accepts a human principal only."
             )
         scopes = _parse_scopes(payload["scope"])
-        if self._token_replay_guard is not None and self._token_replay_guard(token_id):
-            raise AccessTokenValidationError("The Keyverse access token was replayed.")
-        return AuthenticatedPrincipal(
+        principal = AuthenticatedPrincipal(
             tenant_id=tenant_id,
             actor_id=actor_id,
             client_id=client_id,
@@ -197,6 +200,10 @@ class KeyverseAccessTokenVerifier:
             expires_at=expires_at,
             principal_kind=principal_kind,
         )
+        require_access_scopes(principal, required_scopes)
+        if self._token_replay_guard is not None and self._token_replay_guard(token_id):
+            raise AccessTokenValidationError("The Keyverse access token was replayed.")
+        return principal
 
 
 def parse_keyverse_jwks(
