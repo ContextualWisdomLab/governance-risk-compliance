@@ -14,6 +14,7 @@ from cwl_grc.audit import record_audit_event
 from cwl_grc.authorization import AuthorizationDecision
 from cwl_grc.catalog import FrameworkCode, get_control_item
 from cwl_grc.encryption import (
+    EVIDENCE_ALGORITHM_VERSION,
     EncryptedEvidence,
     EvidenceCipher,
     EvidenceDecryptionError,
@@ -118,7 +119,7 @@ def rewrap_evidence_records(
             )
             if (
                 record.encryption_key_id == cipher.active_key_id
-                and record.encryption_algorithm_version == "fernet-v1"
+                and record.encryption_algorithm_version == EVIDENCE_ALGORITHM_VERSION
             ):
                 continue
             encrypted = cipher.encrypt_record(plaintext, context=context)

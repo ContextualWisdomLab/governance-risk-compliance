@@ -29,8 +29,9 @@ tables.
    mismatches, and tampered envelope metadata.
 4. Keep pre-existing single-key rows explicitly marked as
    fernet-v1-legacy; the migration does not invent a context digest. The
-   operator rewrap service converts them in bounded, repeatable batches and
-   appends rewrap_evidence or rewrap_failed audit events.
+   operator keyring must retain the predecessor under the migration's
+   `legacy-v1` key ID until the bounded, repeatable rewrap completes. The
+   service appends rewrap_evidence or rewrap_failed audit events.
 5. Accept keyring configuration through dependency injection or the process
    environment (CWL_GRC_EVIDENCE_KEYRING_JSON plus
    CWL_GRC_EVIDENCE_ACTIVE_KEY_ID). Raw values remain outside GRC tables.
