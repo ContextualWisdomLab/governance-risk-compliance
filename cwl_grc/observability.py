@@ -118,4 +118,4 @@ def _valid_traceparent(value: str | None) -> bool:
 
 def _new_traceparent() -> str:
     """Generate a valid W3C version-zero traceparent with sampled-off flags."""
-    return f"00-{uuid4().hex}-{secrets.token_hex(8)}-01"
+    return f"00-{uuid4().hex}-{secrets.token_hex(8)}-00"
