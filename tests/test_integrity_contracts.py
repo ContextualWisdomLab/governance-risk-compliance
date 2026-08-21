@@ -317,6 +317,27 @@ def test_catalog_migration_adds_release_link_to_existing_framework(
     assert receipt_count == 3
 
 
+def test_policy_migration_skips_partial_schema(tmp_path: Path) -> None:
+    """A partial store does not execute policy updates against missing tables."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'partial.sqlite'}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE schema_migration ("
+                "migration_key VARCHAR(64) PRIMARY KEY, "
+                "applied_at TIMESTAMP NOT NULL)"
+            )
+        )
+        connection.execute(
+            text("CREATE TABLE policy_document (policy_document_id VARCHAR(64) PRIMARY KEY)")
+        )
+    apply_schema_migrations(engine)
+    with engine.connect() as connection:
+        migrations = set(connection.execute(text("SELECT migration_key FROM schema_migration")).scalars())
+    assert "0001_policy_integrity" not in migrations
+    assert {"0002_catalog_provenance", "0003_catalog_release_receipt_link"} <= migrations
+
+
 def test_catalog_release_migration_backfills_latest_successful_receipt(
     tmp_path: Path,
 ) -> None:

@@ -671,6 +671,11 @@ def _catalog_release_snapshot(release: CatalogRelease) -> dict[str, Any]:
             status_code=409,
             detail="The catalog release has no immutable successful import receipt.",
         )
+    if receipt_run.source_artifact_version_id != version.source_artifact_version_id:
+        raise HTTPException(
+            status_code=409,
+            detail="The catalog release import receipt references a different source version.",
+        )
     receipt = receipt_run.receipt
     return {
         "catalog_release_id": release.catalog_release_id,

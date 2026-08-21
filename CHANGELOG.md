@@ -33,6 +33,7 @@
 - Pin every Product workflow action to an immutable commit and verify the exact pull-request head before testing.
 - Replace mutable `pip install` resolution with `uv sync --locked`, verify lock freshness, and reject any tracked or untracked dirty tree on every Product run.
 - Require the explicit `catalog_governance` purpose for catalog provenance writes and protect historical provenance rows with SQLite and PostgreSQL immutability triggers.
+- Reject catalog releases whose import receipt belongs to a different source version at both the database and snapshot boundaries; skip policy upgrades on partial stores.
 - Keep catalog source-host authorization server-owned so an HTTP caller cannot widen the official-source allowlist.
 
 ### ADR

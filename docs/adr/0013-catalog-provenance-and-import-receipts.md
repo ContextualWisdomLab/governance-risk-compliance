@@ -22,6 +22,8 @@ Add a global, tenant-neutral provenance chain:
 - Make import identity idempotent by source version plus parser version; release publication requires a successful receipt.
 - Persist the selected successful import-run identity on each release. Release snapshots resolve only that immutable link; legacy releases without a valid link fail closed rather than switching to a later re-import.
 - Upgrade existing stores with the versioned `0003_catalog_release_receipt_link` migration, backfilling the latest successful receipt when one exists.
+- Enforce that a release's selected import run belongs to the same source-artifact version at the database boundary, and fail closed again when building a snapshot.
+- Leave unrelated policy migrations untouched when a legacy store is only partially materialized; the schema compatibility gate remains responsible for rejecting that store before serving.
 - Require the declared `catalog_governance` purpose. It is an audit-purpose declaration in the local preview, not authentication.
 - Expose a bounded published-release list, a metadata-only release detail endpoint, and a comparison endpoint so officers can review source/version/receipt and explicit license/export policy changes without implying a requirement-level diff.
 - Keep provenance separate from `control_framework` and `control_item`. A later importer may create or update an official framework edition only after verified source bytes, parser output, official identifiers, mapping evidence, and independent review exist.

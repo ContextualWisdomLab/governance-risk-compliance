@@ -61,6 +61,8 @@ def apply_schema_migrations(engine: Engine) -> None:
 def _apply_policy_integrity_migration(connection: Connection) -> None:
     """Upgrade legacy policy columns and record the first migration receipt."""
     inspector = inspect(connection)
+    if not {"policy_document", "policy_version"}.issubset(inspector.get_table_names()):
+        return
     additions = (
         (
             "policy_document",
@@ -316,6 +318,20 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
         END
         """,
         """
+        CREATE TRIGGER IF NOT EXISTS catalog_release_require_matching_import_version
+        BEFORE INSERT ON catalog_release
+        WHEN NEW.catalog_import_run_id IS NOT NULL
+         AND NOT EXISTS (
+            SELECT 1
+            FROM catalog_import_run
+            WHERE catalog_import_run_id = NEW.catalog_import_run_id
+              AND source_artifact_version_id = NEW.source_artifact_version_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'catalog_release import run version mismatch');
+        END
+        """,
+        """
         CREATE TRIGGER IF NOT EXISTS catalog_release_block_delete
         BEFORE DELETE ON catalog_release
         BEGIN
@@ -427,5 +443,28 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
         CREATE TRIGGER catalog_release_immutable
         BEFORE UPDATE OR DELETE ON catalog_release
         FOR EACH ROW EXECUTE FUNCTION prevent_catalog_provenance_mutation()
+        """,
+        """
+        CREATE OR REPLACE FUNCTION validate_catalog_release_import_version()
+        RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF NEW.catalog_import_run_id IS NOT NULL
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM catalog_import_run
+                   WHERE catalog_import_run_id = NEW.catalog_import_run_id
+                     AND source_artifact_version_id = NEW.source_artifact_version_id
+               ) THEN
+                RAISE EXCEPTION 'catalog_release import run version mismatch';
+            END IF;
+            RETURN NEW;
+        END;
+        $$
+        """,
+        "DROP TRIGGER IF EXISTS catalog_release_import_version_guard ON catalog_release",
+        """
+        CREATE TRIGGER catalog_release_import_version_guard
+        BEFORE INSERT ON catalog_release
+        FOR EACH ROW EXECUTE FUNCTION validate_catalog_release_import_version()
         """,
     )

@@ -875,6 +875,31 @@ def test_import_receipt_release_and_append_only_guards() -> None:
             version.source_artifact_version_id,
             release_key="oscal-1.2.3",
         ).catalog_release_id == release.catalog_release_id
+        second_version = register_source_artifact_version(
+            session,
+            _DECISION,
+            version.source_artifact.source_artifact_id,
+            edition_label="1.2.4",
+            content_digest=hashlib.sha256(b"second catalog fixture").hexdigest(),
+            media_type="application/json",
+            byte_length=len(b"second catalog fixture"),
+        )
+        with pytest.raises(IntegrityError, match="version mismatch"):
+            session.execute(
+                text(
+                    "INSERT INTO catalog_release ("
+                    "catalog_release_id, source_artifact_version_id, catalog_import_run_id, "
+                    "release_key, release_status, created_at) VALUES ("
+                    ":release_id, :version_id, :run_id, :release_key, 'published', CURRENT_TIMESTAMP)"
+                ),
+                {
+                    "release_id": "mismatched-release",
+                    "version_id": second_version.source_artifact_version_id,
+                    "run_id": result.run.catalog_import_run_id,
+                    "release_key": "mismatched",
+                },
+            )
+        session.rollback()
         for table, identifier_column, identifier in (
             ("source_artifact_version", "source_artifact_version_id", version.source_artifact_version_id),
             ("catalog_import_run", "catalog_import_run_id", result.run.catalog_import_run_id),
@@ -1229,6 +1254,23 @@ def test_release_snapshot_rejects_unlinked_import_receipt() -> None:
         catalog_import_run=None,
     )
     with pytest.raises(HTTPException, match="immutable successful import receipt"):
+        _catalog_release_snapshot(release)
+
+
+def test_release_snapshot_rejects_mismatched_import_version() -> None:
+    """A release snapshot cannot combine metadata from different source versions."""
+    release = SimpleNamespace(
+        source_artifact_version=SimpleNamespace(
+            source_artifact_version_id="version-a",
+            source_artifact=SimpleNamespace(),
+        ),
+        catalog_import_run=SimpleNamespace(
+            source_artifact_version_id="version-b",
+            run_status="succeeded",
+            receipt=SimpleNamespace(),
+        ),
+    )
+    with pytest.raises(HTTPException, match="different source version"):
         _catalog_release_snapshot(release)
 
 
