@@ -5,7 +5,7 @@ Repository: `ContextualWisdomLab/governance-risk-compliance`
 Baseline parent branch head: `a747077757484c880fccf76e30cac068c593d3b0` (protected `develop`)
 Baseline source parent: `c78ef79499d05e13a8651ccfa2a2979724323160` (pre-refresh PR #19 source parent; re-query the current document branch head below)
 Develop-based buyer-workspace head: `59e1a3cce5a794f1b6a33a9f5128a1ccccf95109`
-Tracked current direct-to-develop heads: PR #17 `ebf24a6ec69855a794dc03f4c665a958c37e17a3`, PR #18 `35d3e55ccd2c5e89efec6c28b7613f1d605cac13`, PR #34 `eafa57c07cbbf405d4d60c914e2a76e557037437`, PR #37 `b3a6d1a09f28f257bf61600809abf511384498c6`, PR #38 `ac499f3e9abbddd9920641b5a41f51816bccc5d2`, PR #43 `f41c387c62998de2d136ce8f4a110b4cb22906ac`, PR #51 `1a8f90dd15f37ffc86b8a0efd217a8b2812e5f99`, and PR #53 `976945dbbe22b0b8fa7893150e2723738a0ff484`. PR #19 is the current document branch; PR #41 is feature-base PR head `2346afe6a063f502517ee235d6c3e87488da8357` on base `8881d3966e3e9da29b8dce990a95295a2780618b`; re-query both before merge.
+Tracked current direct-to-develop heads: PR #17 `ebf24a6ec69855a794dc03f4c665a958c37e17a3`, PR #18 `35d3e55ccd2c5e89efec6c28b7613f1d605cac13`, PR #34 `eafa57c07cbbf405d4d60c914e2a76e557037437`, PR #37 `b3a6d1a09f28f257bf61600809abf511384498c6`, PR #38 `93ca6383d2b14c6793ecdfe42c5da1f400168a35`, PR #43 `f41c387c62998de2d136ce8f4a110b4cb22906ac`, PR #51 `1a8f90dd15f37ffc86b8a0efd217a8b2812e5f99`, and PR #53 `976945dbbe22b0b8fa7893150e2723738a0ff484`. PR #19 is the current document branch; PR #41 is feature-base PR head `2346afe6a063f502517ee235d6c3e87488da8357` on base `8881d3966e3e9da29b8dce990a95295a2780618b`; re-query both before merge.
 Historical Keyverse stack-only merges: PR #6 `b9b3d5c49367d0b128c87aa478d8921eb1f6c349` merged as `bb23d654f58ea1afdb4087fafdf47caf1de1aaea`, PR #7 `25350d6177244d9a39ae3275feca813d5b4a737d` merged as `b44f3e9f83b637a9a580468be5b5b5f95422127b`, and PR #16 `8dfa6bae1a9366335f15294f06abf8313f1380e4` merged as `34a1b25c38c78f367bc77b90301ef0f68a1ad8ba`. These PRs are closed; their feature-branch merges did not update protected `develop`.
 Historical evidence-lifecycle stack-only merges: PR #20 `e91b2384177451ebf80858e518d729e258c40f00` merged as `781b6e3b9f4c33c7d82e46d2881777ea470ff875`, PR #21 `04facc110a7437f7a86b8572707ffb5f65e0515e` merged as `b25cd7dbb9cb1e823f184acc67cea0aa8cea7280`, PR #22 `9c1923e8e6f6145d0f789a97db4dd15f94f2adf3` merged into its feature branch as `04facc110a7437f7a86b8572707ffb5f65e0515e`, and PR #50 `ba78e4790f3e361826991455ce83634004f2875d` merged as `8d355811a2a6b809cfa7e4c03e36a1c6f48bdf49`. PRs #23–#26 and #31 remain historical feature-branch merges; none is an active child PR in the current open-PR snapshot.
 
@@ -108,7 +108,7 @@ independent approval.
 
 The Keyverse buyer-boundary work is represented by direct-to-`develop` PR #38,
 the replacement for closed PR #5. Its current exact head is
-`ac499f3e9abbddd9920641b5a41f51816bccc5d2`; it adds the bounded OIDC/JWKS
+`93ca6383d2b14c6793ecdfe42c5da1f400168a35`; it adds the bounded OIDC/JWKS
 loader, verified-principal route enforcement, tenant record isolation, and
 the undefined-offset provider-clock rejection described below. PRs #6, #7,
 and #16 are closed stack-only history with merge commits
@@ -137,13 +137,14 @@ requirement-level control diff, or `control_framework` publication; two
 approving reviews and last-push approval remain outstanding.
 
 PR #38 is the direct-to-`develop` replacement for closed PR #5. Its exact head
-`ac499f3e9abbddd9920641b5a41f51816bccc5d2` adds an optional caller-owned,
+`93ca6383d2b14c6793ecdfe42c5da1f400168a35` adds an optional caller-owned,
 atomic JTI replay guard, enforces scope authorization before replay-token
 consumption, and rejects provider refresh clocks whose timezone has no defined
 UTC offset. The exact head has 98 local tests with 100% statement/branch/
 docstring coverage, full lint/compile/lock/actionlint/Semgrep/pip-audit
-evidence, and hosted checks were recreated after the latest security repair;
-independent approval and last-push approval remain absent.
+evidence, and the latest hosted observation is 0 success, 13 pending, and 7
+skipped checks after the changelog repair; independent approval and last-push
+approval remain absent.
 
 PR #51 adds the GRC OpenTelemetry request boundary on `develop`. Its current
 fork head is `1a8f90dd15f37ffc86b8a0efd217a8b2812e5f99`, including the sampled-off
@@ -344,7 +345,7 @@ merge, force-push, or predecessor-head evidence is valid.
 | [#33](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/33) | `6648cc7fc255ed6711275887ba5cd5e857073d41` (2026-08-21) | Closed, stack-only | Obligation applicability was merged into `feat/internal-control-model` as `8881d3966e3e9da29b8dce990a95295a2780618b`; this is historical feature-branch evidence, not protected `develop` integration. |
 | [#34](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/34) | `eafa57c07cbbf405d4d60c914e2a76e557037437` (2026-08-22) | Ready, merge-blocked, review-required | Issue #30 buyer-workspace design authority on `develop`; the exact head adds the Open deficiencies exact-value row, access-denied Request access action, explicit local-developer-preview boundary in both locales, CSS lint repair, release-specific NIST SP 800-53 Release 5.2.0 sources, and Storybook reuse of the real index markup. Storybook build, five-story Chromium checks, three page interactions, and six Python design-contract tests pass; hosted checks were recreated and independent approval remains absent. |
 | [#37](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/37) | `b3a6d1a09f28f257bf61600809abf511384498c6` (2026-08-22) | Ready, merge-blocked, review-required | Issue #29 catalog-provenance slice on `develop`; the current repair accepts explicit HTTPS `:443` while rejecting non-default ports, skips policy DDL on partial stores, and enforces matching release/import source versions at database and snapshot boundaries. Exact-head local evidence is 79 passing tests with 100% statement/branch/docstring coverage, PostgreSQL clean-install/idempotent migration evidence, and quality/security checks green. Hosted required runs were recreated after this push; independent approval is absent. |
-| [#38](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/38) | `ac499f3e9abbddd9920641b5a41f51816bccc5d2` (2026-08-22) | Ready, merge-blocked, review-required | Replacement for closed PR #5. The exact head adds the optional caller-owned atomic JTI replay guard, scope-before-consume ordering, and undefined-offset provider-clock rejection; local evidence is 98 passing tests with 100% statement/branch/docstring coverage plus lint/compile/lock/actionlint/Semgrep/pip-audit, while hosted checks were recreated and independent approval remains absent. |
+| [#38](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/38) | `93ca6383d2b14c6793ecdfe42c5da1f400168a35` (2026-08-22) | Ready, merge-blocked, review-required | Replacement for closed PR #5. The exact head adds the optional caller-owned atomic JTI replay guard, scope-before-consume ordering, undefined-offset provider-clock rejection, and the ADR 0004 changelog entry; local evidence is 98 passing tests with 100% statement/branch/docstring coverage plus lint/compile/lock/actionlint/Semgrep/pip-audit, while hosted checks are pending (0 success, 13 pending, 7 skipped) and independent approval remains absent. |
 | [#39](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/39) | `c78ef79499d05e13a8651ccfa2a2979724323160` (2026-08-22) | Merged, stack-only | The baseline follow-up was merged into PR #19's feature branch; this historical row is superseded by the live PR #19 row below. |
 | [#40](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/40) | `4daab149d364f6117e31df22e14e11ad35d230b2` (2026-08-21) | Merged, stack-only | Scorecard pinned-dependencies fix for PR #34; merged into the buyer-workspace feature branch as `59e1a3cce5a794f1b6a33a9f5128a1ccccf95109`. This did not update protected `develop`; its checks and review state do not transfer to current PR #34. |
 | [#41](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/41) | `2346afe6a063f502517ee235d6c3e87488da8357` (2026-08-22) | Ready, merge-blocked, review-required | Replacement for closed PR #36, normally restacked on feature base `8881d3966e3e9da29b8dce990a95295a2780618b`; verified merge-result tree `845d082e0f7bf8ef81d819287c8c7e8c4d01b094`. Local 165-test 100% statement/branch/docstring, Ruff, compile, lock, package, actionlint, Semgrep, and wheel-install evidence passes; hosted review remains pending and independent approval is absent. |
