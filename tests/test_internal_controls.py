@@ -822,6 +822,7 @@ def test_migration_backfills_preexisting_direct_binding_as_unassessed() -> None:
         session.commit()
 
     apply_schema_migrations(engine)
+    apply_schema_migrations(engine)
     with session_factory() as session:
         usage = session.execute(
             text(
