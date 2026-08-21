@@ -262,6 +262,24 @@ def create_app(
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return _serialize_catalog_release(release)
 
+    @app.get("/catalog/releases")
+    def get_catalog_releases(
+        session: Session = Depends(get_session),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """List published catalog release identities for governed review."""
+        require_purpose(x_actor_id, x_purpose, PurposeCode.CATALOG_GOVERNANCE)
+        releases = (
+            session.query(CatalogRelease)
+            .order_by(CatalogRelease.published_at.desc())
+            .all()
+        )
+        return {
+            "next_action": "Review the release change set before using it in compliance decisions.",
+            "releases": [_serialize_catalog_release(release) for release in releases],
+        }
+
     @app.post("/policy-documents", status_code=201)
     def post_policy_document(
         body: dict[str, Any],

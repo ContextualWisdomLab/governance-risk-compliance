@@ -903,6 +903,11 @@ def test_catalog_routes_execute_the_local_governance_workflow() -> None:
     )
     assert release_response.status_code == 201
     assert release_response.json()["release_status"] == "published"
+    releases_response = client.get("/catalog/releases", headers=_HEADERS)
+    assert releases_response.status_code == 200
+    assert releases_response.json()["releases"][0]["catalog_release_id"] == release_response.json()["catalog_release_id"]
+    assert releases_response.json()["next_action"].startswith("Review the release")
+    assert client.get("/catalog/releases").status_code == 401
     assert client.post(
         "/catalog/source-artifacts",
         json={
