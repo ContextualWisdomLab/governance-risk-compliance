@@ -117,6 +117,18 @@ def test_release_mode_rejects_backslash_repository_path(
     assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2
 
 
+def test_release_mode_rejects_embedded_null_repository_path(
+    tmp_path: Path,
+) -> None:
+    """A path rejected by the OS remains a typed manifest validation error."""
+    path = tmp_path / "manifest.json"
+    evidence = _bound_repository_evidence()
+    evidence["path"] = "tests/\u0000evidence.py"
+    _write_manifest(path, _all_ready_manifest([evidence]))
+
+    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2
+
+
 def test_release_mode_rejects_missing_repository_root(tmp_path: Path) -> None:
     """Evidence verification fails when the reviewed repository tree is absent."""
     path = tmp_path / "manifest.json"

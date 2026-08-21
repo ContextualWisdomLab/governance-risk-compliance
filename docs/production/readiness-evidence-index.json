@@ -5,7 +5,7 @@
   "components": [
     {
       "path": "cwl_grc/production_readiness.py",
-      "git_blob_oid": "e1916f02e99e3ac904e18ba5e1ed8e2d1a78e25d"
+      "git_blob_oid": "4ebf8bb30ded64b914f07bd0769d7bb5c8ab5bc8"
     },
     {
       "path": "tests/test_production_readiness.py",
@@ -13,7 +13,7 @@
     },
     {
       "path": "tests/test_production_readiness_evidence_binding.py",
-      "git_blob_oid": "77741e2831533d7b8149d4a208e03129dee4715a"
+      "git_blob_oid": "39f5aab9731f4b36e6e7bf74e94231fdf386fc52"
     },
     {
       "path": ".github/workflows/production-readiness.yml",

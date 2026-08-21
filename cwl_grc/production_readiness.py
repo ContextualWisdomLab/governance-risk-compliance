@@ -153,7 +153,7 @@ def verify_repository_evidence(
     """Verify every evidence path and SHA-256 digest in one reviewed tree."""
     try:
         root = repository_root.resolve(strict=True)
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         raise ReadinessManifestError(
             f"Repository root {repository_root} cannot be resolved."
         ) from exc
@@ -166,7 +166,7 @@ def verify_repository_evidence(
             candidate = root / evidence["path"]
             try:
                 resolved = candidate.resolve(strict=True)
-            except OSError as exc:
+            except (OSError, ValueError) as exc:
                 raise ReadinessManifestError(
                     f"{path}.path does not identify a readable repository file."
                 ) from exc
