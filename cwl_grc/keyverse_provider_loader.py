@@ -142,7 +142,7 @@ class KeyverseDocumentFetcher(Protocol):
         maximum_bytes: int,
     ) -> bytes:
         """Return exact response bytes or fail without following redirects."""
-        ...
+        pass  # pragma: no cover
 
 
 class _ConnectionLike(Protocol):
@@ -150,15 +150,15 @@ class _ConnectionLike(Protocol):
 
     def request(self, method: str, target: str, headers: dict[str, str]) -> None:
         """Issue one request."""
-        ...
+        pass  # pragma: no cover
 
     def getresponse(self) -> Any:
         """Return one response object."""
-        ...
+        pass  # pragma: no cover
 
     def close(self) -> None:
         """Close the transport."""
-        ...
+        pass  # pragma: no cover
 
 
 ConnectionFactory = Callable[[str, int, str, float], _ConnectionLike]
