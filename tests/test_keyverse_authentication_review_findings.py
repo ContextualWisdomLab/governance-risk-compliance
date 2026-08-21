@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Any
 
@@ -100,10 +101,19 @@ def _settings(**overrides: Any) -> KeyverseAccessTokenSettings:
     return KeyverseAccessTokenSettings(**values)
 
 
-def _verifier(jwk: dict[str, Any]) -> KeyverseAccessTokenVerifier:
+def _verifier(
+    jwk: dict[str, Any],
+    *,
+    token_replay_guard: Callable[[str], bool] | None = None,
+) -> KeyverseAccessTokenVerifier:
     """Build the closed verifier with a deterministic UTC clock."""
     key_set = parse_keyverse_jwks(json.dumps({"keys": [jwk]}).encode())
-    return KeyverseAccessTokenVerifier(_settings(), key_set, now=lambda: NOW)
+    return KeyverseAccessTokenVerifier(
+        _settings(),
+        key_set,
+        now=lambda: NOW,
+        token_replay_guard=token_replay_guard,
+    )
 
 
 def test_impossible_access_token_time_windows_are_rejected_before_clock_skew() -> None:
@@ -190,6 +200,25 @@ def test_registered_full_access_token_media_type_remains_supported() -> None:
         _token(private_key, _claims(), typ="application/at+jwt")
     )
     assert principal.actor_id == "subject-1"
+
+
+def test_optional_token_replay_guard_rejects_a_reused_jti() -> None:
+    """A caller-owned atomic JTI guard can enforce one-time token use."""
+    private_key, jwk = _material()
+    seen: set[str] = set()
+
+    def replay_guard(token_id: str) -> bool:
+        """Return whether this JTI was already observed in the deterministic test."""
+        if token_id in seen:
+            return True
+        seen.add(token_id)
+        return False
+
+    verifier = _verifier(jwk, token_replay_guard=replay_guard)
+    token = _token(private_key, _claims())
+    assert verifier.verify(token).token_id == "token-1"
+    with pytest.raises(AccessTokenValidationError, match="replayed"):
+        verifier.verify(token)
 
 
 def test_resource_server_settings_reject_edge_whitespace_without_normalizing() -> None:
