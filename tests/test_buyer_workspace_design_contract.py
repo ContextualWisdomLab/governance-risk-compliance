@@ -60,6 +60,10 @@ def test_storybook_inventory_covers_reusable_states_with_a11y_enabled() -> None:
     assert "@storybook/web-components-vite" in main
     assert "@storybook/addon-a11y" in main
     assert "./index.html?raw" in stories
+    assert "accessDenied = true" in stories
+    assert "stale = true" in stories
+    assert "renderFixture({ accessDenied: true, stale: false })" in stories
+    assert "renderFixture({ accessDenied: false, stale: true })" in stories
     for story in ("ComplianceOfficerDesktop", "ComplianceOfficerMobile", "AccessDenied", "StaleEvidence"):
         assert story in stories
     assert '"storybook": "10.5.10"' in package

@@ -12,7 +12,7 @@ const meta = {
 
 export default meta;
 
-function renderFixture({ mobile = false, accessDenied = false, stale = false, locale = 'en' } = {}) {
+function renderFixture({ mobile = false, accessDenied = true, stale = true, locale = 'en' } = {}) {
   const host = document.createElement('div');
   host.style.width = '100%';
   host.style.maxWidth = mobile ? '390px' : '1376px';
@@ -31,6 +31,6 @@ function renderFixture({ mobile = false, accessDenied = false, stale = false, lo
 
 export const ComplianceOfficerDesktop = { render: () => renderFixture() };
 export const ComplianceOfficerMobile = { render: () => renderFixture({ mobile: true }), parameters: { viewport: { defaultViewport: 'mobile1' } } };
-export const AccessDenied = { render: () => renderFixture({ accessDenied: true }) };
-export const StaleEvidence = { render: () => renderFixture({ stale: true }) };
+export const AccessDenied = { render: () => renderFixture({ accessDenied: true, stale: false }) };
+export const StaleEvidence = { render: () => renderFixture({ accessDenied: false, stale: true }) };
 export const KoreanLocale = { render: () => renderFixture({ locale: 'ko' }) };
