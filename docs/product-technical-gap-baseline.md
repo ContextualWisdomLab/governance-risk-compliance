@@ -164,10 +164,11 @@ current hosted observation is 17 successful, 9 skipped, and 1 failure. The
 findings, and Trivy, dependency review, and Scorecard succeeded. This is
 reproducible infrastructure evidence, not a source-vulnerability verdict;
 no source revert is inferred. The competing central `.github` PR #1208 was closed unmerged;
-the causal repairs are now owned by open PR #1158 at exact head
-`092d838cc2f984030e5885ca66498c55082ab769`, PR #1153 at exact head
-`1f8878d78cb2f0aed68964ea5fabf5679526e78b`, and PR #1198 at exact head
-`4d3d24aa404959f5067735fec0558d5924ade590` (the related scheduler PR #1203
+the causal repairs are now owned by open ContextualWisdomLab/.github#1158 at
+exact head `4748ced3e09c8c684d34b1b6f763c450f6d4e218`, ContextualWisdomLab/.github#1153
+at exact head `ab1b5dea287f7ba1ae5a9052bb4303ec49435e28`, and
+ContextualWisdomLab/.github#1198 at exact head
+`33cdcad75af2dc9aab1ea5e2b61858581d25ae89` (the related scheduler PR #1203
 is already merged). Normal required checks and independent approval remain
 outstanding.
 
