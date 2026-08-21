@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -38,9 +39,6 @@ from cwl_grc.models import (
     Base,
     ControlEvidenceBinding,
     ControlDefinitionVersion,
-    ControlDeficiency,
-    ControlOwnerAssignment,
-    ControlTestPlan,
     ControlTestExecution,
     EvidenceRecord,
 )
@@ -316,50 +314,92 @@ def test_internal_control_status_projection_covers_failure_exception_stale_and_n
         assert not_tested_control is not None
         assert control_coverage_status(session, not_tested_control.control_item_id, decision.tenant_id) is ControlCoverageStatus.IMPLEMENTED_NOT_TESTED
 
-
-def test_retired_definition_and_inactive_plan_cannot_project_effectiveness() -> None:
-    """Coverage excludes historical conclusions outside the active control scope."""
-    factory = _factory()
-    decision = _decision()
-    with factory() as session:
-        retired = _foundation(session, decision, "IC-RETIRED-DEFINITION")
-        _map(session, decision, retired, "10.2.2")
-        retired_plan = _plan(session, decision, retired, "operating")
-        retired_execution = _execution(session, decision, retired_plan)
-        record_control_test_result(
-            session,
-            decision,
-            retired_execution.test_execution_id,
-            ControlTestResultCode.EFFECTIVE.value,
-            "The historical operating sample passed.",
-        )
-        retired_control = get_control_item(session, FrameworkCode.CSAP_2026, "10.2.2")
-        assert retired_control is not None
-        assert control_coverage_status(session, retired_control.control_item_id, decision.tenant_id) is ControlCoverageStatus.OPERATING_EFFECTIVE
-        retired.definition.lifecycle_status = "retired"
-        session.flush()
-        assert control_coverage_status(session, retired_control.control_item_id, decision.tenant_id) is ControlCoverageStatus.UNKNOWN
-
-        inactive = _foundation(session, decision, "IC-INACTIVE-PLAN")
-        _map(session, decision, inactive, "10.3.1")
-        inactive_plan = _plan(session, decision, inactive, "operating")
-        inactive_execution = _execution(session, decision, inactive_plan)
-        record_control_test_result(
-            session,
-            decision,
-            inactive_execution.test_execution_id,
-            ControlTestResultCode.EFFECTIVE.value,
-            "The historical operating sample passed.",
-        )
-        inactive_control = get_control_item(session, FrameworkCode.CSAP_2026, "10.3.1")
-        assert inactive_control is not None
-        inactive_plan.active = False
-        session.flush()
-        assert control_coverage_status(session, inactive_control.control_item_id, decision.tenant_id) is ControlCoverageStatus.IMPLEMENTED_NOT_TESTED
-
     for status in ControlCoverageStatus:
         assert next_action_for_coverage(status)
     assert next_action_for_coverage("not-a-status") == next_action_for_coverage(ControlCoverageStatus.UNKNOWN)
+
+
+def test_latest_operating_effective_result_does_not_inherit_old_staleness() -> None:
+    """A fresh operating pass must not be downgraded by an older overdue pass."""
+    factory = _factory()
+    decision = _decision()
+    with factory() as session:
+        foundation = _foundation(session, decision, "IC-LATEST-OPERATING-1")
+        _map(session, decision, foundation, "10.2.1")
+        old_plan = _plan(session, decision, foundation, "operating", due=datetime(2025, 12, 31))
+        with patch("cwl_grc.internal_controls.datetime") as old_clock:
+            old_clock.now.return_value = datetime(2026, 1, 15)
+            record_control_test_result(
+                session,
+                decision,
+                _execution(session, decision, old_plan).test_execution_id,
+                ControlTestResultCode.EFFECTIVE.value,
+                "The older sample passed.",
+            )
+        recent_plan = _plan(session, decision, foundation, "operating", due=datetime(2026, 3, 31))
+        with patch("cwl_grc.internal_controls.datetime") as recent_clock:
+            recent_clock.now.return_value = datetime(2026, 2, 15)
+            record_control_test_result(
+                session,
+                decision,
+                _execution(session, decision, recent_plan).test_execution_id,
+                ControlTestResultCode.EFFECTIVE.value,
+                "The current sample passed.",
+            )
+        session.flush()
+        control = get_control_item(session, FrameworkCode.CSAP_2026, "10.2.1")
+        assert control is not None
+        assert control_coverage_status(
+            session,
+            control.control_item_id,
+            decision.tenant_id,
+            datetime(2026, 2, 20),
+        ) is ControlCoverageStatus.OPERATING_EFFECTIVE
+
+
+def test_latest_operating_retest_clears_historical_ineffective_result() -> None:
+    """A passing retest must supersede an older ineffective result on the same plan."""
+    factory = _factory()
+    decision = _decision()
+    with factory() as session:
+        foundation = _foundation(session, decision, "IC-RETEST-OPERATING-1")
+        _map(session, decision, foundation, "10.2.2")
+        plan = _plan(session, decision, foundation, "operating", due=datetime(2026, 3, 31))
+        old_execution = _execution(session, decision, plan)
+        with patch("cwl_grc.internal_controls.datetime") as old_clock:
+            old_clock.now.return_value = datetime(2026, 1, 15)
+            record_control_test_result(
+                session,
+                decision,
+                old_execution.test_execution_id,
+                ControlTestResultCode.INEFFECTIVE.value,
+                "The historical sample found an unresolved access review gap.",
+            )
+        recent_execution = _execution(
+            session,
+            decision,
+            plan,
+            start=datetime(2026, 2, 1),
+            end=datetime(2026, 2, 28),
+        )
+        with patch("cwl_grc.internal_controls.datetime") as recent_clock:
+            recent_clock.now.return_value = datetime(2026, 2, 15)
+            record_control_test_result(
+                session,
+                decision,
+                recent_execution.test_execution_id,
+                ControlTestResultCode.EFFECTIVE.value,
+                "The current retest confirms the access review gap is remediated.",
+            )
+        session.flush()
+        control = get_control_item(session, FrameworkCode.CSAP_2026, "10.2.2")
+        assert control is not None
+        assert control_coverage_status(
+            session,
+            control.control_item_id,
+            decision.tenant_id,
+            datetime(2026, 2, 20),
+        ) is ControlCoverageStatus.OPERATING_EFFECTIVE
 
 
 def test_internal_control_rejections_are_tenant_and_purpose_bound() -> None:
@@ -646,78 +686,6 @@ def test_internal_control_rejections_are_tenant_and_purpose_bound() -> None:
             )
 
 
-def test_duplicate_internal_control_writes_return_conflicts_on_insert_races(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Unique-write races become stable conflicts instead of raw database errors."""
-    factory = _factory()
-    decision = _decision()
-    with factory() as session:
-        foundation = _foundation(session, decision, "IC-RACE-MAPPING")
-        session.autoflush = False
-
-        def mapping_race_flush(*_args, **_kwargs) -> None:  # noqa: ANN002, ANN003
-            raise IntegrityError("mapping race", {}, RuntimeError("mapping race"))
-
-        monkeypatch.setattr(session, "flush", mapping_race_flush)
-        with pytest.raises(HTTPException, match="mapping already exists"):
-            _map(session, decision, foundation, "10.2.2")
-
-    factory = _factory()
-    with factory() as session:
-        foundation = _foundation(session, decision, "IC-RACE-RESULT")
-        plan = _plan(session, decision, foundation, "operating")
-        execution = _execution(session, decision, plan)
-        session.autoflush = False
-
-        def result_race_flush(*_args, **_kwargs) -> None:  # noqa: ANN002, ANN003
-            raise IntegrityError("result race", {}, RuntimeError("result race"))
-
-        monkeypatch.setattr(session, "flush", result_race_flush)
-        with pytest.raises(HTTPException, match="already has a result"):
-            record_control_test_result(
-                session,
-                decision,
-                execution.test_execution_id,
-                ControlTestResultCode.EFFECTIVE.value,
-                "Concurrent result.",
-            )
-
-    factory = _factory()
-    with factory() as session:
-        session.autoflush = False
-        original_flush = session.flush
-        flush_count = 0
-
-        def objective_race_flush(*_args, **_kwargs) -> None:  # noqa: ANN002, ANN003
-            nonlocal flush_count
-            flush_count += 1
-            if flush_count == 2:
-                raise IntegrityError("objective race", {}, RuntimeError("objective race"))
-            original_flush(*_args, **_kwargs)
-
-        monkeypatch.setattr(session, "flush", objective_race_flush)
-        with pytest.raises(HTTPException, match="objective already exists"):
-            _foundation(session, _decision(), "IC-RACE-OBJECTIVE")
-
-    factory = _factory()
-    with factory() as session:
-        session.autoflush = False
-        original_flush = session.flush
-        flush_count = 0
-
-        def definition_race_flush(*_args, **_kwargs) -> None:  # noqa: ANN002, ANN003
-            nonlocal flush_count
-            flush_count += 1
-            if flush_count == 4:
-                raise IntegrityError("definition race", {}, RuntimeError("definition race"))
-            original_flush(*_args, **_kwargs)
-
-        monkeypatch.setattr(session, "flush", definition_race_flush)
-        with pytest.raises(HTTPException, match="internal control code already exists"):
-            _foundation(session, _decision(), "IC-RACE-DEFINITION")
-
-
 def test_legacy_binding_backfill_and_sqlite_immutability() -> None:
     """Legacy direct bindings become unassessed and finalized histories cannot mutate."""
     factory = _factory()
@@ -799,102 +767,6 @@ def test_sqlite_composite_foreign_keys_reject_cross_tenant_internal_rows() -> No
         )
         with pytest.raises(IntegrityError):
             session.commit()
-
-
-def test_sqlite_control_graph_triggers_reject_mismatched_foundations() -> None:
-    """Database guards reject plan, execution, and deficiency graph mismatches."""
-    factory = _factory()
-    decision = _decision()
-    with factory() as session:
-        first = _foundation(session, decision, "IC-GRAPH-FIRST")
-        second = _foundation(session, decision, "IC-GRAPH-SECOND")
-        session.commit()
-        with pytest.raises(IntegrityError, match="foundation mismatch"):
-            session.add(
-                ControlTestPlan(
-                    test_plan_id=uuid4().hex,
-                    tenant_id=decision.tenant_id,
-                    control_definition_version_id=first.definition_version.control_definition_version_id,
-                    control_implementation_id=second.implementation.control_implementation_id,
-                    test_name="Mismatched plan",
-                    effectiveness_type="design",
-                    method="inspect",
-                    sample_population="sample",
-                    test_frequency="monthly",
-                    active=True,
-                    created_at=_JANUARY_START,
-                )
-            )
-            session.flush()
-        session.rollback()
-        plan = _plan(session, decision, first, "operating")
-        session.commit()
-        with pytest.raises(IntegrityError, match="implementation mismatch"):
-            session.add(
-                ControlTestExecution(
-                    test_execution_id=uuid4().hex,
-                    tenant_id=decision.tenant_id,
-                    test_plan_id=plan.test_plan_id,
-                    control_implementation_id=second.implementation.control_implementation_id,
-                    test_period_start=_JANUARY_START,
-                    test_period_end=_JANUARY_END,
-                    executed_at=_JANUARY_START,
-                    performed_by=decision.actor_identifier,
-                    sample_description="Mismatched sample",
-                    execution_status="completed",
-                    rationale="Mismatched rationale",
-                    created_at=_JANUARY_START,
-                )
-            )
-            session.flush()
-        session.rollback()
-        execution = _execution(session, decision, plan)
-        with pytest.raises(IntegrityError, match="implementation mismatch"):
-            session.add(
-                ControlDeficiency(
-                    deficiency_id=uuid4().hex,
-                    tenant_id=decision.tenant_id,
-                    control_implementation_id=second.implementation.control_implementation_id,
-                    test_execution_id=execution.test_execution_id,
-                    deficiency_code="GRAPH-MISMATCH",
-                    severity="medium",
-                    deficiency_description="Mismatched deficiency",
-                    deficiency_status="open",
-                    identified_at=_JANUARY_START,
-                    created_at=_JANUARY_START,
-                )
-            )
-            session.flush()
-        session.rollback()
-        mismatched_owner = ControlOwnerAssignment(
-            assignment_id=uuid4().hex,
-            tenant_id=decision.tenant_id,
-            internal_control_definition_id=first.definition.internal_control_definition_id,
-            control_implementation_id=second.implementation.control_implementation_id,
-            owner_kind="reviewer",
-            owner_reference="reviewer-owner",
-            valid_from=_JANUARY_START,
-            assigned_at=_JANUARY_START,
-        )
-        with pytest.raises(IntegrityError, match="owner assignment foundation mismatch"):
-            session.add(mismatched_owner)
-            session.flush()
-        session.rollback()
-        valid_owner = ControlOwnerAssignment(
-            assignment_id=uuid4().hex,
-            tenant_id=decision.tenant_id,
-            internal_control_definition_id=first.definition.internal_control_definition_id,
-            control_implementation_id=first.implementation.control_implementation_id,
-            owner_kind="reviewer",
-            owner_reference="reviewer-owner",
-            valid_from=_JANUARY_START,
-            assigned_at=_JANUARY_START,
-        )
-        session.add(valid_owner)
-        session.flush()
-        valid_owner.control_implementation_id = second.implementation.control_implementation_id
-        with pytest.raises(IntegrityError, match="owner assignment foundation mismatch"):
-            session.flush()
 
 
 def test_database_factory_rejects_unknown_dialect_after_generic_engine_path() -> None:

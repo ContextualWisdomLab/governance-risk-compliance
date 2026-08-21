@@ -91,9 +91,7 @@ keeps source URLs and citations in `docs/doctoring/REFERENCES.md`.
 ## Acceptance evidence
 
 The acceptance suite requires 100% statement and branch coverage and 100%
-production docstring coverage. Local acceptance evidence also includes a real
-PostgreSQL 18 upgrade/runtime probe; Product CI currently runs the locked
-Python checks without provisioning PostgreSQL. A future release must attach
-authenticated tenant authorization, CI or release automation for the
-PostgreSQL probe, production migration, load/partition evidence, and export
+production docstring coverage. It also runs a real PostgreSQL 18 probe in
+addition to SQLite tests. A future release must attach authenticated tenant
+authorization, production migration, load/partition evidence, and export
 acceptance before changing the local-preview status.

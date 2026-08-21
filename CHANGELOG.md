@@ -30,8 +30,6 @@
 - Proposed availability, mutation-success, audit-write, and recovery SLO/error-budget policy with bounded-label burn-rate alert thresholds.
 - Tenant-scoped internal-control model: immutable definition versions, scoped implementations and owners, reviewed many-to-many catalog mappings, design/operating tests, exceptions, deficiencies, evidence usage, and explicit coverage statuses.
 - Additive migration that classifies preexisting direct evidence bindings as `unassessed` without inventing effectiveness.
-- Database-enforced control-graph consistency for test plans, executions, and deficiencies; retired definitions and inactive plans no longer project positive coverage.
-- Keyverse-enabled catalog and coverage reads now require the signed tenant and `grc.control.read` scope.
 
 ### Security
 
@@ -54,7 +52,6 @@
 - Require retention metadata and a verified `grc.evidence.retention` purpose for legal-hold changes; leave destructive disposition and remote access disabled until their operating contracts exist.
 - Keep `/healthz` dependency-free; require database, schema receipts, seed rows, integrity guards, key round-trip, and environment checks before startup admits traffic.
 - Enable SQLite foreign-key enforcement and require PostgreSQL-compatible boolean constraints for the internal-control schema.
-- Stage PostgreSQL schema creation around the compatibility indexes needed before creating `evidence_usage`, allowing existing pre-tenant stores to upgrade safely.
 
 ### ADR
 
