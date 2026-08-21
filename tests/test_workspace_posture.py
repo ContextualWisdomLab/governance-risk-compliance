@@ -55,6 +55,12 @@ def test_posture_preview_exposes_truthful_not_assessed_boundary() -> None:
         == body["metrics"]["official_control_count"]
     )
     assert {row["status"] for row in body["exact_value_rows"]} == {"not_assessed"}
+    assert all(row["catalog_edition"] for row in body["exact_value_rows"])
+    assert all(
+        row["catalog_source_url"].startswith("https://")
+        for row in body["exact_value_rows"]
+    )
+    assert body["policy_gap_rows"] == []
     assert all("payload_text" not in row for row in body["exact_value_rows"])
 
 
@@ -68,6 +74,7 @@ def test_legacy_evidence_remains_unknown_until_effectiveness_exists() -> None:
 
     assert row["status"] == "unknown"
     assert "effectiveness" in row["reason"]
+    assert row["catalog_edition"] == "2026.07"
     assert body["metrics"]["legacy_evidence_only_count"] == 1
     assert body["metrics"]["effective_control_count"] == 0
 
@@ -94,5 +101,6 @@ def test_posture_reports_policy_gap_count_without_claiming_certification() -> No
     body = client.get("/workspace/posture").json()
 
     assert body["metrics"]["policy_gap_count"] == 1
+    assert body["policy_gap_rows"][0]["catalog_identifier"] == "10.2.1"
     assert body["posture_status"] == "not_assessed"
     assert any("internal controls" in action for action in body["next_actions"])

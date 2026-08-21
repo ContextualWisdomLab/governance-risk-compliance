@@ -38,6 +38,8 @@ def build_preview_posture(session: Session) -> dict[str, Any]:
         status_rows.append(
             {
                 "framework": item.framework_key,
+                "catalog_edition": item.control_framework.edition_label,
+                "catalog_source_url": item.control_framework.source_url,
                 "catalog_identifier": item.catalog_identifier,
                 "control_title": item.control_title,
                 "status": status,
@@ -66,6 +68,17 @@ def build_preview_posture(session: Session) -> dict[str, Any]:
             "policy_gap_count": len(policy_gaps),
         },
         "exact_value_rows": status_rows,
+        "policy_gap_rows": [
+            {
+                "policy_document_id": gap.policy_document_id,
+                "policy_title": gap.policy_title,
+                "version_number": gap.version_number,
+                "framework": gap.framework,
+                "catalog_identifier": gap.catalog_identifier,
+                "control_title": gap.control_title,
+            }
+            for gap in policy_gaps
+        ],
         "next_actions": [
             "Configure Keyverse-backed identity and tenant authorization before remote exposure.",
             "Define internal controls and effectiveness tests before calling a control effective.",
