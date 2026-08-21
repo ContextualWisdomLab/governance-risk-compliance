@@ -183,6 +183,35 @@ def test_readiness_reports_schema_receipt_seed_guard_and_key_failures() -> None:
     )
 
 
+def test_readiness_rejects_missing_required_purpose_with_matching_row_count() -> None:
+    """Readiness verifies required purpose identifiers, not only their row count."""
+    app = _app()
+    with app.state.session_factory.kw["bind"].begin() as connection:
+        connection.execute(
+            text(
+                "DELETE FROM authorization_purpose "
+                "WHERE purpose_code = 'evidence_retention'"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO authorization_purpose "
+                "(purpose_code, purpose_label, purpose_description) "
+                "VALUES ('unsupported', 'Unsupported', 'Unsupported')"
+            )
+        )
+
+    report = readiness_payload(
+        app.state.session_factory,
+        app.state.evidence_cipher,
+        LOCAL_PREVIEW_ENVIRONMENT,
+        None,
+        app.state.lifecycle,
+    )
+    assert report["status"] == "not_ready"
+    assert report["checks"]["seed_state"]["reason_code"] == "seed_state_incomplete"
+
+
 def test_startup_rejects_production_preview_and_unknown_environment(monkeypatch) -> None:  # noqa: ANN001
     """Production cannot start behind the local-only boundary or unknown environment."""
     monkeypatch.setenv("CWL_GRC_ENVIRONMENT", "production")
