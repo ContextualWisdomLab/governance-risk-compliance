@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import time
+import json
 from collections.abc import Awaitable, Callable, Iterator
 from datetime import datetime
 from typing import Any
@@ -31,6 +32,13 @@ from cwl_grc.evidence import (
     record_encryption_envelope,
     release_evidence_legal_hold,
 )
+from cwl_grc.evidence_requests import (
+    create_evidence_request,
+    list_evidence_requests,
+    next_action_for_evidence_request,
+    review_evidence_request,
+    submit_evidence_request,
+)
 from cwl_grc.health import (
     LOCAL_PREVIEW_ENVIRONMENT,
     LifecycleState,
@@ -44,7 +52,7 @@ from cwl_grc.keyverse_authentication import (
     KeyverseAccessTokenVerifier,
     require_access_scopes,
 )
-from cwl_grc.models import ComplianceObligation, ControlItem, EvidenceRecord
+from cwl_grc.models import AuditEvent, ComplianceObligation, ControlItem, EvidenceRecord
 from cwl_grc.obligations import (
     ApplicabilityCode,
     ObligationWorkItem,
@@ -563,6 +571,7 @@ def create_app(
             upcoming_days=upcoming_days,
         )
         policy_gaps = list_policy_gaps(session, None, tenant_id=decision.tenant_id)
+        evidence_requests = list_evidence_requests(session, decision)
         unresolved = {
             ControlCoverageStatus.UNKNOWN,
             ControlCoverageStatus.UNASSESSED,
@@ -583,6 +592,10 @@ def create_app(
         review_queue_counts = {
             queue: sum(item.queue == queue for item in obligations)
             for queue in ("overdue", "upcoming", "none")
+        }
+        evidence_request_state_counts = {
+            state: sum(item.request_state == state for item in evidence_requests)
+            for state in ("requested", "submitted", "accepted", "rejected")
         }
         control_actions = [
             {
@@ -618,8 +631,18 @@ def create_app(
             }
             for gap in policy_gaps
         ]
+        evidence_request_actions = [
+            {
+                "kind": "evidence_request",
+                "reference": request.evidence_request_id,
+                "status": request.request_state,
+                "next_action": next_action_for_evidence_request(request.request_state),
+            }
+            for request in evidence_requests
+            if request.request_state != "accepted"
+        ]
         return {
-            "projection": "controls_obligations_policy_gaps",
+            "projection": "controls_obligations_policy_gaps_evidence_requests",
             "posture": {
                 "control_total": len(coverage),
                 "control_unresolved": sum(item.status in unresolved for item in coverage),
@@ -631,6 +654,8 @@ def create_app(
                 "applicability_work_item_counts": applicability_counts,
                 "review_queue_work_item_counts": review_queue_counts,
                 "policy_gap_total": len(policy_gaps),
+                "evidence_request_total": len(evidence_requests),
+                "evidence_request_state_counts": evidence_request_state_counts,
             },
             "controls": [
                 serialize_control(item.control_item, coverage_status=item.status)
@@ -638,9 +663,12 @@ def create_app(
             ],
             "obligations": [_serialize_obligation_item(item) for item in obligations],
             "policy_gaps": [serialize_gap(gap) for gap in policy_gaps],
-            "next_actions": control_actions + obligation_actions + gap_actions,
+            "evidence_requests": [
+                _serialize_evidence_request(session, request)
+                for request in evidence_requests
+            ],
+            "next_actions": control_actions + obligation_actions + gap_actions + evidence_request_actions,
             "not_yet_projected": [
-                "evidence_requests",
                 "risk_register",
                 "audit_programs",
                 "controlled_exports",
@@ -947,6 +975,103 @@ def create_app(
         )
         return _serialize_evidence_retention(record)
 
+    @app.post("/evidence-requests", status_code=201)
+    def post_evidence_request(
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Create a tenant-scoped request for a named contributor and period."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.write",
+        )
+        request = create_evidence_request(
+            session,
+            decision,
+            body.get("request_title", ""),
+            body.get("requested_scope_type", ""),
+            body.get("requested_scope_reference", ""),
+            parse_required_timestamp(body, "requested_period_from"),
+            parse_required_timestamp(body, "requested_period_to"),
+            body.get("required_fields"),
+            body.get("contributor_reference", ""),
+            parse_required_timestamp(body, "due_at"),
+            body.get("reuse_policy", ""),
+        )
+        return _serialize_evidence_request(session, request)
+
+    @app.get("/evidence-requests")
+    def get_evidence_requests(
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """List tenant-scoped request state and audit history without evidence payloads."""
+        decision = decision_for_compliance_read(authorization, x_purpose)
+        requests = list_evidence_requests(session, decision)
+        return {
+            "evidence_requests": [
+                _serialize_evidence_request(session, request) for request in requests
+            ]
+        }
+
+    @app.post("/evidence-requests/{evidence_request_id}/submissions")
+    def post_evidence_request_submission(
+        evidence_request_id: str,
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Submit an existing same-tenant evidence artifact for one request."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.write",
+        )
+        request = submit_evidence_request(
+            session,
+            decision,
+            evidence_request_id,
+            body.get("evidence_record_id", ""),
+        )
+        return _serialize_evidence_request(session, request)
+
+    @app.post("/evidence-requests/{evidence_request_id}/review")
+    def post_evidence_request_review(
+        evidence_request_id: str,
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Accept or reject a contributor submission under a separate actor."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.write",
+        )
+        request = review_evidence_request(
+            session,
+            decision,
+            evidence_request_id,
+            body.get("decision_code", ""),
+            body.get("rejection_reason"),
+        )
+        return _serialize_evidence_request(session, request)
+
     @app.post("/evidence-records/{evidence_record_id}/legal-hold/release")
     def post_evidence_legal_hold_release(
         evidence_record_id: str,
@@ -1140,6 +1265,58 @@ def _serialize_evidence_retention(record: EvidenceRecord) -> dict[str, Any]:
         "legal_hold_reason": record.legal_hold_reason,
         "legal_hold_authority": record.legal_hold_authority,
         "disposition_outcome": record.disposition_outcome,
+    }
+
+
+def _serialize_evidence_request(session: Session, request: Any) -> dict[str, Any]:
+    """Serialize request workflow metadata, evidence identity, and audit history."""
+    audit_history = (
+        session.query(AuditEvent)
+        .filter_by(
+            tenant_id=request.tenant_id,
+            resource_kind="evidence_request",
+            resource_identifier=request.evidence_request_id,
+        )
+        .order_by(AuditEvent.recorded_at, AuditEvent.audit_event_id)
+        .all()
+    )
+    return {
+        "evidence_request_id": request.evidence_request_id,
+        "request_title": request.request_title,
+        "requester_actor": request.requester_actor,
+        "requested_scope_type": request.requested_scope_type,
+        "requested_scope_reference": request.requested_scope_reference,
+        "requested_period_from": request.requested_period_from.isoformat(),
+        "requested_period_to": request.requested_period_to.isoformat(),
+        "required_fields": json.loads(request.required_fields),
+        "contributor_reference": request.contributor_reference,
+        "due_at": request.due_at.isoformat(),
+        "reuse_policy": request.reuse_policy,
+        "request_state": request.request_state,
+        "evidence_record_id": request.evidence_record_id,
+        "submitted_by_actor": request.submitted_by_actor,
+        "submitted_at": (
+            request.submitted_at.isoformat() if request.submitted_at is not None else None
+        ),
+        "reviewed_by_actor": request.reviewed_by_actor,
+        "reviewed_at": (
+            request.reviewed_at.isoformat() if request.reviewed_at is not None else None
+        ),
+        "rejection_reason": request.rejection_reason,
+        "accepted_at": (
+            request.accepted_at.isoformat() if request.accepted_at is not None else None
+        ),
+        "created_at": request.created_at.isoformat(),
+        "audit_history": [
+            {
+                "action_name": event.action_name,
+                "actor_identifier": event.actor_identifier,
+                "purpose_code": event.purpose_code,
+                "recorded_at": event.recorded_at.isoformat(),
+            }
+            for event in audit_history
+        ],
+        "next_action": next_action_for_evidence_request(request.request_state),
     }
 
 

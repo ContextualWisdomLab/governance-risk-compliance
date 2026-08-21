@@ -179,6 +179,76 @@ class EvidenceRecord(Base):
     )
 
 
+class EvidenceRequest(Base):
+    """One tenant-scoped request for a bounded evidence submission and review."""
+
+    __tablename__ = "evidence_request"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "evidence_request_id",
+            name="evidence_request_tenant_identity",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "evidence_record_id"],
+            ["evidence_record.tenant_id", "evidence_record.evidence_record_id"],
+            name="evidence_request_tenant_evidence",
+        ),
+        CheckConstraint(
+            "request_state IN ('requested', 'submitted', 'accepted', 'rejected')",
+            name="evidence_request_state",
+        ),
+        CheckConstraint(
+            "reuse_policy IN ('single_use', 'reusable')",
+            name="evidence_request_reuse_policy",
+        ),
+        CheckConstraint(
+            "requested_period_to >= requested_period_from",
+            name="evidence_request_period",
+        ),
+        CheckConstraint(
+            "(request_state = 'requested' AND evidence_record_id IS NULL AND submitted_by_actor IS NULL AND submitted_at IS NULL AND reviewed_by_actor IS NULL AND reviewed_at IS NULL AND rejection_reason IS NULL AND accepted_at IS NULL) OR "
+            "(request_state = 'submitted' AND evidence_record_id IS NOT NULL AND submitted_by_actor IS NOT NULL AND submitted_at IS NOT NULL AND reviewed_by_actor IS NULL AND reviewed_at IS NULL AND rejection_reason IS NULL AND accepted_at IS NULL) OR "
+            "(request_state = 'accepted' AND evidence_record_id IS NOT NULL AND submitted_by_actor IS NOT NULL AND submitted_at IS NOT NULL AND reviewed_by_actor IS NOT NULL AND reviewed_at IS NOT NULL AND rejection_reason IS NULL AND accepted_at IS NOT NULL) OR "
+            "(request_state = 'rejected' AND evidence_record_id IS NOT NULL AND submitted_by_actor IS NOT NULL AND submitted_at IS NOT NULL AND reviewed_by_actor IS NOT NULL AND reviewed_at IS NOT NULL AND rejection_reason IS NOT NULL AND accepted_at IS NULL)",
+            name="evidence_request_state_fields",
+        ),
+        Index("evidence_request_tenant_state", "tenant_id", "request_state"),
+    )
+
+    evidence_request_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
+    )
+    request_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    requester_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    requested_scope_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    requested_scope_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    requested_period_from: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    requested_period_to: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    required_fields: Mapped[str] = mapped_column(Text, nullable=False)
+    contributor_reference: Mapped[str] = mapped_column(String(128), nullable=False)
+    due_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    reuse_policy: Mapped[str] = mapped_column(String(32), nullable=False)
+    request_state: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="requested",
+        server_default="requested",
+    )
+    evidence_record_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    submitted_by_actor: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reviewed_by_actor: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
 class ControlEvidenceBinding(Base):
     """Binds tenant-owned evidence to one official control identifier."""
 

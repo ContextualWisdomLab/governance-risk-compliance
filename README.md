@@ -12,7 +12,7 @@ This repository is the ContextualWisdomLab home for policy, control, risk, evide
 4. Open `/` from the same machine, author the next policy, and map it only to official catalog identifiers.
 5. Read the policy-gap list, distinguish `unknown`, `unassessed`, design, operating, stale, exception, and ineffective statuses, then establish the next control test.
 6. Register an authoritative obligation source and exact revision, record an evidenced applicability decision, and review overdue/upcoming obligations from `/obligations`.
-7. Read `/compliance-workspace` for one tenant-scoped posture projection combining controls, obligations, and policy gaps; it does not claim evidence-request, risk, audit, or export state.
+7. Read `/compliance-workspace` for one tenant-scoped posture projection combining controls, obligations, policy gaps, and evidence-request workflow state; it does not claim risk, audit-program, data-room, or export state.
 8. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
 9. Confirm `/readyz` returns `200` with database, schema, seed, guard, key, identity, and lifecycle checks; use `/startupz` to inspect the checks that admitted the process.
 10. Set the standard `OTEL_EXPORTER_OTLP_ENDPOINT` only when an approved collector is available; request traces and low-cardinality request metrics are then exported asynchronously.
@@ -46,9 +46,10 @@ The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `
 | Store compatibility evidence binding | `POST /control-evidence-bindings` or `cwl-grc bind`; direct bindings remain `unassessed` until a scoped control test uses the evidence |
 | Register source and exact revision | `POST /obligations/sources`, `POST /obligations/sources/{id}/revisions` with `X-Purpose: compliance_governance` |
 | Register and decide an obligation | `POST /obligations`, `POST /obligations/{id}/applicability-decisions`; decisions require rationale, evidence reference, period, and next review |
+| Request and review evidence | `POST /evidence-requests`, `POST /evidence-requests/{id}/submissions`, `POST /evidence-requests/{id}/review`, or `GET /evidence-requests`; request state is tenant-scoped and audit-backed |
 | Propose obligation truth | `POST /obligations/{id}/requirements` to a finalized policy or internal control; the response remains `proposed` until independent review |
 | Review obligations and source changes | `GET /obligations` (`upcoming_days` 0–3660), `POST /obligations/changes`, and `POST /obligations/changes/{id}/impact-assessments` |
-| Read the tenant-scoped compliance workspace | `GET /compliance-workspace` with `compliance_governance`; returns distinct obligations, work-item queues, controls, and policy-gap posture only |
+| Read the tenant-scoped compliance workspace | `GET /compliance-workspace` with `compliance_governance`; returns distinct obligations, work-item queues, controls, policy gaps, and evidence-request state |
 | Liveness probe | `GET /healthz` (dependency-free) |
 | Readiness probe | `GET /readyz` (returns `503` with stable reason codes when traffic is unsafe) |
 | Startup probe | `GET /startupz` (reports the checks completed before admission) |
@@ -67,6 +68,7 @@ Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `n
 - Versioned schema upgrades leave `schema_migration` receipts and upgrade existing first-slice stores before integrity triggers are installed.
 - Internal controls are separate from official catalog requirements: published definition versions, scoped implementations, reviewed mappings, design/operating tests, deficiencies, exceptions, and purpose-approved evidence usage project explicit coverage statuses.
 - Obligations are separate from framework controls: exact source revisions, jurisdiction/scope, evidenced applicability decisions, commitments, proposed policy/control links, immutable change intake, and impact/re-approval worklists preserve legal and operational truth without copying source text. Requirement creation never self-asserts approval.
+- Evidence requests are separate workflow metadata: exact scope/period, named contributor, due date, reuse policy, same-tenant evidence link, independent review, outcome, and append-only audit history. Request routes never return evidence payloads and rejected requests are terminal in this first slice.
 - A persistent database cannot start without explicit `CWL_GRC_EVIDENCE_KEY` material. Ephemeral keys are limited to explicitly selected in-memory tests.
 
 ## Personal-data handling

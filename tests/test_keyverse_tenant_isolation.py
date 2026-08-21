@@ -21,6 +21,7 @@ from cwl_grc.models import (
     AuditEvent,
     ControlEvidenceBinding,
     EvidenceRecord,
+    EvidenceRequest,
     PolicyControlMapping,
     PolicyDocument,
     PolicyVersion,
@@ -154,6 +155,7 @@ def test_tenant_owned_models_persist_exact_tenant_key() -> None:
         PolicyControlMapping,
         EvidenceRecord,
         ControlEvidenceBinding,
+        EvidenceRequest,
         AuditEvent,
     ):
         assert "tenant_id" in model.__table__.columns
@@ -190,6 +192,56 @@ def test_policy_list_requires_verified_read_scope() -> None:
     assert wrong_scope.status_code == 403
     assert allowed.status_code == 200
     assert len(allowed.json()["policies"]) == 1
+
+
+def test_evidence_request_list_is_tenant_scoped_under_keyverse() -> None:
+    """Protected request metadata follows the verified tenant, not caller input."""
+    private_key, public_jwk = _material()
+    client = _client(public_jwk)
+    request = client.post(
+        "/evidence-requests",
+        headers=_headers(
+            private_key,
+            tenant_id="tenant-a",
+            scope="grc.compliance.write",
+            purpose="compliance_governance",
+        ),
+        json={
+            "request_title": "Tenant A evidence",
+            "requested_scope_type": "application",
+            "requested_scope_reference": "tenant-a-app",
+            "requested_period_from": "2026-01-01T00:00:00Z",
+            "requested_period_to": "2026-03-31T00:00:00Z",
+            "required_fields": ["reviewer", "decision_date"],
+            "contributor_reference": "officer-tenant-a",
+            "due_at": "2026-04-15T00:00:00Z",
+            "reuse_policy": "single_use",
+        },
+    )
+    assert request.status_code == 201
+    tenant_a = client.get(
+        "/evidence-requests",
+        headers=_headers(
+            private_key,
+            tenant_id="tenant-a",
+            scope="grc.compliance.read",
+            purpose="compliance_governance",
+        ),
+    )
+    tenant_b = client.get(
+        "/evidence-requests",
+        headers=_headers(
+            private_key,
+            tenant_id="tenant-b",
+            scope="grc.compliance.read",
+            purpose="compliance_governance",
+        ),
+    )
+    assert tenant_a.status_code == 200
+    assert len(tenant_a.json()["evidence_requests"]) == 1
+    assert tenant_a.json()["evidence_requests"][0]["requested_scope_reference"] == "tenant-a-app"
+    assert tenant_b.status_code == 200
+    assert tenant_b.json()["evidence_requests"] == []
 
 
 def test_authenticated_request_log_contains_hashed_verified_principal(caplog) -> None:  # noqa: ANN001
