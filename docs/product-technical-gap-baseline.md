@@ -71,15 +71,16 @@ PR #38 stages a fix on PR #5's Keyverse branch. Its exact head
 `0c4084705b4f86913acdefa1ada3d17aa2d1e6f7` adds an optional caller-owned,
 atomic JTI replay guard while preserving reusable bearer-token semantics when
 the guard is absent. It responds to the prior exact-head Strix MEDIUM replay
-finding on PR #5. Local full coverage is 100% across 72 tests; Product has
-completed successfully, while Strix and other required/security gates remain
-external pending checks. It remains Draft with no independent formal approval.
+finding on PR #5. Local full coverage is 100% across 72 tests; Product #514,
+SAST #155, and Security #155 are terminal-success. It is Ready for independent
+review, remains unmerged, and has no independent formal approval.
 
 PR #40 stages the Issue #30 workflow security correction on PR #34's buyer
-workspace branch. Its exact head `9bff870e8b540e49745e3c48f39caa6de96ccbf2`
-replaces `npm exec` with the checked-in local Playwright binary so the browser
-install path cannot fetch an unpinned runner package. Local `npm ci`, Storybook,
-Chromium install, and two browser tests pass; refreshed Scorecard/Security gates
+workspace branch. Its exact head `4daab149d364f6117e31df22e14e11ad35d230b2`
+contains a normal merge of current PR #34 and replaces `npm exec` with the
+checked-in local Playwright binary so the browser install path cannot fetch an
+unpinned runner package. Local `npm ci`, Storybook, Chromium install, and three
+browser tests pass; Product #570 is terminal-success, while SAST/Security #183
 and independent approval remain pending.
 
 The next production action is to integrate one verified Keyverse tenant and
@@ -207,14 +208,14 @@ self-approval, admin merge, force-push, or predecessor-head evidence is valid.
 | [#35](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/35) | `2861c9c5bfd17f6ac6778e42db1b4d735a809ce9` | Draft, stacked, review-required | Buyer-gap baseline refresh for PR #33 and PR #34 on the baseline branch. PR #39 carries the current queue follow-up; neither docs PR is production, issue-completion, or merge approval evidence. |
 | [#36](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/36) | `cb1a48395109c87c17ad287ea1fc81dc25b135e1` | Draft, stacked, review-required | Review fixes for PR #32 on `feat/internal-control-model`, including owner graph guards and objective/definition race conflicts. Local 157-test 100% evidence and PostgreSQL 18.6 upgrade/graph probes pass; Product is green, while required/security gates and independent approval remain outstanding. |
 | [#37](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/37) | `bfb3f61767886075be32b669871cc4b21b168708` | Draft, mergeable, review-required | Issue #29 catalog-provenance slice on `develop`. Current head makes the HTTP source-host allowlist server-owned; local full 100% evidence and PostgreSQL 18.6 host-boundary probe pass. Scope excludes remote source retrieval and OSCAL/OLIR parsing; refreshed required/security gates and independent approval remain outstanding. |
-| [#38](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/38) | `0c4084705b4f86913acdefa1ada3d17aa2d1e6f7` | Draft, stacked, review-required | Optional JTI replay guard stacked on PR #5's Keyverse branch. Local 72-test 100% evidence and Product success are observed; Strix and other required/security gates are still pending, with no independent approval. |
+| [#38](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/38) | `0c4084705b4f86913acdefa1ada3d17aa2d1e6f7` | Ready, stacked, review-required | Optional JTI replay guard stacked on PR #5's Keyverse branch. Local 72-test 100% evidence and Product/SAST/Security #514/#155 terminal success are observed; independent approval remains outstanding. |
 | [#39](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/39) | parent `2861c9c5bfd17f6ac6778e42db1b4d735a809ce9` | Draft, stacked, review-required | Current buyer-gap baseline follow-up stacked on PR #35. Its child head is intentionally tracked by the PR metadata because this document records the queue it describes; it records the exact heads and observed boundaries for PR #36, #37, and #38 and remains documentation evidence only. |
 | [#40](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/40) | `4daab149d364f6117e31df22e14e11ad35d230b2` | Draft, stacked, review-required | Scorecard Pinned-Dependencies fix for PR #34. A normal merge commit brings the current PR34 base into the child; the stacked diff remains one workflow-line change. Local Python 53-test/100% coverage, Interrogate 100%, Storybook, actionlint, and three browser tests pass; Product #570 is successful, SAST/Security #183 are queued, and independent approval remains outstanding. |
 | [#19](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/19) | `de571802239ba819b0fd5201993f2e20ddad5645` (2026-08-21) | Ready, review-required | Documentation baseline and GRC roadmap review fixes. The current head makes `not_applicable` require an exact authorized decision, maps applicable-without-implementation/evidence to `unknown`, records `posture-projection-v1` and input fact versions, and enumerates the complete release-gate token set. Prior checks do not transfer; Product #576 and SAST/Security #186 are queued, and independent approval remains outstanding. |
 | [#16](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/16) | `c1496be499473befc273ff55ea284ac9f5582b73` | Draft, mergeable | Tenant isolation remains stacked behind #7. Preserve the shared official catalog outside tenant-owned records; regenerate all current-head gates after parent integration. |
 | [#7](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/7) | `ebac50ccbb9cf528044cc53d4832ceec176b50c9` | Draft, mergeable | Route enforcement remains stacked behind #6. Revalidate every protected route and scope on the integrated parent. |
 | [#6](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/6) | `887f5c64843cca5cd8f699cae58e33afa3b7498f` | Draft, mergeable | OIDC/JWKS loading remains stacked behind #5. Preserve bounded source retrieval, exact issuer matching, address pinning, TLS identity, and rotation semantics. |
-| [#5](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/5) | `0c9c2525918f0f392185942065920c376ef9de28` | Ready, mergeable, blocked | JWT verification is the first direct-to-`develop` security slice. Its exact head still has the earlier Strix replay-protection failure; PR #38 carries the optional caller-owned JTI replay guard fix on a child branch, whose checks and independent approval are pending. Do not infer PR #5 merge readiness from the child. |
+| [#5](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/5) | `0c9c2525918f0f392185942065920c376ef9de28` | Ready, mergeable, blocked | JWT verification is the first direct-to-`develop` security slice. Product #386, SAST #118, and Security #118 are terminal-success, but the exact head still has the earlier Strix replay-protection finding; PR #38 carries the optional caller-owned JTI replay guard fix on a child branch. Do not infer PR #5 merge readiness from the child; independent approval remains outstanding. |
 
 PR #19 carries this snapshot on branch `docs/product-technical-gap-baseline`.
 It is not its own production, issue-completion, or merge approval.
