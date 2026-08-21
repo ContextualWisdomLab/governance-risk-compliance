@@ -5,7 +5,7 @@ Repository: `ContextualWisdomLab/governance-risk-compliance`
 Baseline parent branch head: `a747077757484c880fccf76e30cac068c593d3b0` (protected `develop`)
 Baseline source parent: `c78ef79499d05e13a8651ccfa2a2979724323160` (pre-refresh PR #19 source parent; re-query the current document branch head below)
 Develop-based buyer-workspace head: `59e1a3cce5a794f1b6a33a9f5128a1ccccf95109`
-Tracked current direct-to-develop heads: PR #17 `ebf24a6ec69855a794dc03f4c665a958c37e17a3`, PR #18 `35d3e55ccd2c5e89efec6c28b7613f1d605cac13`, PR #34 `e9d25798f53d7ac13c1a6cdf02c54c16fa82b150`, PR #37 `b3a6d1a09f28f257bf61600809abf511384498c6`, PR #38 `ac499f3e9abbddd9920641b5a41f51816bccc5d2`, PR #43 `f41c387c62998de2d136ce8f4a110b4cb22906ac`, PR #51 `1a8f90dd15f37ffc86b8a0efd217a8b2812e5f99`, and PR #53 `976945dbbe22b0b8fa7893150e2723738a0ff484`. PR #19 is the current document branch; PR #41 is feature-base PR head `2346afe6a063f502517ee235d6c3e87488da8357` on base `8881d3966e3e9da29b8dce990a95295a2780618b`; re-query both before merge.
+Tracked current direct-to-develop heads: PR #17 `ebf24a6ec69855a794dc03f4c665a958c37e17a3`, PR #18 `35d3e55ccd2c5e89efec6c28b7613f1d605cac13`, PR #34 `eafa57c07cbbf405d4d60c914e2a76e557037437`, PR #37 `b3a6d1a09f28f257bf61600809abf511384498c6`, PR #38 `ac499f3e9abbddd9920641b5a41f51816bccc5d2`, PR #43 `f41c387c62998de2d136ce8f4a110b4cb22906ac`, PR #51 `1a8f90dd15f37ffc86b8a0efd217a8b2812e5f99`, and PR #53 `976945dbbe22b0b8fa7893150e2723738a0ff484`. PR #19 is the current document branch; PR #41 is feature-base PR head `2346afe6a063f502517ee235d6c3e87488da8357` on base `8881d3966e3e9da29b8dce990a95295a2780618b`; re-query both before merge.
 Historical Keyverse stack-only merges: PR #6 `b9b3d5c49367d0b128c87aa478d8921eb1f6c349` merged as `bb23d654f58ea1afdb4087fafdf47caf1de1aaea`, PR #7 `25350d6177244d9a39ae3275feca813d5b4a737d` merged as `b44f3e9f83b637a9a580468be5b5b5f95422127b`, and PR #16 `8dfa6bae1a9366335f15294f06abf8313f1380e4` merged as `34a1b25c38c78f367bc77b90301ef0f68a1ad8ba`. These PRs are closed; their feature-branch merges did not update protected `develop`.
 Historical evidence-lifecycle stack-only merges: PR #20 `e91b2384177451ebf80858e518d729e258c40f00` merged as `781b6e3b9f4c33c7d82e46d2881777ea470ff875`, PR #21 `04facc110a7437f7a86b8572707ffb5f65e0515e` merged as `b25cd7dbb9cb1e823f184acc67cea0aa8cea7280`, PR #22 `9c1923e8e6f6145d0f789a97db4dd15f94f2adf3` merged into its feature branch as `04facc110a7437f7a86b8572707ffb5f65e0515e`, and PR #50 `ba78e4790f3e361826991455ce83634004f2875d` merged as `8d355811a2a6b809cfa7e4c03e36a1c6f48bdf49`. PRs #23–#26 and #31 remain historical feature-branch merges; none is an active child PR in the current open-PR snapshot.
 
@@ -58,7 +58,7 @@ not transfer after this parent/head rebuild; terminal hosted checks, two
 approving reviews, last-push approval, and protected merge remain absent.
 
 PR #34 stages the Issue #30 buyer-workspace design authority directly on
-`develop`. Its exact head `e9d25798f53d7ac13c1a6cdf02c54c16fa82b150` records the
+`develop`. Its exact head `eafa57c07cbbf405d4d60c914e2a76e557037437` records the
 current NIST SP 800-53 Release 5.2.0 APA 7 reference, rendered Figma header and
 content repair,
 the missing `Open deficiencies` exact-value row, and the English/Korean i18n contract against the existing checked-in npm
@@ -66,13 +66,12 @@ lockfile/Node pin, Storybook build, and Chromium interaction evidence. The
 current head has a 53-test Python suite with 100% statement/branch coverage,
 Interrogate 100% docstring coverage, a six-test design-contract suite,
 Storybook 10.5.10 build, and three
-Chromium interaction tests. Product #568 and Buyer Workspace #10 are successful
-on this exact head. The latest hosted exact-head observation has 3 successful,
-11 queued, and 7 skipped check runs; Analyze, Semgrep, dependency review, OSV,
-required workflow, Scorecard, Trivy, and Strix remain queued. The current-head
-Scorecard review thread is resolved, but independent approval is absent. It is
-non-Draft; the fixture is not authentication, API, export,
-accessibility-certification, or deployment evidence.
+Chromium interaction tests. The latest hosted exact-head observation has 2
+successful, 12 queued (including Storybook in progress), and 7 skipped check
+runs with no failure conclusion. Analyze, Semgrep, dependency review, OSV,
+required workflow, Scorecard, Trivy, and Strix remain queued. Independent
+approval is absent. It is non-Draft; the fixture is not authentication, API,
+export, accessibility-certification, or deployment evidence.
 
 PR #36 was closed after its earlier base became empty; its historical merge
 record is not current source or protected-merge evidence. PR #41 carries the
@@ -343,7 +342,7 @@ merge, force-push, or predecessor-head evidence is valid.
 | [#31](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/31) | `2a14e9f0a91861df7bcdbbcec859bd19b996d358` | Closed, stack-only | Recovery-event telemetry was merged into `feat/pool-telemetry-contract` as `441d97efa033a410e67132ab3300511222a05ce9`; this is historical feature-branch evidence, not protected `develop` integration. |
 | [#32](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/32) | `a86fb10cfcadd18769e5830d0982abea4e728bb5` (2026-08-21) | Closed, stack-only | Internal-control model was merged into `feat/recovery-event-telemetry` as `7eab5bd272ca88850198f47a6c78313e3f7bd49e`; this is historical feature-branch evidence, not protected `develop` integration. |
 | [#33](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/33) | `6648cc7fc255ed6711275887ba5cd5e857073d41` (2026-08-21) | Closed, stack-only | Obligation applicability was merged into `feat/internal-control-model` as `8881d3966e3e9da29b8dce990a95295a2780618b`; this is historical feature-branch evidence, not protected `develop` integration. |
-| [#34](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/34) | `e9d25798f53d7ac13c1a6cdf02c54c16fa82b150` (2026-08-22) | Ready, merge-blocked, review-required | Issue #30 buyer-workspace design authority on `develop`; the exact head adds the missing Open deficiencies value/status/source/limitation/next-action row with English/Korean i18n coverage. Storybook build, three Chromium interactions, and six Python design-contract tests pass; required review evidence and independent approval remain absent. |
+| [#34](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/34) | `eafa57c07cbbf405d4d60c914e2a76e557037437` (2026-08-22) | Ready, merge-blocked, review-required | Issue #30 buyer-workspace design authority on `develop`; the exact head adds the Open deficiencies exact-value row, access-denied Request access action, explicit local-developer-preview boundary in both locales, CSS lint repair, release-specific NIST SP 800-53 Release 5.2.0 sources, and Storybook reuse of the real index markup. Storybook build, five-story Chromium checks, three page interactions, and six Python design-contract tests pass; hosted checks were recreated and independent approval remains absent. |
 | [#37](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/37) | `b3a6d1a09f28f257bf61600809abf511384498c6` (2026-08-22) | Ready, merge-blocked, review-required | Issue #29 catalog-provenance slice on `develop`; the current repair accepts explicit HTTPS `:443` while rejecting non-default ports, skips policy DDL on partial stores, and enforces matching release/import source versions at database and snapshot boundaries. Exact-head local evidence is 79 passing tests with 100% statement/branch/docstring coverage, PostgreSQL clean-install/idempotent migration evidence, and quality/security checks green. Hosted required runs were recreated after this push; independent approval is absent. |
 | [#38](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/38) | `ac499f3e9abbddd9920641b5a41f51816bccc5d2` (2026-08-22) | Ready, merge-blocked, review-required | Replacement for closed PR #5. The exact head adds the optional caller-owned atomic JTI replay guard, scope-before-consume ordering, and undefined-offset provider-clock rejection; local evidence is 98 passing tests with 100% statement/branch/docstring coverage plus lint/compile/lock/actionlint/Semgrep/pip-audit, while hosted checks were recreated and independent approval remains absent. |
 | [#39](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/39) | `c78ef79499d05e13a8651ccfa2a2979724323160` (2026-08-22) | Merged, stack-only | The baseline follow-up was merged into PR #19's feature branch; this historical row is superseded by the live PR #19 row below. |
