@@ -13,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from cwl_grc import create_app
+from cwl_grc.app import _require_published_catalog_release
 from cwl_grc.authorization import AuthorizationDecision, PurposeCode
 from cwl_grc.catalog_provenance import (
     MAX_SOURCE_ARTIFACT_BYTES,
@@ -1107,3 +1108,11 @@ def test_catalog_routes_execute_the_local_governance_workflow() -> None:
             "publication_date": "not-a-date",
         },
     ).status_code == 400
+
+
+def test_catalog_comparison_rejects_unpublished_release() -> None:
+    """Release comparisons remain limited to published catalog identities."""
+    published = SimpleNamespace(release_status="published")
+    _require_published_catalog_release(published, "first")
+    with pytest.raises(HTTPException, match="second catalog release is not published"):
+        _require_published_catalog_release(SimpleNamespace(release_status="withdrawn"), "second")

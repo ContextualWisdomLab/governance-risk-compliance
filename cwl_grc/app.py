@@ -319,9 +319,11 @@ def create_app(
         from_release = session.get(CatalogRelease, catalog_release_id)
         if from_release is None:
             raise HTTPException(status_code=404, detail="The first catalog release is not on file.")
+        _require_published_catalog_release(from_release, "first")
         to_release = session.get(CatalogRelease, other_catalog_release_id)
         if to_release is None:
             raise HTTPException(status_code=404, detail="The second catalog release is not on file.")
+        _require_published_catalog_release(to_release, "second")
         return _serialize_catalog_release_comparison(from_release, to_release)
 
     @app.post("/policy-documents", status_code=201)
@@ -592,6 +594,12 @@ def _serialize_catalog_release(release: CatalogRelease) -> dict[str, Any]:
         "published_at": release.published_at.isoformat() if release.published_at else None,
         "next_action": "Review the release change set before using it in compliance decisions.",
     }
+
+
+def _require_published_catalog_release(release: CatalogRelease, label: str) -> None:
+    """Reject comparisons involving a draft or withdrawn catalog release."""
+    if release.release_status != "published":
+        raise HTTPException(status_code=409, detail=f"The {label} catalog release is not published.")
 
 
 _CATALOG_RELEASE_COMPARISON_FIELDS = (
