@@ -11,6 +11,9 @@ from cwl_grc.authorization import AuthorizationDecision
 from cwl_grc.models import AuditEvent
 
 
+AUDIT_EVENT_COUNT_INFO_KEY = "cwl_grc.audit_event_count"
+
+
 def record_audit_event(
     session: Session,
     decision: AuthorizationDecision,
@@ -19,6 +22,9 @@ def record_audit_event(
     resource_identifier: str,
 ) -> AuditEvent:
     """Append one audit event for an authorized tenant-scoped action."""
+    session.info[AUDIT_EVENT_COUNT_INFO_KEY] = (
+        session.info.get(AUDIT_EVENT_COUNT_INFO_KEY, 0) + 1
+    )
     event = AuditEvent(
         audit_event_id=uuid4().hex,
         tenant_id=decision.tenant_id,

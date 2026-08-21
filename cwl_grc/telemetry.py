@@ -68,6 +68,21 @@ class RequestTelemetry:
             unit="{denial}",
             description="HTTP authorization denials observed by the service.",
         )
+        self._transaction_count: Counter = meter.create_counter(
+            "cwl_grc.database.transaction.count",
+            unit="{transaction}",
+            description="Database session transaction outcomes.",
+        )
+        self._transaction_duration: Histogram = meter.create_histogram(
+            "cwl_grc.database.transaction.duration",
+            unit="s",
+            description="Database session transaction duration in seconds.",
+        )
+        self._audit_write_count: Counter = meter.create_counter(
+            "cwl_grc.audit.write.count",
+            unit="{write}",
+            description="Audit events committed or rejected by the database transaction.",
+        )
 
     @property
     def metric_reader(self) -> InMemoryMetricReader:
@@ -120,6 +135,29 @@ class RequestTelemetry:
         )
         if status_code in {401, 403}:
             self._authorization_denials.add(1, {"http.route": route})
+
+    def record_database_transaction(
+        self,
+        database_system: str,
+        outcome: str,
+        duration_seconds: float,
+    ) -> None:
+        """Record a bounded database transaction outcome and duration."""
+        attributes = {"db.system.name": database_system, "cwl_grc.outcome": outcome}
+        self._transaction_count.add(1, attributes)
+        self._transaction_duration.record(duration_seconds, {"db.system.name": database_system})
+
+    def record_audit_write(
+        self,
+        database_system: str,
+        outcome: str,
+        event_count: int,
+    ) -> None:
+        """Record the bounded count and outcome of one audit write batch."""
+        self._audit_write_count.add(
+            event_count,
+            {"db.system.name": database_system, "cwl_grc.outcome": outcome},
+        )
 
     def shutdown(self) -> None:
         """Flush configured exporters and release provider resources."""

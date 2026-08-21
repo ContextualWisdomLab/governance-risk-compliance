@@ -29,10 +29,12 @@ plaintext evidence, or raw tenant/actor identifiers into tickets or logs.
 
 Set the standard `OTEL_EXPORTER_OTLP_ENDPOINT` to the approved collector before
 starting a reviewed deployment. The service emits `http.server.request.count`,
-`http.server.request.duration`, and `cwl_grc.authorization.denial.count` with
-method, registered route template, status, and environment-scoped resource
-attributes. If no endpoint is configured, the local bounded reader supports
-tests and developer diagnostics but is not an external monitoring path.
+`http.server.request.duration`, `cwl_grc.authorization.denial.count`,
+`cwl_grc.database.transaction.count`, and
+`cwl_grc.database.transaction.duration` with method, registered route template,
+status, database system, outcome, and environment-scoped resource attributes.
+If no endpoint is configured, the local bounded reader supports tests and
+developer diagnostics but is not an external monitoring path.
 
 Next action: verify collector delivery, dashboards, SLO/error-budget policy,
 burn-rate alerts, and paging before treating telemetry as production evidence.
@@ -40,6 +42,6 @@ burn-rate alerts, and paging before treating telemetry as production evidence.
 ## Current boundary
 
 This runbook covers the implemented local readiness contract and request-level
-OpenTelemetry emission. Database/pool/transaction metrics, SLO/error budgets,
+OpenTelemetry emission. Database pool metrics, SLO/error budgets,
 burn-rate alerts, restore/rollback rehearsals, and a production paging
 integration must be added before describing the service as production-ready.

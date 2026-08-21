@@ -24,6 +24,7 @@
 - Evidence retention metadata and purpose-authorized legal-hold placement/release without altering stored payloads.
 - Truthful `/readyz` and `/startupz` contracts, bounded PostgreSQL connection setup, drain rejection, W3C correlation, and redaction-safe JSON request logs.
 - OpenTelemetry request traces, request rate/duration metrics, authorization-denial metrics, and route-template cardinality protection with standard OTLP export configuration.
+- Database session transaction outcome/duration metrics with rollback-safe request dependency instrumentation.
 
 ### Security
 
