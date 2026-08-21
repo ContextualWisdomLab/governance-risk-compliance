@@ -33,6 +33,7 @@
 - Check required action scopes before consuming an optional one-time-use Keyverse token replay guard.
 - Reject ID-token/access-token confusion, unsigned or alternate-algorithm tokens, unsupported critical headers, unknown or duplicate keys, private/symmetric/encryption JWKs, stale/future tokens, and client/subject confusion.
 - Bound offline Keyverse JWK input to 1 MiB and support reviewed old/new public-key overlap without enabling network discovery or remote GRC traffic.
+- Reject provider refresh clocks whose `tzinfo` exists without a defined UTC offset.
 
 ### ADR
 

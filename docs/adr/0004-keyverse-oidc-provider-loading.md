@@ -28,7 +28,7 @@ Key rotation also needs an atomic snapshot: a partially validated refresh cannot
     - expose a non-empty string array in `id_token_signing_alg_values_supported`;
     - advertise `RS256`.
 11. Validate the JWK document through ADR 0003’s public-RSA-signing-key parser. Old and new keys may coexist during a reviewed rotation window.
-12. Record SHA-256 references for the exact metadata and JWK bytes and an aware UTC `loaded_at` time.
+12. Record SHA-256 references for the exact metadata and JWK bytes and an aware UTC `loaded_at` time with a defined UTC offset.
 13. Replace the active provider snapshot atomically only when the new snapshot has the same issuer and a strictly later `loaded_at` value. A failed, stale, or cross-issuer refresh leaves the previous snapshot intact.
 14. Keep provider loading independent of FastAPI routes and tenant persistence. Remote traffic remains disabled until the complete issue #4 boundary is implemented and accepted.
 

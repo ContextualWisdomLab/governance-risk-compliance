@@ -633,7 +633,7 @@ def _sha256_reference(document: bytes) -> str:
 
 def _aware_utc(value: datetime) -> datetime:
     """Require an aware snapshot time and normalize it to UTC."""
-    if value.tzinfo is None:
+    if value.tzinfo is None or value.utcoffset() is None:
         raise KeyverseProviderLoadError(
             "Keyverse provider snapshot time must be timezone-aware."
         )

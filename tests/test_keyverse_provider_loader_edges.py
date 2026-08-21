@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import socket
-from datetime import datetime, timezone
+from datetime import datetime, timezone, tzinfo
 from typing import Any
 
 import jwt
@@ -34,6 +34,22 @@ ISSUER = "https://identity.example.test/realms/cwl"
 DISCOVERY_URL = f"{ISSUER}/.well-known/openid-configuration"
 JWKS_URL = "https://keys.example.test/jwks"
 NOW = datetime(2026, 8, 19, 5, 0, tzinfo=timezone.utc)
+
+
+class _UndefinedOffsetTimeZone(tzinfo):
+    """Expose a timezone object without a defined UTC offset."""
+
+    def utcoffset(self, _value: datetime | None) -> None:
+        """Return no offset so the datetime is rejected as not truly aware."""
+        return None
+
+    def dst(self, _value: datetime | None) -> None:
+        """Return no daylight-saving offset."""
+        return None
+
+    def tzname(self, _value: datetime | None) -> str:
+        """Return a diagnostic timezone name."""
+        return "undefined-offset"
 
 
 def _public_jwks() -> bytes:
@@ -313,6 +329,19 @@ def test_loader_rejects_oversized_jwks_invalid_jwks_and_naive_time() -> None:
             fetcher=valid,
             resolver=_resolver,
             now=lambda: datetime(2026, 8, 19, 5, 0),
+        )
+    with pytest.raises(KeyverseProviderLoadError, match="timezone-aware"):
+        load_keyverse_provider(
+            _settings(),
+            fetcher=valid,
+            resolver=_resolver,
+            now=lambda: datetime(
+                2026,
+                8,
+                19,
+                5,
+                tzinfo=_UndefinedOffsetTimeZone(),
+            ),
         )
     assert _aware_utc(NOW) == NOW
 
