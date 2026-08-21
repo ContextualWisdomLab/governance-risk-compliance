@@ -65,7 +65,7 @@ from cwl_grc.policy import (
     serialize_policy,
 )
 from cwl_grc.remote_access import request_is_local
-from cwl_grc.telemetry import RequestTelemetry
+from cwl_grc.telemetry import RequestTelemetry, span_traceparent
 
 
 MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
@@ -312,7 +312,7 @@ def create_app(
                     response = await call_next(request)
                 status_code = response.status_code
                 response.headers["X-Request-ID"] = context.request_id
-                response.headers["traceparent"] = context.traceparent
+                response.headers["traceparent"] = span_traceparent(span)
                 return response
             except Exception as exc:
                 error_class = type(exc).__name__
@@ -374,12 +374,15 @@ def create_app(
     def list_controls(
         session: Session = Depends(get_session),
         framework: str | None = None,
+        authorization: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        """List official controls, optionally limited to one catalog."""
+        """List official controls and tenant-scoped effectiveness statuses."""
+        tenant_id = tenant_for_policy_read(authorization, x_purpose)
         coverage = list_control_coverage(
             session,
             parse_framework(framework),
-            tenant_id=LOCAL_DEVELOPMENT_TENANT,
+            tenant_id=tenant_id,
         )
         return {
             "controls": [
@@ -392,14 +395,17 @@ def create_app(
     def uncovered_controls(
         session: Session = Depends(get_session),
         framework: str | None = None,
+        authorization: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        """List official controls that still need evidence."""
+        """List official controls still needing evidence for the verified tenant."""
+        tenant_id = tenant_for_policy_read(authorization, x_purpose)
         coverage = [
             item
             for item in list_control_coverage(
                 session,
                 parse_framework(framework),
-                tenant_id=LOCAL_DEVELOPMENT_TENANT,
+                tenant_id=tenant_id,
             )
             if item.status
             not in {ControlCoverageStatus.OPERATING_EFFECTIVE, ControlCoverageStatus.NOT_APPLICABLE}
@@ -608,15 +614,20 @@ def create_app(
         }
 
     @app.get("/", response_class=HTMLResponse)
-    def officer_home(session: Session = Depends(get_session)) -> str:
-        """Show local policy authoring, policy gaps, and the next evidence action."""
+    def officer_home(
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> str:
+        """Show tenant policy authoring, policy gaps, and the next evidence action."""
+        tenant_id = tenant_for_policy_read(authorization, x_purpose)
         return render_officer_home(
             [
                 item
                 for item in list_control_coverage(
                     session,
                     None,
-                    tenant_id=LOCAL_DEVELOPMENT_TENANT,
+                    tenant_id=tenant_id,
                 )
                 if item.status
                 not in {
@@ -624,7 +635,7 @@ def create_app(
                     ControlCoverageStatus.NOT_APPLICABLE,
                 }
             ],
-            policy_gaps=list_policy_gaps(session, None),
+            policy_gaps=list_policy_gaps(session, None, tenant_id=tenant_id),
             catalog_items=list_control_items(session, None),
         )
 
