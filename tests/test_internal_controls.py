@@ -357,6 +357,51 @@ def test_latest_operating_effective_result_does_not_inherit_old_staleness() -> N
         ) is ControlCoverageStatus.OPERATING_EFFECTIVE
 
 
+def test_latest_operating_retest_clears_historical_ineffective_result() -> None:
+    """A passing retest must supersede an older ineffective result on the same plan."""
+    factory = _factory()
+    decision = _decision()
+    with factory() as session:
+        foundation = _foundation(session, decision, "IC-RETEST-OPERATING-1")
+        _map(session, decision, foundation, "10.2.2")
+        plan = _plan(session, decision, foundation, "operating", due=datetime(2026, 3, 31))
+        old_execution = _execution(session, decision, plan)
+        with patch("cwl_grc.internal_controls.datetime") as old_clock:
+            old_clock.now.return_value = datetime(2026, 1, 15)
+            record_control_test_result(
+                session,
+                decision,
+                old_execution.test_execution_id,
+                ControlTestResultCode.INEFFECTIVE.value,
+                "The historical sample found an unresolved access review gap.",
+            )
+        recent_execution = _execution(
+            session,
+            decision,
+            plan,
+            start=datetime(2026, 2, 1),
+            end=datetime(2026, 2, 28),
+        )
+        with patch("cwl_grc.internal_controls.datetime") as recent_clock:
+            recent_clock.now.return_value = datetime(2026, 2, 15)
+            record_control_test_result(
+                session,
+                decision,
+                recent_execution.test_execution_id,
+                ControlTestResultCode.EFFECTIVE.value,
+                "The current retest confirms the access review gap is remediated.",
+            )
+        session.flush()
+        control = get_control_item(session, FrameworkCode.CSAP_2026, "10.2.2")
+        assert control is not None
+        assert control_coverage_status(
+            session,
+            control.control_item_id,
+            decision.tenant_id,
+            datetime(2026, 2, 20),
+        ) is ControlCoverageStatus.OPERATING_EFFECTIVE
+
+
 def test_internal_control_rejections_are_tenant_and_purpose_bound() -> None:
     """Invalid workflows fail closed without allowing guessed tenant identifiers."""
     factory = _factory()
