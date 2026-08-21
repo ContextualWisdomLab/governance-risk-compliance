@@ -103,7 +103,11 @@ class KeyverseJwkSet:
 
 
 class KeyverseAccessTokenVerifier:
-    """Validate signed RFC 9068-style Keyverse access tokens for CWL GRC."""
+    """Validate signed RFC 9068-style Keyverse access tokens for CWL GRC.
+
+    Bearer access tokens remain reusable by default; callers that require
+    one-time use can provide an atomic JTI check-and-record guard.
+    """
 
     def __init__(
         self,
@@ -111,11 +115,13 @@ class KeyverseAccessTokenVerifier:
         key_set: KeyverseJwkSet,
         *,
         now: Callable[[], datetime] | None = None,
+        token_replay_guard: Callable[[str], bool] | None = None,
     ) -> None:
-        """Bind one closed policy, reviewed key set, and injectable UTC clock."""
+        """Bind policy, reviewed keys, clock, and an optional caller-owned replay guard."""
         self._settings = settings
         self._key_set = key_set
         self._now = now or (lambda: datetime.now(timezone.utc))
+        self._token_replay_guard = token_replay_guard
 
     def verify(self, token: str) -> AuthenticatedPrincipal:
         """Return a principal only after type, key, signature, claim, and scope checks."""
@@ -177,6 +183,8 @@ class KeyverseAccessTokenVerifier:
                 "This Keyverse profile accepts a human principal only."
             )
         scopes = _parse_scopes(payload["scope"])
+        if self._token_replay_guard is not None and self._token_replay_guard(token_id):
+            raise AccessTokenValidationError("The Keyverse access token was replayed.")
         return AuthenticatedPrincipal(
             tenant_id=tenant_id,
             actor_id=actor_id,
