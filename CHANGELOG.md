@@ -20,6 +20,7 @@
 - Bounded Keyverse OIDC Discovery and JWKS loading with exact issuer, host, address, TLS identity, response-size, and key-rotation provenance controls.
 - Verified-principal HTTP authorization for protected policy and evidence mutations.
 - Non-null tenant ownership on policy, evidence, binding, and audit records, including a migration backfill for pre-tenant local-preview data.
+- Versioned evidence encryption metadata, bounded old/new key overlap, and audited idempotent rewrap support.
 
 ### Security
 
@@ -38,6 +39,7 @@
 - Require `grc.policy.read` for policy and policy-gap reads in Keyverse mode, and derive every protected mutation actor and tenant from the verified bearer rather than caller identity headers.
 - Hide cross-tenant policy and evidence identifiers behind tenant-filtered reads and `404 Not Found` mutation responses.
 - Pair tenant and parent identifiers with named composite foreign-key constraints for new schemas and idempotent tenant-parent guards for existing SQLite and PostgreSQL stores.
+- Require explicit evidence key IDs and authenticated tenant-record encryption context; reject unknown, revoked, mismatched, or tampered encryption metadata without falling back to another key.
 
 ### ADR
 
@@ -46,3 +48,4 @@
 - `docs/adr/0003-keyverse-jwt-access-token-profile.md` — closed RFC 9068-style Keyverse access-token profile before route and tenant integration.
 - `docs/adr/0004-keyverse-oidc-provider-loading.md` — bounded issuer metadata and public-key loading without arbitrary discovery or ambient network authority.
 - `docs/adr/0005-verified-tenant-record-isolation.md` — verified tenant ownership, protected reads, cross-tenant non-disclosure, and database-enforced tenant-parent relationships.
+- `docs/adr/0006-evidence-keyring-and-rotation.md` — provider-neutral evidence key inventory, context-bound envelopes, and bounded rewrap behavior.
