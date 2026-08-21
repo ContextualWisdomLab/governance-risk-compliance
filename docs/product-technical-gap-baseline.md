@@ -3,7 +3,7 @@
 Snapshot (document generation date): 2026-08-22, Asia/Seoul
 Repository: `ContextualWisdomLab/governance-risk-compliance`  
 Baseline parent branch head: `a747077757484c880fccf76e30cac068c593d3b0` (protected `develop`)
-Baseline source head: `c78ef79499d05e13a8651ccfa2a2979724323160` (PR #19 exact source head)
+Baseline source parent: `c78ef79499d05e13a8651ccfa2a2979724323160` (pre-refresh PR #19 source parent; re-query the current document branch head below)
 Develop-based buyer-workspace head: `59e1a3cce5a794f1b6a33a9f5128a1ccccf95109`
 Tracked current direct-to-develop heads: PR #17 `e0b84fea21b179138196a4d25a321049fad1d7f3`, PR #18 `35d3e55ccd2c5e89efec6c28b7613f1d605cac13`, PR #34 `59e1a3cce5a794f1b6a33a9f5128a1ccccf95109`, PR #37 `fc647fbb288499a1492ed7313209195dd113677c`, PR #38 `8f9c37108ffb16519f2af7f559cba69fc1a40f3d`, PR #43 `f41c387c62998de2d136ce8f4a110b4cb22906ac`, and PR #51 `b222cbf1cebe227fae95b3c53406e0604af4e797`. PR #19 is the current document branch; PR #41 is feature-base PR head `2346afe6a063f502517ee235d6c3e87488da8357` on base `8881d3966e3e9da29b8dce990a95295a2780618b`; re-query both before merge.
 Active Keyverse stack heads: PR #6 `b9b3d5c49367d0b128c87aa478d8921eb1f6c349`, PR #7 `174b83691b103a42607ec33ca5fc7225216744b6`, and PR #16 `d7f867f2d55b21e04f548446c4148c1fdfa7474a`, stacked on PR #38 in that order.
