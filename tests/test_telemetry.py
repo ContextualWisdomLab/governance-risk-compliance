@@ -7,6 +7,8 @@ from unittest.mock import Mock
 import pytest
 from fastapi.testclient import TestClient
 from opentelemetry.trace import StatusCode
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 import cwl_grc.telemetry as telemetry_module
 from cwl_grc import create_app
@@ -36,6 +38,10 @@ def _metrics(app) -> dict[str, object]:  # noqa: ANN001
 def test_requests_emit_otel_metrics_with_route_templates_and_spans() -> None:
     """Requests emit standard rate/duration metrics without raw path identifiers."""
     app = _app()
+    span_exporter = InMemorySpanExporter()
+    app.state.telemetry._tracer_provider.add_span_processor(
+        SimpleSpanProcessor(span_exporter)
+    )
     valid_traceparent = "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"
     with TestClient(app) as client:
         response = client.get("/healthz", headers={"traceparent": valid_traceparent})
@@ -48,6 +54,10 @@ def test_requests_emit_otel_metrics_with_route_templates_and_spans() -> None:
 
     assert response.status_code == 200
     assert denied.status_code == 403
+    server_span = span_exporter.get_finished_spans()[0]
+    traceparent_parts = response.headers["traceparent"].split("-")
+    assert traceparent_parts[1] == f"{server_span.context.trace_id:032x}"
+    assert traceparent_parts[2] == f"{server_span.context.span_id:016x}"
     assert {"http.server.request.count", "http.server.request.duration"}.issubset(metrics)
     request_points = metrics["http.server.request.count"].data.data_points  # type: ignore[attr-defined]
     assert any(

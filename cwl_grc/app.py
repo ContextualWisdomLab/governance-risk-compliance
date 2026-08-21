@@ -64,7 +64,7 @@ from cwl_grc.policy import (
     serialize_policy,
 )
 from cwl_grc.remote_access import request_is_local
-from cwl_grc.telemetry import RequestTelemetry
+from cwl_grc.telemetry import RequestTelemetry, span_traceparent
 
 
 MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
@@ -302,7 +302,7 @@ def create_app(
                     response = await call_next(request)
                 status_code = response.status_code
                 response.headers["X-Request-ID"] = context.request_id
-                response.headers["traceparent"] = context.traceparent
+                response.headers["traceparent"] = span_traceparent(span)
                 return response
             except Exception as exc:
                 error_class = type(exc).__name__

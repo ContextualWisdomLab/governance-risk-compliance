@@ -57,7 +57,7 @@ def test_health_readiness_startup_and_trace_contracts() -> None:
 
 
 def test_correlation_headers_are_preserved_or_replaced() -> None:
-    """Valid W3C context survives while malformed or unbounded values are replaced."""
+    """Request IDs survive while server spans continue or replace trace context."""
     app = _app()
     client = TestClient(app)
     valid_request_id = "officer-request:2026-08-20"
@@ -67,7 +67,10 @@ def test_correlation_headers_are_preserved_or_replaced() -> None:
         headers={"X-Request-ID": valid_request_id, "traceparent": valid_traceparent},
     )
     assert preserved.headers["X-Request-ID"] == valid_request_id
-    assert preserved.headers["traceparent"] == valid_traceparent
+    returned_traceparent = preserved.headers["traceparent"].split("-")
+    assert returned_traceparent[0] == "00"
+    assert returned_traceparent[1] == valid_traceparent.split("-")[1]
+    assert returned_traceparent[2] != valid_traceparent.split("-")[2]
 
     replaced = client.get(
         "/healthz",
