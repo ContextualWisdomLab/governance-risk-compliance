@@ -69,13 +69,25 @@ class KeyverseProviderLoaderSettings:
         ):
             raise ValueError("Keyverse requires a non-empty JWK host allowlist.")
         object.__setattr__(self, "allowed_jwks_hosts", normalized_hosts)
-        if not 0 < self.timeout_seconds <= MAX_TIMEOUT_SECONDS:
+        if (
+            isinstance(self.timeout_seconds, bool)
+            or not isinstance(self.timeout_seconds, (int, float))
+            or not 0 < self.timeout_seconds <= MAX_TIMEOUT_SECONDS
+        ):
             raise ValueError(
                 "Keyverse timeout must be greater than 0 and at most 30 seconds."
             )
-        if not 0 < self.metadata_maximum_bytes <= MAX_METADATA_BYTES:
+        if (
+            isinstance(self.metadata_maximum_bytes, bool)
+            or not isinstance(self.metadata_maximum_bytes, int)
+            or not 0 < self.metadata_maximum_bytes <= MAX_METADATA_BYTES
+        ):
             raise ValueError("Keyverse metadata size must be between 1 byte and 1 MiB.")
-        if not 0 < self.jwks_maximum_bytes <= MAX_JWKS_BYTES:
+        if (
+            isinstance(self.jwks_maximum_bytes, bool)
+            or not isinstance(self.jwks_maximum_bytes, int)
+            or not 0 < self.jwks_maximum_bytes <= MAX_JWKS_BYTES
+        ):
             raise ValueError("Keyverse JWK size must be between 1 byte and 1 MiB.")
 
 

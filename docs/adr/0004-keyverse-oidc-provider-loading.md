@@ -20,7 +20,7 @@ Key rotation also needs an atomic snapshot: a partially validated refresh cannot
 6. Resolve each endpoint once per load, reject the entire result when any answer is malformed or non-global, deduplicate addresses, and dial only the pinned addresses returned by that validation.
 7. Preserve the original hostname for TLS SNI and HTTP `Host` while dialing a pinned IP address. Use the platform trust store and hostname verification.
 8. Use one `GET` request with `Accept: application/json`, `Accept-Encoding: identity`, a fixed product user agent, and no redirect behavior.
-9. Require HTTP 200 and media type `application/json`. Bound both declared `Content-Length` and streamed bytes. Default bounds are 64 KiB for metadata and 1 MiB for JWKs; reviewed configuration may raise them only within the hard ceilings of 1 MiB and 4 MiB respectively.
+9. Require HTTP 200 and media type `application/json`. Bound both declared `Content-Length` and streamed bytes. Default bounds are 64 KiB for metadata and 1 MiB for JWKs; reviewed configuration may raise them only within the hard ceilings of 1 MiB for metadata and 1 MiB for JWKs.
 10. Require discovery metadata to:
     - be a JSON object;
     - return an `issuer` byte-for-byte equal to the configured issuer string;
