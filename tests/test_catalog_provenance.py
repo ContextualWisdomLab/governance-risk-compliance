@@ -914,6 +914,13 @@ def test_catalog_routes_execute_the_local_governance_workflow() -> None:
     assert releases_response.json()["offset"] == 0
     assert releases_response.json()["has_more"] is False
     assert releases_response.json()["next_action"].startswith("Review the release")
+    detail_response = client.get(
+        f"/catalog/releases/{release_response.json()['catalog_release_id']}",
+        headers=_HEADERS,
+    )
+    assert detail_response.status_code == 200
+    assert detail_response.json()["release"]["content_digest"] == _DIGEST
+    assert detail_response.json()["next_action"].startswith("Review the provenance")
     second_digest = hashlib.sha256(b"next lawful catalog fixture").hexdigest()
     second_version_response = client.post(
         f"/catalog/source-artifacts/{artifact_id}/versions",
@@ -977,6 +984,13 @@ def test_catalog_routes_execute_the_local_governance_workflow() -> None:
         headers=_HEADERS,
         params={"offset": 100_001},
     ).status_code == 422
+    assert client.get(
+        "/catalog/releases/missing",
+        headers=_HEADERS,
+    ).status_code == 404
+    assert client.get(
+        f"/catalog/releases/{first_release_id}",
+    ).status_code == 401
     comparison_response = client.get(
         f"/catalog/releases/{first_release_id}/compare/{second_release_id}",
         headers=_HEADERS,

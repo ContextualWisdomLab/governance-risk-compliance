@@ -40,7 +40,7 @@ The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `
 | See catalog coverage gaps | `GET /controls/uncovered?framework=soc2_tsc_2017` |
 | Store evidence | `POST /evidence-records` with `X-Actor-Id` and `X-Purpose: evidence_binding` |
 | Bind evidence | `POST /control-evidence-bindings` or `cwl-grc bind` |
-| Register and compare catalog provenance | `POST /catalog/source-artifacts`, `/versions`, `/import-runs`, or `/releases`, bounded `GET /catalog/releases?limit=50&offset=0`, or `GET /catalog/releases/{id}/compare/{id}` with `X-Purpose: catalog_governance` |
+| Register and compare catalog provenance | `POST /catalog/source-artifacts`, `/versions`, `/import-runs`, or `/releases`, bounded `GET /catalog/releases?limit=50&offset=0`, detail `GET /catalog/releases/{id}`, or `GET /catalog/releases/{id}/compare/{id}` with `X-Purpose: catalog_governance` |
 | Probe | `GET /healthz` |
 
 Policy authoring requires the declared purpose `policy_authoring`. Evidence create and bind require `evidence_binding`. Policies map only to seeded official identifiers: CSAP, SOC 2 TSC, ISMS-P, ISO/IEC 27001:2022, NIST SP 800-53 Rev. 5, COSO 2013, and COSO 2017.

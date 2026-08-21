@@ -289,6 +289,23 @@ def create_app(
             "releases": [_serialize_catalog_release(release) for release in releases[:limit]],
         }
 
+    @app.get("/catalog/releases/{catalog_release_id}")
+    def get_catalog_release(
+        catalog_release_id: str,
+        session: Session = Depends(get_session),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Return one governed release provenance snapshot without source bytes."""
+        require_purpose(x_actor_id, x_purpose, PurposeCode.CATALOG_GOVERNANCE)
+        release = session.get(CatalogRelease, catalog_release_id)
+        if release is None:
+            raise HTTPException(status_code=404, detail="That catalog release is not on file.")
+        return {
+            "release": _catalog_release_snapshot(release),
+            "next_action": "Review the provenance snapshot before using this release in compliance decisions.",
+        }
+
     @app.get("/catalog/releases/{catalog_release_id}/compare/{other_catalog_release_id}")
     def compare_catalog_releases(
         catalog_release_id: str,
