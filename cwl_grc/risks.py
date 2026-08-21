@@ -52,6 +52,7 @@ def next_action_for_risk(
         return "Record an inherent and residual assessment using a versioned methodology."
     if (
         acceptance is not None
+        and acceptance.risk_assessment_id == assessment.risk_assessment_id
         and acceptance.acceptance_status == "active"
         and acceptance.valid_from <= now < acceptance.valid_to
     ):
@@ -496,15 +497,18 @@ def latest_risk_acceptance(
     session: Session,
     decision: AuthorizationDecision,
     risk_id: str,
+    *,
+    risk_assessment_id: str | None = None,
 ) -> RiskAcceptance | None:
-    """Return the latest active acceptance for one exact-tenant risk."""
+    """Return the latest active acceptance for one risk or exact assessment."""
     _require_governance_purpose(decision)
-    return (
+    query = (
         session.query(RiskAcceptance)
         .filter_by(tenant_id=decision.tenant_id, risk_id=risk_id, acceptance_status="active")
-        .order_by(RiskAcceptance.valid_to.desc(), RiskAcceptance.accepted_at.desc())
-        .first()
     )
+    if risk_assessment_id is not None:
+        query = query.filter_by(risk_assessment_id=risk_assessment_id)
+    return query.order_by(RiskAcceptance.valid_to.desc(), RiskAcceptance.accepted_at.desc()).first()
 
 
 def create_risk_closure(
