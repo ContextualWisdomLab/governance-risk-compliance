@@ -17,6 +17,7 @@
 - Hash-locked `uv.lock` dependency graph for runtime and development dependencies.
 - Versioned schema-upgrade receipts for existing first-slice stores.
 - Catalog provenance first slice for Issue #29: allowlisted source pointers, immutable SHA-256 edition metadata, parser receipts, and post-success release records; no raw source bytes or remote fetching.
+- Catalog officers can list published releases and compare provenance/import-receipt metadata without implying a requirement-level catalog diff.
 
 ### Security
 

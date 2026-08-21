@@ -907,6 +907,65 @@ def test_catalog_routes_execute_the_local_governance_workflow() -> None:
     assert releases_response.status_code == 200
     assert releases_response.json()["releases"][0]["catalog_release_id"] == release_response.json()["catalog_release_id"]
     assert releases_response.json()["next_action"].startswith("Review the release")
+    second_digest = hashlib.sha256(b"next lawful catalog fixture").hexdigest()
+    second_version_response = client.post(
+        f"/catalog/source-artifacts/{artifact_id}/versions",
+        headers=_HEADERS,
+        json={
+            "edition_label": "1.2.4",
+            "content_digest": second_digest,
+            "media_type": "application/json",
+            "byte_length": 28,
+            "publication_date": "2024-03-01",
+        },
+    )
+    assert second_version_response.status_code == 201
+    second_version_id = second_version_response.json()["source_artifact_version_id"]
+    assert client.post(
+        "/catalog/import-runs",
+        headers=_HEADERS,
+        json={
+            "source_artifact_version_id": second_version_id,
+            "parser_version": "oscal-json-2",
+            "importer_commit": "e" * 40,
+            "run_status": "succeeded",
+            "requirement_count": 2,
+            "changed_requirement_count": 1,
+        },
+    ).status_code == 201
+    second_release_response = client.post(
+        "/catalog/releases",
+        headers=_HEADERS,
+        json={
+            "source_artifact_version_id": second_version_id,
+            "release_key": "oscal-1.2.4",
+        },
+    )
+    assert second_release_response.status_code == 201
+    first_release_id = release_response.json()["catalog_release_id"]
+    second_release_id = second_release_response.json()["catalog_release_id"]
+    comparison_response = client.get(
+        f"/catalog/releases/{first_release_id}/compare/{second_release_id}",
+        headers=_HEADERS,
+    )
+    assert comparison_response.status_code == 200
+    comparison = comparison_response.json()
+    assert comparison["comparison_scope"] == "source_metadata_and_import_receipt"
+    assert "content_digest" in comparison["changed_fields"]
+    assert "publisher_name" in comparison["unchanged_fields"]
+    assert comparison["limitations"]
+    assert comparison["next_action"].startswith("Review the changed")
+    assert client.get(
+        f"/catalog/releases/{first_release_id}/compare/{second_release_id}"
+    ).status_code == 401
+    assert client.get(
+        f"/catalog/releases/missing/compare/{second_release_id}",
+        headers=_HEADERS,
+    ).status_code == 404
+    assert client.get(
+        f"/catalog/releases/{first_release_id}/compare/missing",
+        headers=_HEADERS,
+    ).status_code == 404
     assert client.get("/catalog/releases").status_code == 401
     assert client.post(
         "/catalog/source-artifacts",

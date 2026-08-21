@@ -280,6 +280,24 @@ def create_app(
             "releases": [_serialize_catalog_release(release) for release in releases],
         }
 
+    @app.get("/catalog/releases/{catalog_release_id}/compare/{other_catalog_release_id}")
+    def compare_catalog_releases(
+        catalog_release_id: str,
+        other_catalog_release_id: str,
+        session: Session = Depends(get_session),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Compare two published release identities without exposing source bytes."""
+        require_purpose(x_actor_id, x_purpose, PurposeCode.CATALOG_GOVERNANCE)
+        from_release = session.get(CatalogRelease, catalog_release_id)
+        if from_release is None:
+            raise HTTPException(status_code=404, detail="The first catalog release is not on file.")
+        to_release = session.get(CatalogRelease, other_catalog_release_id)
+        if to_release is None:
+            raise HTTPException(status_code=404, detail="The second catalog release is not on file.")
+        return _serialize_catalog_release_comparison(from_release, to_release)
+
     @app.post("/policy-documents", status_code=201)
     def post_policy_document(
         body: dict[str, Any],
@@ -547,4 +565,99 @@ def _serialize_catalog_release(release: CatalogRelease) -> dict[str, Any]:
         "release_status": release.release_status,
         "published_at": release.published_at.isoformat() if release.published_at else None,
         "next_action": "Review the release change set before using it in compliance decisions.",
+    }
+
+
+_CATALOG_RELEASE_COMPARISON_FIELDS = (
+    "release_key",
+    "release_status",
+    "source_artifact_id",
+    "publisher_name",
+    "source_reference",
+    "source_url",
+    "edition_label",
+    "publication_date",
+    "effective_date",
+    "withdrawal_date",
+    "content_digest",
+    "media_type",
+    "byte_length",
+    "version_status",
+    "parser_version",
+    "importer_commit",
+    "requirement_count",
+    "changed_requirement_count",
+    "warning_count",
+    "receipt_digest",
+)
+
+
+def _serialize_catalog_release_comparison(
+    from_release: CatalogRelease,
+    to_release: CatalogRelease,
+) -> dict[str, Any]:
+    """Return a metadata-only change set for two published catalog releases."""
+    from_snapshot = _catalog_release_snapshot(from_release)
+    to_snapshot = _catalog_release_snapshot(to_release)
+    changed_fields = [
+        field
+        for field in _CATALOG_RELEASE_COMPARISON_FIELDS
+        if from_snapshot[field] != to_snapshot[field]
+    ]
+    unchanged_fields = [
+        field
+        for field in _CATALOG_RELEASE_COMPARISON_FIELDS
+        if from_snapshot[field] == to_snapshot[field]
+    ]
+    return {
+        "from_release": from_snapshot,
+        "to_release": to_snapshot,
+        "comparison_scope": "source_metadata_and_import_receipt",
+        "changed_fields": changed_fields,
+        "unchanged_fields": unchanged_fields,
+        "limitations": [
+            "Requirement-level control-item diff is unavailable until a verified importer publishes official catalog rows."
+        ],
+        "next_action": "Review the changed provenance fields before using the target release in compliance decisions.",
+    }
+
+
+def _catalog_release_snapshot(release: CatalogRelease) -> dict[str, Any]:
+    """Build a release snapshot from immutable source and successful receipt metadata."""
+    version = release.source_artifact_version
+    artifact = version.source_artifact
+    receipt_run = max(
+        (
+            run
+            for run in version.import_runs
+            if run.run_status == "succeeded" and run.receipt is not None
+        ),
+        key=lambda run: run.completed_at,
+    )
+    receipt = receipt_run.receipt
+    assert receipt is not None
+    return {
+        "catalog_release_id": release.catalog_release_id,
+        "release_key": release.release_key,
+        "release_status": release.release_status,
+        "published_at": release.published_at.isoformat() if release.published_at else None,
+        "source_artifact_id": artifact.source_artifact_id,
+        "publisher_name": artifact.publisher_name,
+        "source_reference": artifact.source_reference,
+        "source_url": artifact.source_url,
+        "source_artifact_version_id": version.source_artifact_version_id,
+        "edition_label": version.edition_label,
+        "publication_date": version.publication_date.isoformat() if version.publication_date else None,
+        "effective_date": version.effective_date.isoformat() if version.effective_date else None,
+        "withdrawal_date": version.withdrawal_date.isoformat() if version.withdrawal_date else None,
+        "content_digest": version.content_digest,
+        "media_type": version.media_type,
+        "byte_length": version.byte_length,
+        "version_status": version.version_status,
+        "parser_version": receipt_run.parser_version,
+        "importer_commit": receipt_run.importer_commit,
+        "requirement_count": receipt.requirement_count,
+        "changed_requirement_count": receipt.changed_requirement_count,
+        "warning_count": receipt.warning_count,
+        "receipt_digest": receipt.receipt_digest,
     }

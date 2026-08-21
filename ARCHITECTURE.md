@@ -27,7 +27,7 @@ flowchart LR
 ## Runtime layers
 
 1. **Officer home**: buyer-oriented HTML that authors a policy, lists policy gaps, and attaches the next evidence in a local preview.
-2. **HTTP API**: policy author/revise/list, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, catalog provenance registration, and `/healthz`.
+2. **HTTP API**: policy author/revise/list, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, catalog provenance registration/review/comparison, and `/healthz`.
 3. **Preview network boundary**: always rejects proxy-forwarded and non-loopback traffic; no runtime override exists before Keyverse authentication.
 4. **CLI tools**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and the local Uvicorn `cwl-grc serve`.
 5. **Kernel package**: `create_app()` for modular composition; `python -m cwl_grc` for standalone local HTTP.
