@@ -26,6 +26,11 @@ remain time-bounded, and include an escalation reference when residual exposure
 exceeds tolerance. Both disposition records are tenant-scoped, audit-recorded,
 and protected from update or deletion at the database boundary.
 
+Closure is a separate immutable approval. It can reference only the latest
+within-appetite reassessment, requires an actor other than the assessor, and
+requires a closure evidence reference. An active acceptance must expire before
+closure; all earlier assessments and disposition records remain available.
+
 ## API
 
 - `POST /risk-methodologies` creates one immutable methodology version.
@@ -37,8 +42,10 @@ and protected from update or deletion at the database boundary.
   version using an expected revision number.
 - `POST /risks/{risk_id}/acceptances` records an independent, current,
   future-ending acceptance for the latest above-appetite assessment.
+- `POST /risks/{risk_id}/closures` records an independent closure approval
+  for the latest within-appetite reassessment after active acceptance expires.
 - `GET /compliance-workspace` includes `risks`, risk posture counts, and risk
-  treatment/acceptance projections, and deterministic next actions.
+  treatment/acceptance/closure projections, and deterministic next actions.
 
 Writes require the compliance-governance purpose and the existing verified
 tenant boundary. Local preview headers remain compatibility inputs only; they
@@ -48,7 +55,7 @@ projection.
 ## Deliberate ceiling
 
 This slice does not claim treatment completion, portfolio aggregation,
-audit-program completion, closure approval, or certification. A proposed
+audit-program completion, or certification. A proposed
 treatment still requires officer follow-through and evidence; an active
 acceptance produces an expiry review action and never becomes a compliance
 conclusion.

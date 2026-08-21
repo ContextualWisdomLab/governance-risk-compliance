@@ -20,6 +20,7 @@ OBLIGATION_REQUIREMENT_TARGET_MIGRATION = "0007_obligation_requirement_target"
 EVIDENCE_REQUEST_WORKFLOW_MIGRATION = "0008_evidence_request_workflow"
 RISK_REGISTER_CORE_MIGRATION = "0009_risk_register_core"
 RISK_DISPOSITION_MIGRATION = "0010_risk_disposition"
+RISK_CLOSURE_MIGRATION = "0011_risk_closure"
 OBLIGATION_HISTORY_TABLES = (
     "source_revision",
     "compliance_obligation",
@@ -106,6 +107,9 @@ def apply_schema_migrations(engine: Engine) -> None:
         if not _migration_applied(connection, RISK_DISPOSITION_MIGRATION):
             _apply_risk_disposition_migration(connection)
             _record_migration(connection, RISK_DISPOSITION_MIGRATION)
+        if not _migration_applied(connection, RISK_CLOSURE_MIGRATION):
+            _apply_risk_closure_migration(connection)
+            _record_migration(connection, RISK_CLOSURE_MIGRATION)
 
 
 def _migration_applied(connection: Connection, migration_key: str) -> bool:
@@ -395,6 +399,13 @@ def _apply_risk_register_core_migration(connection: Connection) -> None:
 
 def _apply_risk_disposition_migration(connection: Connection) -> None:
     """Create immutable treatment and time-bounded acceptance tables."""
+    from cwl_grc.models import Base
+
+    Base.metadata.create_all(connection)
+
+
+def _apply_risk_closure_migration(connection: Connection) -> None:
+    """Create immutable independent risk-closure approvals."""
     from cwl_grc.models import Base
 
     Base.metadata.create_all(connection)
@@ -703,6 +714,7 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
             "risk_assessment_control_link",
             "risk_treatment_plan",
             "risk_acceptance",
+            "risk_closure",
         )
     ) + tuple(
         f"""
@@ -718,6 +730,7 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
             "risk_assessment_control_link",
             "risk_treatment_plan",
             "risk_acceptance",
+            "risk_closure",
         )
     ) + tuple(
         f"""
@@ -926,6 +939,12 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
         """
         CREATE TRIGGER risk_acceptance_immutable
         BEFORE UPDATE OR DELETE ON risk_acceptance
+        FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
+        """,
+        "DROP TRIGGER IF EXISTS risk_closure_immutable ON risk_closure",
+        """
+        CREATE TRIGGER risk_closure_immutable
+        BEFORE UPDATE OR DELETE ON risk_closure
         FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
         """,
         """
