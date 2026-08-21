@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime, timezone
 
-from sqlalchemy import Connection, Engine, inspect, text
+from sqlalchemy import Connection, DDL, Engine, Index, MetaData, Table, inspect, text
 
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
@@ -148,11 +148,13 @@ def _apply_tenant_isolation_migration(connection: Connection) -> None:
         columns = {column["name"] for column in inspector.get_columns(table_name)}
         if "tenant_id" in columns:
             continue
+        table = Table(table_name, MetaData(), autoload_with=connection)
         connection.execute(
-            text(
-                f"ALTER TABLE {table_name} ADD COLUMN tenant_id VARCHAR(128) "
-                f"NOT NULL DEFAULT '{LOCAL_DEVELOPMENT_TENANT}'"
-            )
+            DDL(
+                "ALTER TABLE %(table)s ADD COLUMN tenant_id VARCHAR(128) "
+                "NOT NULL DEFAULT '%(tenant)s'",
+                context={"tenant": LOCAL_DEVELOPMENT_TENANT},
+            ).against(table)
         )
         inspector = inspect(connection)
 
@@ -251,25 +253,25 @@ def _apply_internal_control_model_migration(connection: Connection) -> None:
     from cwl_grc.models import Base
 
     inspector = inspect(connection)
-    for table_name, index_name, columns in (
+    for table_name, index_name, column_names in (
         (
             "evidence_record",
             "evidence_record_tenant_identity_compat",
-            "tenant_id, evidence_record_id",
+            ("tenant_id", "evidence_record_id"),
         ),
         (
             "control_evidence_binding",
             "control_evidence_binding_tenant_identity_compat",
-            "tenant_id, binding_id",
+            ("tenant_id", "binding_id"),
         ),
     ):
         if inspector.has_table(table_name):
-            connection.execute(
-                text(
-                    f"CREATE UNIQUE INDEX IF NOT EXISTS {index_name} "
-                    f"ON {table_name} ({columns})"
-                )
-            )
+            table = Table(table_name, MetaData(), autoload_with=connection)
+            Index(
+                index_name,
+                *(table.c[column_name] for column_name in column_names),
+                unique=True,
+            ).create(connection, checkfirst=True)
     Base.metadata.create_all(connection)
     connection.execute(
         text(
