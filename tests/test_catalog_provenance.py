@@ -151,6 +151,23 @@ def test_source_registration_rejects_unsafe_pointers(
             )
 
 
+def test_source_registration_accepts_explicit_default_https_port() -> None:
+    """An explicit HTTPS default port remains an equivalent safe pointer."""
+    factory = _factory()
+    with factory() as session:
+        artifact = register_source_artifact(
+            session,
+            _DECISION,
+            publisher_name="NIST",
+            source_reference="explicit-default-port",
+            source_url="https://pages.nist.gov:443/OSCAL/",
+            artifact_content_class="identifier_only",
+            license_policy_code="identifier_only",
+            allowed_source_hosts={"pages.nist.gov"},
+        )
+        assert artifact.source_host == "pages.nist.gov"
+
+
 def test_source_registration_rejects_wrong_policy_and_purpose() -> None:
     """Unknown licenses and undeclared purposes cannot create source pointers."""
     factory = _factory()

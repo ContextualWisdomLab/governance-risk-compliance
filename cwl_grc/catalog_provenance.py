@@ -511,7 +511,7 @@ def _validated_source_host(source_url: str, allowed_hosts: set[str]) -> str:
         raise ValueError("source URL must be HTTPS without credentials.")
     if parsed.fragment:
         raise ValueError("source URL must not contain a fragment.")
-    if parsed.port is not None:
+    if parsed.port is not None and parsed.port != 443:
         raise ValueError("source URL must not contain a non-default port.")
     host = parsed.hostname.lower().rstrip(".")
     normalized_hosts = {str(item).lower().rstrip(".") for item in allowed_hosts}
