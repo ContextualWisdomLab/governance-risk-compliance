@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from collections.abc import Awaitable, Callable, Iterator
 from typing import Any
 
@@ -18,6 +19,13 @@ from cwl_grc.encryption import EvidenceCipher
 from cwl_grc.evidence import bind_control_evidence, create_evidence_record
 from cwl_grc.health import health_payload
 from cwl_grc.models import ControlItem, EvidenceRecord
+from cwl_grc.observability import (
+    build_request_context,
+    emit_request_log,
+    reset_verified_principal,
+    route_template,
+    set_verified_principal,
+)
 from cwl_grc.officer_console import parse_control_ref, render_officer_home
 from cwl_grc.policy import (
     ControlRef,
@@ -30,6 +38,7 @@ from cwl_grc.policy import (
     serialize_policy,
 )
 from cwl_grc.remote_access import request_is_local
+from cwl_grc.telemetry import RequestTelemetry
 
 
 def parse_framework(value: str | None) -> FrameworkCode | None:
@@ -84,30 +93,79 @@ def create_app(
 
     app = FastAPI(title="CWL GRC", version="0.1.0")
     app.state.evidence_cipher = cipher
+    environment = os.environ.get("CWL_GRC_ENVIRONMENT", "local_preview")
+    app.state.telemetry = RequestTelemetry(environment)
+    app.router.add_event_handler("shutdown", app.state.telemetry.shutdown)
 
     @app.middleware("http")
     async def enforce_developer_preview_boundary(
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        """Reject every non-loopback or proxy-forwarded request until real auth exists."""
-        client_host = getattr(request.client, "host", None)
-        local_request = request_is_local(
-            client_host,
-            request.headers.get("x-forwarded-for"),
-            request.headers.get("forwarded"),
+        """Enforce the local boundary while recording a safe request trace."""
+        context = build_request_context(
+            request.headers.get("x-request-id"),
+            request.headers.get("traceparent"),
         )
-        if not local_request:
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "detail": (
-                        "Remote preview is disabled. Configure Keyverse-backed identity and "
-                        "tenant authorization before exposing CWL GRC."
+        request.state.request_reference = context.request_id
+        principal_token = set_verified_principal(None, None)
+        started_at = time.perf_counter()
+        status_code = 500
+        error_class: str | None = None
+        route = route_template(request.scope)
+        with app.state.telemetry.server_span(
+            request.method,
+            route,
+            request.headers,
+        ) as span:
+            try:
+                client_host = getattr(request.client, "host", None)
+                local_request = request_is_local(
+                    client_host,
+                    request.headers.get("x-forwarded-for"),
+                    request.headers.get("forwarded"),
+                )
+                if not local_request:
+                    response = JSONResponse(
+                        status_code=503,
+                        content={
+                            "detail": (
+                                "Remote preview is disabled. Configure Keyverse-backed identity and "
+                                "tenant authorization before exposing CWL GRC."
+                            ),
+                            "request_reference": context.request_id,
+                        },
                     )
-                },
-            )
-        return await call_next(request)
+                else:
+                    response = await call_next(request)
+                status_code = response.status_code
+                response.headers["X-Request-ID"] = context.request_id
+                response.headers["traceparent"] = context.traceparent
+                return response
+            except Exception as exc:
+                error_class = type(exc).__name__
+                raise
+            finally:
+                route = route_template(request.scope)
+                elapsed_seconds = time.perf_counter() - started_at
+                span.set_attribute("http.route", route)
+                span.set_attribute("http.response.status_code", status_code)
+                app.state.telemetry.record_request(
+                    request.method,
+                    route,
+                    status_code,
+                    elapsed_seconds,
+                )
+                emit_request_log(
+                    context,
+                    request.method,
+                    route,
+                    status_code,
+                    elapsed_seconds * 1000,
+                    environment,
+                    error_class,
+                )
+                reset_verified_principal(principal_token)
 
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:

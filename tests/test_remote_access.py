@@ -39,9 +39,9 @@ def test_forwarded_remote_preview_is_always_denied(monkeypatch) -> None:  # noqa
     assert local.status_code == 200
     for response in (forwarded, standardized):
         assert response.status_code == 503
-        assert response.json() == {
-            "detail": (
-                "Remote preview is disabled. Configure Keyverse-backed identity and "
-                "tenant authorization before exposing CWL GRC."
-            )
-        }
+        assert response.json()["detail"] == (
+            "Remote preview is disabled. Configure Keyverse-backed identity and "
+            "tenant authorization before exposing CWL GRC."
+        )
+        assert response.json()["request_reference"]
+        assert response.headers["X-Request-ID"] == response.json()["request_reference"]
