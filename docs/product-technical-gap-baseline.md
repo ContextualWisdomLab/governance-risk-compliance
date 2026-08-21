@@ -67,12 +67,12 @@ current head has a 53-test Python suite with 100% statement/branch coverage,
 Interrogate 100% docstring coverage, a six-test design-contract suite,
 Storybook 10.5.10 build, and three
 Chromium interaction tests. Product #568 and Buyer Workspace #10 are successful
-on this exact head; Analyze, Scorecard, Semgrep, Trivy, OSV, dependency review,
-required workflow, and Strix checks are also terminal-success, while
-`coverage-evidence` remains queued. The current-head Scorecard review thread
-is resolved, but independent approval is absent. It is non-Draft; the fixture
-is not authentication, API, export, accessibility-certification, or deployment
-evidence.
+on this exact head. The latest hosted exact-head observation has 3 successful,
+11 queued, and 7 skipped check runs; Analyze, Semgrep, dependency review, OSV,
+required workflow, Scorecard, Trivy, and Strix remain queued. The current-head
+Scorecard review thread is resolved, but independent approval is absent. It is
+non-Draft; the fixture is not authentication, API, export,
+accessibility-certification, or deployment evidence.
 
 PR #36 was closed after its earlier base became empty; its historical merge
 record is not current source or protected-merge evidence. PR #41 carries the
@@ -153,15 +153,17 @@ ERROR status for handler-returned 5xx spans. The latest exact head also
 disables SDK automatic exception events/status so raw exception text is not
 recorded in spans. The exact current tree passes 55 tests with 100%
 statement/branch/docstring coverage, Ruff, compile, lock, package build/install
-smoke, actionlint, Semgrep (187 rules, zero findings), and diff checks; hosted
-product and security lanes are terminal success except `osv-scan`, which
-failed at `Require OSV scan output` because the central workflow passed
-deprecated `--output` flags to OSV v2.3.8, leaving the result files absent.
-The exact hosted failure is central control-plane evidence, not a source
-vulnerability verdict; no source revert is inferred. The normal-path central
-repair is `.github` PR #1208 at exact head
-`9f0845517010f2c4695de83dd2bd50385c068a15`; its replacement OSV and required
-lanes are queued on that current head, with independent approval absent.
+smoke, actionlint, Semgrep (187 rules, zero findings), and diff checks; the
+latest exact-head hosted observation has 15 successful, 1 failed, and 9
+skipped runs. The failed `osv-scan` check is retained as central workflow
+output-contract evidence, not a source-vulnerability verdict; no source revert
+is inferred. The competing central `.github` PR #1208 was closed unmerged;
+the causal repairs are now owned by open PR #1158 at exact head
+`092d838cc2f984030e5885ca66498c55082ab769`, PR #1153 at exact head
+`1f8878d78cb2f0aed68964ea5fabf5679526e78b`, and PR #1198 at exact head
+`4d3d24aa404959f5067735fec0558d5924ade590` (the related scheduler PR #1203
+is already merged). Normal required checks and independent approval remain
+outstanding.
 
 PR #53 stages the first buyer-visible G-06 API-contract slice directly on
 `develop`. Its exact head is `976945dbbe22b0b8fa7893150e2723738a0ff484` on
@@ -356,7 +358,7 @@ merge, force-push, or predecessor-head evidence is valid.
 | [#48](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/48) | `afc225e495a7beaaa2bf6924401abe1a80ed563c` (2026-08-21) | Merged, stack-only | Independent risk-closure workflow stacked on PR #47 exact head `3920a505b61cf3986fb5b8819a6cd9ab6b673920`. Local 186-test 100% statement/branch/docstring, security, dependency, and PostgreSQL evidence passed; it was merged into `feat/risk-disposition-20260821` as `2b2c5c414c9e1558a9f8d25b9b71a761ac767d7a`. This did not merge to protected `develop`, and no independent approving review is recorded. |
 | [#49](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/49) | `8b4b563a073e6037dfe6f766709e587c2f553eda` (2026-08-21) | Merged, stack-only | Tenant-scoped risk portfolio indicators stacked on PR #48 exact head `afc225e495a7beaaa2bf6924401abe1a80ed563c`. Local 187-test 100% statement/branch/docstring, security, dependency, and PostgreSQL workspace-route evidence passed; it was merged into `feat/risk-closure-20260821` as `8038d0689cc33a23356166504855d9a692350bdb`. This did not merge to protected `develop`, and no independent approving review is recorded. |
 | [#19](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/19) | Current document branch head (re-query before merge) | Ready, merge-blocked, review-required | Documentation baseline and GRC roadmap review fixes. This branch records the 2026-08-22 open-issue snapshot and all ten live open PRs with exact heads, including the #37, #38, #43, #51, and #53 follow-ups; the self-referential document head is intentionally not copied into its own row. Independent approval and protected merge remain absent. |
-| [#51](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/51) | `1a8f90dd15f37ffc86b8a0efd217a8b2812e5f99` (2026-08-22) | Ready, merge-blocked, review-required | GRC OpenTelemetry request boundary from the fork source. Exact-head local evidence is 55 passing tests with 100% statement/branch/docstring coverage, Ruff, compile, lock, package build/install smoke, actionlint, Semgrep zero findings, and diff checks; the latest hardening also proves finished spans contain no automatic exception events. Hosted security/review lanes were recreated after the latest fork push and independent approval is absent. The older predecessor OSV failure was an output-contract defect in central `security-scan.yml`, not a source result; current-head OSV remains pending. |
+| [#51](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/51) | `1a8f90dd15f37ffc86b8a0efd217a8b2812e5f99` (2026-08-22) | Ready, merge-blocked, review-required | GRC OpenTelemetry request boundary from the fork source. Exact-head local evidence is 55 passing tests with 100% statement/branch/docstring coverage, Ruff, compile, lock, package build/install smoke, actionlint, Semgrep zero findings, and diff checks; the latest hardening also proves finished spans contain no automatic exception events. The latest hosted observation is 15 success, 1 failed `osv-scan`, and 9 skipped; the failure remains central output-contract evidence rather than a source vulnerability result. Independent approval is absent and normal central remediation remains open. |
 | [#53](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/53) | `976945dbbe22b0b8fa7893150e2723738a0ff484` (2026-08-22) | Open, normal-merge candidate, review/checks pending | First G-06 version-one policy API contract on `develop`: strict models, bounded cursor pagination, target-scoped durable idempotency with concurrent unique-key recovery, ETags/If-Match, batched page serialization, bounded non-reflective RFC 9457 errors, OpenAPI deprecation markers, deterministic mapping serialization for stable ETags, and explicit loopback-only preview boundary. Exact-head local evidence passes 100% statement/branch/docstring coverage, Ruff, compile, lock, actionlint, wheel/install smoke, Semgrep zero findings, pip-audit no known vulnerabilities, and PostgreSQL clean-install/legacy-upgrade rehearsal. Hosted required checks and independent review must be re-queried before merge; Gitleaks/osv-scanner were unavailable locally. |
 | [#16](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/16) | `8dfa6bae1a9366335f15294f06abf8313f1380e4` (2026-08-21) | Merged, stack-only | Tenant isolation merged into its feature branch as `34a1b25c38c78f367bc77b90301ef0f68a1ad8ba`; the historical stack had 120 tests and 100% coverage/docstrings, but this did not update protected `develop`. |
 | [#7](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/7) | `25350d6177244d9a39ae3275feca813d5b4a737d` (2026-08-21) | Merged, stack-only | Route enforcement merged into its feature branch as `b44f3e9f83b637a9a580468be5b5b5f95422127b`; the historical stack had 110 tests and 100% coverage/docstrings, but this did not update protected `develop`. |
