@@ -159,7 +159,7 @@ OSV v2.3.8, leaving the result files absent; this is central control-plane
 evidence, not a source vulnerability verdict. The current-head OSV run is
 pending and is not represented as hosted success. The normal-path central
 repair is `.github` PR #1208 at exact head
-`de2ea4b9d7c8bcca81a69834d6d1859bfd9425ed`; its hosted checks are still
+`9f0845517010f2c4695de83dd2bd50385c068a15`; its hosted checks are still
 progressing and independent approval is absent.
 
 PR #53 stages the first buyer-visible G-06 API-contract slice directly on
