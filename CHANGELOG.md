@@ -68,3 +68,4 @@
 - `docs/adr/0010-slo-and-error-budget-contract.md` — proposed SLO, error-budget, and multi-window alert contract pending collector acceptance.
 - `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — separate external requirements, internal controls, scoped implementations, testing, evidence usage, and explicit effectiveness projection.
 - `docs/adr/0012-organization-opentelemetry-evidence-boundary.md` — GRC-owned aggregate OTel acceptance evidence with raw telemetry retained only in the approved observability platform.
+- `docs/doctoring/opentelemetry-evidence-references.md` — APA 7 references for the OpenTelemetry and W3C Trace Context boundary.
