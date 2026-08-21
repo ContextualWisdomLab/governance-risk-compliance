@@ -30,7 +30,7 @@ new consistency boundary.
 
 ## Consequences
 
-The first workspace composes four bounded projections and reuses the existing
+The first workspace composes five bounded projections and reuses the existing
 tenant isolation and append-only audit rules. Catalog coverage is preloaded in
 tenant-scoped batches so a workspace read does not issue one status query per
 catalog item. Risks, audit engagement, controlled export, data-room access,
@@ -41,7 +41,10 @@ and provenance decisions.
 
 `tests/test_obligations.py` verifies missing and wrong scopes, two verified
 tenants, exact obligation scope, policy-gap isolation, explicit posture counts,
-and the evidence-request projection ceiling. `tests/test_evidence_requests.py`
+and the evidence-request projection ceiling. The risk projection adds only
+versioned methodology and immutable inherent/residual assessment state; risk
+treatments and time-bounded acceptances remain outside this read model.
+`tests/test_evidence_requests.py`
 verifies the request, submission, independent review, rejection, audit, and
 tenant-parent contracts. The full product suite must retain 100% statement and
 branch coverage and 100% public docstring coverage.

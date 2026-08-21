@@ -242,6 +242,25 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
         )
         connection.execute(
             text(
+                "CREATE TABLE risk_methodology ("
+                "methodology_id VARCHAR(64) PRIMARY KEY, "
+                "tenant_id VARCHAR(128) NOT NULL, "
+                "methodology_code VARCHAR(64) NOT NULL, "
+                "methodology_version INTEGER NOT NULL, "
+                "methodology_title VARCHAR(255) NOT NULL, "
+                "likelihood_scale_max INTEGER NOT NULL, "
+                "impact_scale_max INTEGER NOT NULL, "
+                "effective_control_factor_percent INTEGER NOT NULL, "
+                "appetite_threshold INTEGER NOT NULL, "
+                "aggregation_rule VARCHAR(128) NOT NULL, "
+                "rounding_policy VARCHAR(64) NOT NULL, "
+                "created_by_actor VARCHAR(128) NOT NULL, "
+                "created_at TIMESTAMP NOT NULL"
+                ")"
+            )
+        )
+        connection.execute(
+            text(
                 "CREATE TABLE obligation_requirement ("
                 "obligation_requirement_id VARCHAR(64) PRIMARY KEY, "
                 "tenant_id VARCHAR(128) NOT NULL, "
@@ -318,7 +337,7 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
     assert finalized in {True, 1}
     assert policy_tenant == "local_development"
     assert version_tenant == "local_development"
-    assert receipt_count == 8
+    assert receipt_count == 9
     with engine.connect() as connection:
         requirement = connection.execute(
             text(

@@ -33,6 +33,7 @@
 - Tenant-scoped obligation register: source revisions, jurisdictions, applicability decisions, legal references, commitments, proposed policy/control links awaiting independent review, regulatory changes, immutable impact assessments, and overdue/upcoming worklists for Issue #28.
 - Tenant-scoped `/compliance-workspace` read model that composes existing control, obligation, and policy-gap projections without a duplicate persistence model, distinguishes obligations from scoped work items, and preloads catalog coverage in tenant batches; risks, audits, and exports remain explicit gaps.
 - Tenant-scoped evidence-request workflow for bounded scope/period collection, same-tenant artifact submission, independent acceptance or rejection, reuse policy, append-only audit history, and workspace projection without copying evidence payloads.
+- Tenant-scoped versioned risk methodology and register core with immutable inherent/residual assessments, explicit appetite status, optimistic revision checks, and mitigation links limited to implemented internal controls, completed test results, and purpose-bound evidence usage; treatments and acceptances remain explicit follow-up gaps.
 - Tenant-scoped `/compliance-workspace` read model that composes existing control, obligation, and policy-gap projections without a duplicate persistence model, distinguishes obligations from scoped work items, and preloads catalog coverage in tenant batches; evidence requests, risks, audits, and exports remain explicit gaps.
 - Organization OpenTelemetry evidence boundary: GRC governs aggregate collector acceptance for `cwl-grc`, `lineageweave`, `contextual-orchestrator`, and Valkey access without storing raw spans or payloads.
 
@@ -60,6 +61,7 @@
 - Add SQLite/PostgreSQL composite tenant guards and immutable-history triggers for obligation and regulatory-change records; require the dedicated `compliance_governance` purpose on the new JSON workflow.
 - Enforce null-safe obligation-target uniqueness, savepoint-backed concurrent-create conflicts, and proposed-only obligation-link insertion so creation cannot self-assert approval.
 - Enforce same-tenant evidence-request artifact links and requested-to-submitted-to-reviewed state transitions in SQLite and PostgreSQL.
+- Enforce same-tenant risk assessment links, optimistic assessment revisions, and immutable methodology/assessment history in SQLite and PostgreSQL.
 - Construct migration tenant DDL and compatibility indexes through SQLAlchemy's quoted schema APIs instead of interpolated SQL identifiers.
 
 ### ADR
@@ -78,5 +80,6 @@
 - `docs/adr/0012-obligation-applicability-and-regulatory-change.md` — source-backed obligation, applicability, commitment, and change-impact history separate from control effectiveness.
 - `docs/adr/0013-compliance-workspace-read-model.md` — tenant-scoped posture composition and explicit projection ceiling.
 - `docs/adr/0014-evidence-request-workflow.md` — bounded evidence request, independent review, payload non-disclosure, and terminal rejection contract.
+- `docs/adr/0015-risk-register-assessment-core.md` — versioned methodology, immutable assessment snapshots, tested-control mitigation links, and explicit treatment/acceptance ceiling.
 - `docs/adr/0012-organization-opentelemetry-evidence-boundary.md` — GRC-owned aggregate OTel acceptance evidence with raw telemetry retained only in the approved observability platform.
 - `docs/doctoring/opentelemetry-evidence-references.md` — APA 7 references for the OpenTelemetry and W3C Trace Context boundary.

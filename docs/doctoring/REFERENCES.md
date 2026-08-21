@@ -12,6 +12,10 @@ Committee of Sponsoring Organizations of the Treadway Commission. (2017). *Enter
 
 International Organization for Standardization. (2022). *Information security, cybersecurity and privacy protection—Information security management systems—Requirements* (ISO/IEC 27001:2022). https://www.iso.org/standard/27001
 
+International Organization for Standardization. (2018). *Risk management—Guidelines* (ISO 31000:2018). https://committee.iso.org/sites/tc262/home/projects/published/iso-31000-2018-risk-management.html
+
+International Organization for Standardization. (2022). *Information security, cybersecurity and privacy protection—Guidelines for information security risk management* (ISO/IEC 27005:2022). https://www.iso.org/standard/80585.html
+
 National Institute of Standards and Technology. (n.d.). *OSCAL Control Mapping Model v1.2.3*. Retrieved August 20, 2026, from https://pages.nist.gov/OSCAL-Reference/models/v1.2.3/mapping/xml-reference/
 
 International Organization for Standardization. (2021). *ISO 37301:2021: Compliance management systems—Requirements with guidance for use*. Retrieved August 20, 2026, from https://www.iso.org/standard/75080.html
@@ -31,6 +35,10 @@ OpenID Foundation. (2023a). *OpenID Connect Core 1.0 incorporating errata set 2*
 OpenID Foundation. (2023b). *OpenID Connect Discovery 1.0 incorporating errata set 2*. https://openid.net/specs/openid-connect-discovery-1_0-errata2.html
 
 Ross, R., & Pillitteri, V. (2020). *Security and privacy controls for information systems and organizations* (NIST Special Publication 800-53 Rev. 5). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-53r5
+
+National Institute of Standards and Technology. (2024). *The NIST cybersecurity framework (CSF) 2.0*. https://www.nist.gov/publications/nist-cybersecurity-framework-csf-20
+
+Ross, R. (2012). *Guide for conducting risk assessments* (NIST Special Publication 800-30 Rev. 1). National Institute of Standards and Technology. https://csrc.nist.gov/pubs/sp/800/30/r1/final
 
 Barker, E. (2020). *Recommendation for key management: Part 1—General* (NIST Special Publication 800-57 Part 1 Revision 5). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-57pt1r5
 

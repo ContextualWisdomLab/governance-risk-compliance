@@ -18,6 +18,7 @@ INTERNAL_CONTROL_MODEL_MIGRATION = "0005_internal_control_model"
 OBLIGATION_MODEL_MIGRATION = "0006_obligation_applicability"
 OBLIGATION_REQUIREMENT_TARGET_MIGRATION = "0007_obligation_requirement_target"
 EVIDENCE_REQUEST_WORKFLOW_MIGRATION = "0008_evidence_request_workflow"
+RISK_REGISTER_CORE_MIGRATION = "0009_risk_register_core"
 OBLIGATION_HISTORY_TABLES = (
     "source_revision",
     "compliance_obligation",
@@ -98,6 +99,9 @@ def apply_schema_migrations(engine: Engine) -> None:
         if not _migration_applied(connection, EVIDENCE_REQUEST_WORKFLOW_MIGRATION):
             _apply_evidence_request_workflow_migration(connection)
             _record_migration(connection, EVIDENCE_REQUEST_WORKFLOW_MIGRATION)
+        if not _migration_applied(connection, RISK_REGISTER_CORE_MIGRATION):
+            _apply_risk_register_core_migration(connection)
+            _record_migration(connection, RISK_REGISTER_CORE_MIGRATION)
 
 
 def _migration_applied(connection: Connection, migration_key: str) -> bool:
@@ -340,6 +344,49 @@ def _apply_evidence_request_workflow_migration(connection: Connection) -> None:
     from cwl_grc.models import Base
 
     Base.metadata.create_all(connection)
+
+
+def _apply_risk_register_core_migration(connection: Connection) -> None:
+    """Create versioned risk tables and unique targets for tenant-bound links."""
+    from cwl_grc.models import Base
+
+    Base.metadata.create_all(connection)
+    methodology_columns = {
+        column["name"] for column in inspect(connection).get_columns("risk_methodology")
+    }
+    if "control_effectiveness_method" not in methodology_columns:
+        connection.execute(
+            text(
+                "ALTER TABLE risk_methodology ADD COLUMN control_effectiveness_method "
+                "VARCHAR(128) NOT NULL DEFAULT "
+                "'completed_operating_test_with_supporting_evidence'"
+            )
+        )
+    if "tolerance_threshold" not in methodology_columns:
+        connection.execute(
+            text(
+                "ALTER TABLE risk_methodology ADD COLUMN tolerance_threshold "
+                "INTEGER NOT NULL DEFAULT 0"
+            )
+        )
+        connection.execute(
+            text(
+                "UPDATE risk_methodology SET tolerance_threshold = appetite_threshold "
+                "WHERE tolerance_threshold = 0"
+            )
+        )
+    connection.execute(
+        text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS control_test_result_tenant_identity_idx "
+            "ON control_test_result (tenant_id, test_result_id)"
+        )
+    )
+    connection.execute(
+        text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS evidence_usage_tenant_identity_idx "
+            "ON evidence_usage (tenant_id, evidence_usage_id)"
+        )
+    )
 
 
 def _apply_obligation_requirement_target_migration(connection: Connection) -> None:
@@ -639,6 +686,32 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
             SELECT RAISE(ABORT, '{table_name} is immutable');
         END
         """
+        for table_name in (
+            "risk_methodology",
+            "risk_assessment",
+            "risk_assessment_control_link",
+        )
+    ) + tuple(
+        f"""
+        CREATE TRIGGER IF NOT EXISTS {table_name}_block_delete
+        BEFORE DELETE ON {table_name}
+        BEGIN
+            SELECT RAISE(ABORT, '{table_name} is immutable');
+        END
+        """
+        for table_name in (
+            "risk_methodology",
+            "risk_assessment",
+            "risk_assessment_control_link",
+        )
+    ) + tuple(
+        f"""
+        CREATE TRIGGER IF NOT EXISTS {table_name}_block_update
+        BEFORE UPDATE ON {table_name}
+        BEGIN
+            SELECT RAISE(ABORT, '{table_name} is immutable');
+        END
+        """
         for table_name in OBLIGATION_HISTORY_TABLES
     ) + tuple(
         f"""
@@ -808,6 +881,24 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
         """
         CREATE TRIGGER evidence_usage_immutable
         BEFORE UPDATE OR DELETE ON evidence_usage
+        FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
+        """,
+        "DROP TRIGGER IF EXISTS risk_methodology_immutable ON risk_methodology",
+        """
+        CREATE TRIGGER risk_methodology_immutable
+        BEFORE UPDATE OR DELETE ON risk_methodology
+        FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
+        """,
+        "DROP TRIGGER IF EXISTS risk_assessment_immutable ON risk_assessment",
+        """
+        CREATE TRIGGER risk_assessment_immutable
+        BEFORE UPDATE OR DELETE ON risk_assessment
+        FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
+        """,
+        "DROP TRIGGER IF EXISTS risk_assessment_control_link_immutable ON risk_assessment_control_link",
+        """
+        CREATE TRIGGER risk_assessment_control_link_immutable
+        BEFORE UPDATE OR DELETE ON risk_assessment_control_link
         FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
         """,
         """

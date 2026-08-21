@@ -4,14 +4,16 @@
 
 The first authenticated workspace must let an officer answer three questions
 for one tenant: what control posture is known, which obligation applicability
-decisions need attention, and which policy/control mappings remain uncovered.
+decisions need attention, which policy/control mappings remain uncovered, and
+which versioned risk assessments require follow-up.
 The contract preserves `unknown`, `unassessed`, `stale`, `exception`, and
 `ineffective` rather than collapsing them into a pass/fail score.
 
 This slice is read-only and reuses the existing control, obligation, and policy
-gap projections. Evidence requests, risk register, audit programs, controlled
-exports, and auditor data rooms remain explicitly out of the projection until
-their authorization and provenance contracts are implemented.
+gap projections, evidence requests, and the bounded risk-register assessment
+projection. Risk treatments, time-bounded risk acceptances, audit programs,
+controlled exports, and auditor data rooms remain explicitly out of the
+projection until their authorization and provenance contracts are implemented.
 
 ## TRD contract
 
@@ -30,12 +32,18 @@ The response contains:
   applicability, review date, queue, and next action;
 - `policy_gaps`: same-tenant latest policy mappings without an effective or
   authorized not-applicable conclusion;
-- `next_actions`: deterministic references into those three projections;
+- `evidence_requests`: metadata-only request state, scope, period, and audit
+  history without evidence payloads;
+- `risks`: stable tenant risk identities with immutable inherent/residual
+  assessment snapshots and explicit appetite status;
+- `next_actions`: deterministic references into the projected work items;
 - `not_yet_projected`: explicit follow-up areas, never presented as empty
-  evidence or risk state.
+  treatment, acceptance, evidence, or audit state.
 
 The route does not expose evidence payloads, source legal text, tenant/actor
-identifiers, or an invented risk score. Applicability and review-queue counts
+identifiers, or an invented risk score. Risk scores are only calculated from a
+versioned methodology and explicit same-tenant internal-control test/evidence
+links; no treatment or acceptance is implied. Applicability and review-queue counts
 are explicitly work-item counts because one obligation can have several active
 scope decisions. A customer-facing UI must render the
 exact rows behind every count and provide a keyboard-accessible empty/loading/
@@ -62,6 +70,6 @@ sequenceDiagram
 Two verified tenant tokens receive only their own obligations and policy gaps;
 the wrong scope is denied. The route is a local-preview contract, not a
 production deployment or compliance conclusion. Adding evidence freshness,
-requests, risk, audit, exports, or data-room projections requires a separate
+risk treatments, risk acceptances, audit, exports, or data-room projections requires a separate
 reviewed contract with purpose-specific field selection, audit, retention, and
 reproducibility evidence.
