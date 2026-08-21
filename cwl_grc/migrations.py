@@ -287,7 +287,7 @@ def _apply_internal_control_model_migration(connection: Connection) -> None:
     from cwl_grc.models import Base
 
     inspector = inspect(connection)
-    for table_name, index_name, column_names in (
+    for table_name, index_name, columns in (
         (
             "evidence_record",
             "evidence_record_tenant_identity_compat",
