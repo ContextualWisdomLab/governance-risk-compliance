@@ -21,7 +21,7 @@ Add a global, tenant-neutral provenance chain:
 - Make source versions, parser runs/receipts, and releases append-only at the SQLite and PostgreSQL database boundary.
 - Make import identity idempotent by source version plus parser version; release publication requires a successful receipt.
 - Require the declared `catalog_governance` purpose. It is an audit-purpose declaration in the local preview, not authentication.
-- Expose a bounded published-release list, a metadata-only release detail endpoint, and a comparison endpoint so officers can review source/version/receipt changes without implying a requirement-level diff.
+- Expose a bounded published-release list, a metadata-only release detail endpoint, and a comparison endpoint so officers can review source/version/receipt and explicit license/export policy changes without implying a requirement-level diff.
 - Keep provenance separate from `control_framework` and `control_item`. A later importer may create or update an official framework edition only after verified source bytes, parser output, official identifiers, mapping evidence, and independent review exist.
 
 ## Consequences

@@ -921,6 +921,9 @@ def test_catalog_routes_execute_the_local_governance_workflow() -> None:
     )
     assert detail_response.status_code == 200
     assert detail_response.json()["release"]["content_digest"] == _DIGEST
+    assert detail_response.json()["release"]["artifact_content_class"] == "identifier_only"
+    assert detail_response.json()["release"]["source_text_export_allowed"] is False
+    assert detail_response.json()["release"]["identifier_export_allowed"] is True
     assert detail_response.json()["next_action"].startswith("Review the provenance")
     second_digest = hashlib.sha256(b"next lawful catalog fixture").hexdigest()
     second_version_response = client.post(

@@ -15,6 +15,9 @@ The loopback-only API accepts `X-Purpose: catalog_governance` and records:
 `GET /catalog/releases?limit=50&offset=0` returns deterministic pages with
 `has_more` state and never returns more than 100 rows per request. A governed
 `GET /catalog/releases/{id}` returns one metadata-only provenance snapshot.
+The snapshot includes the registered content class and explicit source-text
+storage/export and identifier-export policy flags, so an officer can confirm
+the legal boundary before using or exporting a release.
 Historical provenance rows are append-only through database triggers. The
 service does not retain raw source bytes, follow remote redirects, or treat
 actor/purpose headers as authentication.
