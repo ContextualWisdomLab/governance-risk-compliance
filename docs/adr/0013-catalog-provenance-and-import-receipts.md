@@ -20,6 +20,8 @@ Add a global, tenant-neutral provenance chain:
 - Require an externally computed lowercase SHA-256 digest, edition metadata, inert JSON/XML/YAML/plain media type, and bounded byte length. Raw source bytes are not stored.
 - Make source versions, parser runs/receipts, and releases append-only at the SQLite and PostgreSQL database boundary.
 - Make import identity idempotent by source version plus parser version; release publication requires a successful receipt.
+- Persist the selected successful import-run identity on each release. Release snapshots resolve only that immutable link; legacy releases without a valid link fail closed rather than switching to a later re-import.
+- Upgrade existing stores with the versioned `0003_catalog_release_receipt_link` migration, backfilling the latest successful receipt when one exists.
 - Require the declared `catalog_governance` purpose. It is an audit-purpose declaration in the local preview, not authentication.
 - Expose a bounded published-release list, a metadata-only release detail endpoint, and a comparison endpoint so officers can review source/version/receipt and explicit license/export policy changes without implying a requirement-level diff.
 - Keep provenance separate from `control_framework` and `control_item`. A later importer may create or update an official framework edition only after verified source bytes, parser output, official identifiers, mapping evidence, and independent review exist.

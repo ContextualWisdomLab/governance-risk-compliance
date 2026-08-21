@@ -177,6 +177,9 @@ class CatalogImportRun(Base):
     receipt: Mapped[CatalogImportReceipt | None] = relationship(
         back_populates="catalog_import_run", uselist=False
     )
+    catalog_releases: Mapped[list[CatalogRelease]] = relationship(
+        back_populates="catalog_import_run"
+    )
 
 
 class CatalogImportReceipt(Base):
@@ -227,11 +230,17 @@ class CatalogRelease(Base):
     source_artifact_version_id: Mapped[str] = mapped_column(
         ForeignKey("source_artifact_version.source_artifact_version_id"), nullable=False
     )
+    catalog_import_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("catalog_import_run.catalog_import_run_id"), nullable=True
+    )
     release_key: Mapped[str] = mapped_column(String(128), nullable=False)
     release_status: Mapped[str] = mapped_column(String(32), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     source_artifact_version: Mapped[SourceArtifactVersion] = relationship(
+        back_populates="catalog_releases"
+    )
+    catalog_import_run: Mapped[CatalogImportRun | None] = relationship(
         back_populates="catalog_releases"
     )
     frameworks: Mapped[list[ControlFramework]] = relationship(

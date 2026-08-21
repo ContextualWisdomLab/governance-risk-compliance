@@ -665,16 +665,13 @@ def _catalog_release_snapshot(release: CatalogRelease) -> dict[str, Any]:
     """Build a release snapshot from immutable source and successful receipt metadata."""
     version = release.source_artifact_version
     artifact = version.source_artifact
-    receipt_run = max(
-        (
-            run
-            for run in version.import_runs
-            if run.run_status == "succeeded" and run.receipt is not None
-        ),
-        key=lambda run: run.completed_at,
-    )
+    receipt_run = release.catalog_import_run
+    if receipt_run is None or receipt_run.run_status != "succeeded" or receipt_run.receipt is None:
+        raise HTTPException(
+            status_code=409,
+            detail="The catalog release has no immutable successful import receipt.",
+        )
     receipt = receipt_run.receipt
-    assert receipt is not None
     return {
         "catalog_release_id": release.catalog_release_id,
         "release_key": release.release_key,

@@ -13,7 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from cwl_grc import create_app
-from cwl_grc.app import _require_published_catalog_release
+from cwl_grc.app import _catalog_release_snapshot, _require_published_catalog_release
 from cwl_grc.authorization import AuthorizationDecision, PurposeCode
 from cwl_grc.catalog_provenance import (
     MAX_SOURCE_ARTIFACT_BYTES,
@@ -259,6 +259,22 @@ def test_version_digest_is_idempotent_and_immutable_metadata() -> None:
                 media_type="application/json",
                 byte_length=version.byte_length,
             )
+        for date_override in (
+            {"publication_date": date(2024, 2, 27)},
+            {"effective_date": date(2024, 2, 27)},
+            {"withdrawal_date": date(2024, 3, 1)},
+        ):
+            with pytest.raises(HTTPException, match="different immutable metadata"):
+                register_source_artifact_version(
+                    session,
+                    _DECISION,
+                    version.source_artifact_id,
+                    edition_label="1.2.3",
+                    content_digest=_DIGEST,
+                    media_type="application/json",
+                    byte_length=version.byte_length,
+                    **date_override,
+                )
         with pytest.raises(HTTPException, match="not registered"):
             register_source_artifact_version(
                 session,
@@ -329,6 +345,18 @@ def test_version_registration_validates_period_and_integer_type() -> None:
                 media_type="application/json",
                 byte_length=1,
                 effective_date=date(2024, 2, 27),
+                withdrawal_date=date(2024, 2, 26),
+            )
+        with pytest.raises(ValueError, match="publication"):
+            register_source_artifact_version(
+                session,
+                _DECISION,
+                artifact.source_artifact_id,
+                edition_label="1",
+                content_digest=_DIGEST,
+                media_type="application/json",
+                byte_length=1,
+                publication_date=date(2024, 2, 27),
                 withdrawal_date=date(2024, 2, 26),
             )
         with pytest.raises(ValueError, match="integer"):
@@ -1175,6 +1203,16 @@ def test_catalog_routes_execute_the_local_governance_workflow() -> None:
             "publication_date": "not-a-date",
         },
     ).status_code == 400
+
+
+def test_release_snapshot_rejects_unlinked_import_receipt() -> None:
+    """A legacy release without a durable import link fails closed."""
+    release = SimpleNamespace(
+        source_artifact_version=SimpleNamespace(source_artifact=SimpleNamespace()),
+        catalog_import_run=None,
+    )
+    with pytest.raises(HTTPException, match="immutable successful import receipt"):
+        _catalog_release_snapshot(release)
 
 
 def test_catalog_comparison_rejects_unpublished_release() -> None:

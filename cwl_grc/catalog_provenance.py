@@ -228,6 +228,8 @@ def register_source_artifact_version(
         raise ValueError(f"byte length must be between 1 and {MAX_SOURCE_ARTIFACT_BYTES}.")
     if effective_date and publication_date and effective_date < publication_date:
         raise ValueError("effective date cannot precede publication date.")
+    if withdrawal_date and publication_date and withdrawal_date < publication_date:
+        raise ValueError("withdrawal date cannot precede publication date.")
     if withdrawal_date and effective_date and withdrawal_date < effective_date:
         raise ValueError("withdrawal date cannot precede effective date.")
     existing = (
@@ -236,7 +238,15 @@ def register_source_artifact_version(
         .one_or_none()
     )
     if existing is not None:
-        _assert_same_version(existing, edition_label, media_type, byte_length)
+        _assert_same_version(
+            existing,
+            edition_label,
+            media_type,
+            byte_length,
+            publication_date,
+            effective_date,
+            withdrawal_date,
+        )
         return existing
     version = SourceArtifactVersion(
         source_artifact_version_id=uuid4().hex,
@@ -263,7 +273,15 @@ def register_source_artifact_version(
         )
         if existing is None:
             raise
-        _assert_same_version(existing, edition_label, media_type, byte_length)
+        _assert_same_version(
+            existing,
+            edition_label,
+            media_type,
+            byte_length,
+            publication_date,
+            effective_date,
+            withdrawal_date,
+        )
         return existing
     return version
 
@@ -410,7 +428,18 @@ def publish_catalog_release(
     release_key = _required_text(release_key, "release key")
     successful = (
         session.query(CatalogImportRun)
-        .filter_by(source_artifact_version_id=source_artifact_version_id, run_status="succeeded")
+        .join(
+            CatalogImportReceipt,
+            CatalogImportReceipt.catalog_import_run_id == CatalogImportRun.catalog_import_run_id,
+        )
+        .filter(
+            CatalogImportRun.source_artifact_version_id == source_artifact_version_id,
+            CatalogImportRun.run_status == "succeeded",
+        )
+        .order_by(
+            CatalogImportRun.completed_at.desc(),
+            CatalogImportRun.catalog_import_run_id.desc(),
+        )
         .first()
     )
     if successful is None:
@@ -426,6 +455,7 @@ def publish_catalog_release(
     release = CatalogRelease(
         catalog_release_id=uuid4().hex,
         source_artifact_version_id=version.source_artifact_version_id,
+        catalog_import_run_id=successful.catalog_import_run_id,
         release_key=release_key,
         release_status="published",
         created_at=now,
@@ -511,12 +541,18 @@ def _assert_same_version(
     edition_label: str,
     media_type: str,
     byte_length: int,
+    publication_date: date | None,
+    effective_date: date | None,
+    withdrawal_date: date | None,
 ) -> None:
     """Reject a digest collision whose metadata differs from the first receipt."""
     if (
         version.edition_label != edition_label
         or version.media_type != media_type
         or version.byte_length != byte_length
+        or version.publication_date != publication_date
+        or version.effective_date != effective_date
+        or version.withdrawal_date != withdrawal_date
     ):
         raise HTTPException(
             status_code=409,

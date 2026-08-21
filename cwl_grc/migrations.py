@@ -10,6 +10,7 @@ from sqlalchemy import Connection, Engine, inspect, text
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
 CATALOG_PROVENANCE_MIGRATION = "0002_catalog_provenance"
+CATALOG_RELEASE_RECEIPT_LINK_MIGRATION = "0003_catalog_release_receipt_link"
 
 
 def apply_schema_migrations(engine: Engine) -> None:
@@ -40,6 +41,18 @@ def apply_schema_migrations(engine: Engine) -> None:
                 ),
                 {
                     "migration_key": CATALOG_PROVENANCE_MIGRATION,
+                    "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
+                },
+            )
+        if CATALOG_RELEASE_RECEIPT_LINK_MIGRATION not in applied:
+            _apply_catalog_release_receipt_link_migration(connection)
+            connection.execute(
+                text(
+                    "INSERT INTO schema_migration (migration_key, applied_at) "
+                    "VALUES (:migration_key, :applied_at)"
+                ),
+                {
+                    "migration_key": CATALOG_RELEASE_RECEIPT_LINK_MIGRATION,
                     "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
                 },
             )
@@ -113,6 +126,49 @@ def _apply_catalog_provenance_migration(connection: Connection) -> None:
                 "VARCHAR(64) REFERENCES catalog_release (catalog_release_id)"
             )
         )
+
+
+def _apply_catalog_release_receipt_link_migration(connection: Connection) -> None:
+    """Bind existing catalog releases to their latest successful receipt when possible."""
+    inspector = inspect(connection)
+    table_names = set(inspector.get_table_names())
+    if "catalog_release" not in table_names:
+        return
+    columns = {column["name"] for column in inspector.get_columns("catalog_release")}
+    if "catalog_import_run_id" not in columns:
+        connection.execute(
+            text(
+                "ALTER TABLE catalog_release ADD COLUMN catalog_import_run_id "
+                "VARCHAR(64) REFERENCES catalog_import_run (catalog_import_run_id)"
+            )
+        )
+        columns.add("catalog_import_run_id")
+    if not {
+        "catalog_import_run",
+        "catalog_import_receipt",
+    }.issubset(table_names) or "source_artifact_version_id" not in columns:
+        return
+    connection.execute(
+        text(
+            """
+            UPDATE catalog_release
+            SET catalog_import_run_id = (
+                SELECT catalog_import_run.catalog_import_run_id
+                FROM catalog_import_run
+                JOIN catalog_import_receipt
+                  ON catalog_import_receipt.catalog_import_run_id =
+                     catalog_import_run.catalog_import_run_id
+                WHERE catalog_import_run.source_artifact_version_id =
+                      catalog_release.source_artifact_version_id
+                  AND catalog_import_run.run_status = 'succeeded'
+                ORDER BY catalog_import_run.completed_at DESC,
+                         catalog_import_run.catalog_import_run_id DESC
+                LIMIT 1
+            )
+            WHERE catalog_import_run_id IS NULL
+            """
+        )
+    )
 
 
 def install_integrity_guards(engine: Engine) -> None:
