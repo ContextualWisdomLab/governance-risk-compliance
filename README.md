@@ -66,8 +66,6 @@ Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `n
 - Internal controls are separate from official catalog requirements: published definition versions, scoped implementations, reviewed mappings, design/operating tests, deficiencies, exceptions, and purpose-approved evidence usage project explicit coverage statuses.
 - Database guards reject mismatched control-definition/implementation test graphs, and coverage ignores retired definitions and inactive test plans.
 - Obligations are separate from framework controls: exact source revisions, jurisdiction/scope, evidenced applicability decisions, commitments, proposed policy/control links, immutable change intake, and impact/re-approval worklists preserve legal and operational truth without copying source text. Requirement creation never self-asserts approval.
- - Database guards reject mismatched control-definition/implementation test graphs, and coverage ignores retired definitions and inactive test plans.
- - Obligations are separate from framework controls: exact source revisions, jurisdiction/scope, evidenced applicability decisions, commitments, proposed policy/control links, immutable change intake, and impact/re-approval worklists preserve legal and operational truth without copying source text. Requirement creation never self-asserts approval.
 - A persistent database cannot start without explicit `CWL_GRC_EVIDENCE_KEY` material. Ephemeral keys are limited to explicitly selected in-memory tests.
 
 ## Personal-data handling
