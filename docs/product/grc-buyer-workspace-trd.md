@@ -16,7 +16,7 @@ The workspace is a projection. Obligation/applicability truth is owned by #28, i
 
 ## Design runtime
 
-Storybook is pinned at 10.5.10 with `@storybook/web-components-vite` and `@storybook/addon-a11y`; `package-lock.json` and `mise.toml` pin the transitive npm graph and Node 24.18.0. The exact-head workflow builds Storybook and runs a Chromium interaction check. These remain design evidence rather than release evidence.
+Storybook is pinned at 10.5.10 with `@storybook/web-components-vite` and `@storybook/addon-a11y`; `package-lock.json` and `mise.toml` pin the transitive npm graph and Node 24.18.0. Stories import the real `index.html` main element as raw markup and only select fixture state visibility, preventing Storybook from becoming a second markup authority. The exact-head workflow builds Storybook and runs a Chromium interaction check. These remain design evidence rather than release evidence.
 
 Supported design states in this slice:
 

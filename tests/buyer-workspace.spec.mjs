@@ -14,6 +14,12 @@ test('keyboard actions expose exact values and truthful preview boundaries', asy
   await expect(page).toHaveURL(/#exact-title$/);
   await expect(page.getByRole('table')).toContainText('Source version');
   await expect(page.getByRole('table')).toContainText('Confirm applicability');
+
+  const requestAccess = page.getByRole('link', { name: 'Request access' });
+  await requestAccess.focus();
+  await expect(requestAccess).toBeFocused();
+  await requestAccess.press('Enter');
+  await expect(page).toHaveURL(/#action-feedback$/);
 });
 
 test('mobile and print fallbacks keep the page usable without false overflow', async ({ page }) => {

@@ -84,7 +84,7 @@ const MESSAGES = Object.freeze({
     'feedback.preview': 'Preview action:',
     'feedback.connect': 'Connect the verified GRC workflow before requesting or sharing evidence.',
     'feedback.limitation': 'Limitation:',
-    'feedback.fixture': 'This local fixture demonstrates buyer-facing state semantics only. It does not authenticate a tenant, read protected GRC APIs, authorize exports, or certify compliance.',
+    'feedback.fixture': 'This local developer preview demonstrates buyer-facing state semantics only. It is not a production deployment. It does not authenticate a tenant, read protected GRC APIs, authorize exports, or certify compliance.',
   }),
   ko: Object.freeze({
     'locale.label': '언어',
@@ -171,7 +171,7 @@ const MESSAGES = Object.freeze({
     'feedback.preview': '미리보기 조치:',
     'feedback.connect': '증적을 요청하거나 공유하기 전에 검증된 GRC 워크플로를 연결하세요.',
     'feedback.limitation': '제한사항:',
-    'feedback.fixture': '이 로컬 fixture는 구매자 화면의 상태 의미만 보여줍니다. 테넌트를 인증하거나 보호된 GRC API를 읽거나 export를 승인하거나 컴플라이언스를 인증하지 않습니다.',
+    'feedback.fixture': '이 로컬 개발자 미리보기는 구매자 화면의 상태 의미만 보여줍니다. 프로덕션 배포가 아닙니다. 테넌트를 인증하거나 보호된 GRC API를 읽거나 export를 승인하거나 컴플라이언스를 인증하지 않습니다.',
   }),
 });
 

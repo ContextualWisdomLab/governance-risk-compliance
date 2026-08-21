@@ -18,7 +18,11 @@ Open Policy Agent. (n.d.). *Policy language*. https://www.openpolicyagent.org/do
 
 Microsoft. (n.d.). *Playwright documentation*. Retrieved August 21, 2026, from https://playwright.dev/docs/intro
 
-Joint Task Force. (2025). *Security and privacy controls for information systems and organizations* (NIST Special Publication 800-53, Revision 5, Release 5.2.0). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-53r5
+Joint Task Force. (2020). *Security and privacy controls for information systems and organizations* (NIST Special Publication 800-53, Revision 5). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-53r5
+
+National Institute of Standards and Technology. (2025, August 27). *NIST releases revision to SP 800-53 controls: Release 5.2.0*. https://csrc.nist.gov/News/2025/nist-releases-revision-to-sp-800-53-controls
+
+National Institute of Standards and Technology. (n.d.). *NIST SP 800-53 Revision 5 catalog (OSCAL JSON, Release 5.2.0)*. GitHub. https://github.com/usnistgov/oscal-content/blob/main/nist.gov/SP800-53/rev5/json/NIST_SP-800-53_rev5_catalog.json
 
 Storybook. (n.d.). *Accessibility testing*. Retrieved August 21, 2026, from https://storybook.js.org/docs/writing-tests/accessibility-testing
 

@@ -18,13 +18,19 @@ def test_workspace_exposes_truthful_buyer_states_and_next_actions() -> None:
     html = read("apps/grc-workspace/index.html")
     for state in ("unknown", "not assessed", "stale", "blocked", "access denied"):
         assert state in html.lower()
-    for action in ("Request missing evidence", "View exact values", "Open evidence room"):
+    for action in (
+        "Request missing evidence",
+        "View exact values",
+        "Open evidence room",
+        "Request access",
+    ):
         assert action in html
     assert 'aria-labelledby="workspace-title"' in html
     assert '<html lang="en">' in html
     assert '<table' in html
     assert '<caption' in html
     assert 'data-i18n="table.deficienciesValue"' in html
+    assert 'data-i18n="action.requestAccess"' in html
     assert 'id="action-feedback"' in html
     assert 'href="#exact-title"' in html
 
@@ -39,6 +45,8 @@ def test_workspace_preserves_keyboard_motion_touch_print_and_responsive_contract
         "@media print",
         "@media (max-width: 720px)",
         "min-height: 44px",
+        "clip-path: inset(50%)",
+        "[hidden] { display: none !important; }",
     ):
         assert contract in css
 
@@ -51,6 +59,7 @@ def test_storybook_inventory_covers_reusable_states_with_a11y_enabled() -> None:
     package = read("package.json")
     assert "@storybook/web-components-vite" in main
     assert "@storybook/addon-a11y" in main
+    assert "./index.html?raw" in stories
     for story in ("ComplianceOfficerDesktop", "ComplianceOfficerMobile", "AccessDenied", "StaleEvidence"):
         assert story in stories
     assert '"storybook": "10.5.10"' in package
@@ -102,7 +111,15 @@ def test_i18n_contract_keeps_english_and_korean_semantics_aligned() -> None:
     assert 'src="./i18n-bootstrap.mjs"' in html
     assert "export const LOCALES" in i18n
     assert "'ko'" in i18n
-    for key in ("header.title", "metric.applicable", "status.unknown3", "feedback.limitation"):
+    for key in (
+        "header.title",
+        "metric.applicable",
+        "status.unknown3",
+        "action.requestAccess",
+        "feedback.limitation",
+    ):
         assert f"'{key}'" in i18n
+    assert "local developer preview" in i18n
+    assert "로컬 개발자 미리보기" in i18n
     assert "applyLocale(document, locale)" in bootstrap
     assert "KoreanLocale" in stories

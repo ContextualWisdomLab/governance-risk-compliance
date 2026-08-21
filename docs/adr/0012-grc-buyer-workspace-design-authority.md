@@ -21,7 +21,7 @@ Use the Figma design file `ta1jjWSjmADz2BFxka9UPs` and repository Storybook as p
 
 The shared semantic tokens are defined in `apps/grc-workspace/styles.css`. Repeated states use explicit text plus color: `effective`, `unknown`, `not assessed`, `stale`, `blocked`, and `access denied`. Repeated actions use persistent controls for requesting evidence, opening the evidence room, and revealing exact values. No buyer-critical action depends on hover, drag, animation, or a chart alone.
 
-Storybook 10.5.10 uses the official Web Components + Vite framework and `@storybook/addon-a11y`. The checked-in npm lockfile and `mise.toml` pin the frontend toolchain; the exact-head workflow also runs a real Chromium interaction check. The initial inventory is:
+Storybook 10.5.10 uses the official Web Components + Vite framework and `@storybook/addon-a11y`. The stories import the real page shell from `apps/grc-workspace/index.html?raw` and select state visibility from that markup, so Storybook and the browser preview have one markup authority. The checked-in npm lockfile and `mise.toml` pin the frontend toolchain; the exact-head workflow also runs a real Chromium interaction check. The initial inventory is:
 
 - `ComplianceOfficerDesktop`
 - `ComplianceOfficerMobile`
