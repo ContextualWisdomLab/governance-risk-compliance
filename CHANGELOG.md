@@ -4,6 +4,7 @@
 
 ### Added
 
+- Added a local-only `/workspace/posture` projection that reports official catalog counts, legacy-evidence-only rows, policy gaps, and explicit `not_assessed`/`unknown` boundaries without claiming tenant authorization or control effectiveness.
 - Bounded GRC buyer-workspace design slice for issue #30 with a truthful compliance-officer posture projection, explicit `unknown`, `not assessed`, `stale`, `blocked`, and `access denied` states, persistent next actions, and an exact-value table that preserves source version, limitation, and next action.
 - Figma design authority `ta1jjWSjmADz2BFxka9UPs` with desktop/mobile frames, reusable semantic components, and interaction-state contracts paired with repository Storybook.
 - Storybook 10.5.10 Web Components + Vite inventory with accessibility addon coverage for desktop, mobile, stale-evidence, and access-denied states, plus an exact-PR-head build workflow.

@@ -30,6 +30,7 @@ from cwl_grc.policy import (
     serialize_policy,
 )
 from cwl_grc.remote_access import request_is_local
+from cwl_grc.workspace_posture import build_preview_posture
 
 
 def parse_framework(value: str | None) -> FrameworkCode | None:
@@ -196,6 +197,11 @@ def create_app(
                 for gap in list_policy_gaps(session, policy_document_id)
             ],
         }
+
+    @app.get("/workspace/posture")
+    def get_workspace_posture(session: Session = Depends(get_session)) -> dict[str, Any]:
+        """Return the local preview posture with explicit missing-truth states."""
+        return build_preview_posture(session)
 
     @app.post("/evidence-records", status_code=201)
     def post_evidence(
