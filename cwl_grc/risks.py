@@ -341,8 +341,11 @@ def create_risk_treatment(
     """Create the next immutable treatment-plan version for an assessed risk."""
     _require_governance_purpose(decision)
     risk = _locked_risk(session, decision, risk_id, expected_revision_number)
-    if latest_risk_assessment(session, decision, risk_id) is None:
+    assessment = latest_risk_assessment(session, decision, risk_id)
+    if assessment is None:
         raise HTTPException(status_code=409, detail="Assess the risk before creating treatment.")
+    if assessment.appetite_status != "above_appetite":
+        raise HTTPException(status_code=409, detail="Only an above-appetite assessment can have treatment.")
     strategy = _required_text(treatment_strategy, "treatment strategy")
     if strategy not in {"avoid", "reduce", "transfer", "accept"}:
         raise HTTPException(status_code=400, detail="Use a supported treatment strategy.")
