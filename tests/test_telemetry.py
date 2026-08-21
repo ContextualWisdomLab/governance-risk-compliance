@@ -166,7 +166,14 @@ def test_failed_request_logs_error_class_without_exception_text(
     )
 
     assert response.status_code == 500
+    assert response.headers["X-Request-ID"] == "failure-request"
+    assert response.headers["traceparent"].startswith("00-")
+    assert response.json() == {
+        "detail": "Internal server error.",
+        "request_reference": "failure-request",
+    }
     record = json.loads(caplog.records[-1].message)
     assert record["request_id"] == "failure-request"
     assert record["error_class"] == "RuntimeError"
+    assert caplog.records[-1].levelno == logging.ERROR
     assert "private evidence payload" not in caplog.text

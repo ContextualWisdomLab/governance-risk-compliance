@@ -144,7 +144,16 @@ def create_app(
                 return response
             except Exception as exc:
                 error_class = type(exc).__name__
-                raise
+                response = JSONResponse(
+                    status_code=500,
+                    content={
+                        "detail": "Internal server error.",
+                        "request_reference": context.request_id,
+                    },
+                )
+                response.headers["X-Request-ID"] = context.request_id
+                response.headers["traceparent"] = context.traceparent
+                return response
             finally:
                 route = route_template(request.scope)
                 elapsed_seconds = time.perf_counter() - started_at
