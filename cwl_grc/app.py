@@ -171,6 +171,8 @@ def create_app(
                 elapsed_seconds = time.perf_counter() - started_at
                 span.set_attribute("http.route", route)
                 span.set_attribute("http.response.status_code", status_code)
+                if status_code >= 500:
+                    span.set_status(Status(StatusCode.ERROR, error_class or f"HTTP {status_code}"))
                 app.state.telemetry.record_request(
                     request.method,
                     route,

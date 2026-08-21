@@ -7,7 +7,11 @@ import logging
 from unittest.mock import Mock
 
 import pytest
+from fastapi import Response
 from fastapi.testclient import TestClient
+from opentelemetry.trace import StatusCode
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 import cwl_grc.telemetry as telemetry_module
 from cwl_grc import create_app
@@ -199,3 +203,23 @@ def test_failed_request_logs_error_class_without_exception_text(
     assert record["error_class"] == "RuntimeError"
     assert caplog.records[-1].levelno == logging.ERROR
     assert "private evidence payload" not in caplog.text
+
+
+def test_returned_server_error_marks_span_error() -> None:
+    """A handler-returned server error is recorded as an OpenTelemetry error."""
+    app = _app()
+    exporter = InMemorySpanExporter()
+    app.state.telemetry._tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+
+    @app.get("/telemetry-response-failure")
+    def response_failure() -> Response:
+        """Return a server error without raising an exception."""
+        return Response(status_code=500)
+
+    with TestClient(app) as client:
+        response = client.get("/telemetry-response-failure")
+
+    assert response.status_code == 500
+    span = exporter.get_finished_spans()[-1]
+    assert span.status.status_code is StatusCode.ERROR
+    assert span.status.description == "HTTP 500"
