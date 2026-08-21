@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime, timezone
 
-from sqlalchemy import Connection, DDL, Engine, Index, MetaData, Table, inspect, text
+from sqlalchemy import Connection, Engine, Index, MetaData, Table, inspect, text
 
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
@@ -33,6 +33,38 @@ TENANT_OWNED_TABLES = (
     "control_exception",
     "control_deficiency",
     "evidence_usage",
+)
+TENANT_COLUMN_ADDITIONS = (
+    (
+        "policy_document",
+        "ALTER TABLE policy_document ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "policy_version",
+        "ALTER TABLE policy_version ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "policy_control_mapping",
+        "ALTER TABLE policy_control_mapping ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "evidence_record",
+        "ALTER TABLE evidence_record ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "control_evidence_binding",
+        "ALTER TABLE control_evidence_binding ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "audit_event",
+        "ALTER TABLE audit_event ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
 )
 
 
@@ -142,20 +174,13 @@ def _apply_policy_integrity_migration(connection: Connection) -> None:
 def _apply_tenant_isolation_migration(connection: Connection) -> None:
     """Backfill tenant keys onto existing tenant-owned rows without inventing identities."""
     inspector = inspect(connection)
-    for table_name in TENANT_OWNED_TABLES:
+    for table_name, statement in TENANT_COLUMN_ADDITIONS:
         if not inspector.has_table(table_name):
             continue
         columns = {column["name"] for column in inspector.get_columns(table_name)}
         if "tenant_id" in columns:
             continue
-        table = Table(table_name, MetaData(), autoload_with=connection)
-        connection.execute(
-            DDL(
-                "ALTER TABLE %(table)s ADD COLUMN tenant_id VARCHAR(128) "
-                "NOT NULL DEFAULT '%(tenant)s'",
-                context={"tenant": LOCAL_DEVELOPMENT_TENANT},
-            ).against(table)
-        )
+        connection.execute(text(statement))
         inspector = inspect(connection)
 
 
