@@ -12,9 +12,10 @@ This repository is the ContextualWisdomLab home for policy, control, risk, evide
 4. Open `/` from the same machine, author the next policy, and map it only to official catalog identifiers.
 5. Read the policy-gap list, distinguish `unknown`, `unassessed`, design, operating, stale, exception, and ineffective statuses, then establish the next control test.
 6. Register an authoritative obligation source and exact revision, record an evidenced applicability decision, and review overdue/upcoming obligations from `/obligations`.
-7. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
-8. Confirm `/readyz` returns `200` with database, schema, seed, guard, key, identity, and lifecycle checks; use `/startupz` to inspect the checks that admitted the process.
-9. Set the standard `OTEL_EXPORTER_OTLP_ENDPOINT` only when an approved collector is available; request traces and low-cardinality request metrics are then exported asynchronously.
+7. Read `/compliance-workspace` for one tenant-scoped posture projection combining controls, obligations, and policy gaps; it does not claim evidence-request, risk, audit, or export state.
+8. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
+9. Confirm `/readyz` returns `200` with database, schema, seed, guard, key, identity, and lifecycle checks; use `/startupz` to inspect the checks that admitted the process.
+10. Set the standard `OTEL_EXPORTER_OTLP_ENDPOINT` only when an approved collector is available; request traces and low-cardinality request metrics are then exported asynchronously.
 
 The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. The command-line server binds to `127.0.0.1`, and the app always rejects proxy-forwarded or non-loopback traffic. No runtime bypass exists. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
 
@@ -47,6 +48,7 @@ The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `
 | Register and decide an obligation | `POST /obligations`, `POST /obligations/{id}/applicability-decisions`; decisions require rationale, evidence reference, period, and next review |
 | Propose obligation truth | `POST /obligations/{id}/requirements` to a finalized policy or internal control; the response remains `proposed` until independent review |
 | Review obligations and source changes | `GET /obligations` (`upcoming_days` 0–3660), `POST /obligations/changes`, and `POST /obligations/changes/{id}/impact-assessments` |
+| Read the tenant-scoped compliance workspace | `GET /compliance-workspace` with `compliance_governance`; returns control, obligation, and policy-gap posture only |
 | Liveness probe | `GET /healthz` (dependency-free) |
 | Readiness probe | `GET /readyz` (returns `503` with stable reason codes when traffic is unsafe) |
 | Startup probe | `GET /startupz` (reports the checks completed before admission) |

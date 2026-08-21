@@ -547,6 +547,103 @@ def create_app(
         )
         return {"obligations": [_serialize_obligation_item(item) for item in items]}
 
+    @app.get("/compliance-workspace")
+    def get_compliance_workspace(
+        session: Session = Depends(get_session),
+        upcoming_days: int = 30,
+        authorization: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Return one tenant-scoped posture read model for the current first slice."""
+        decision = decision_for_compliance_read(authorization, x_purpose)
+        coverage = list_control_coverage(session, None, tenant_id=decision.tenant_id)
+        obligations = list_obligation_worklist(
+            session,
+            decision,
+            upcoming_days=upcoming_days,
+        )
+        policy_gaps = list_policy_gaps(session, None, tenant_id=decision.tenant_id)
+        unresolved = {
+            ControlCoverageStatus.UNKNOWN,
+            ControlCoverageStatus.UNASSESSED,
+            ControlCoverageStatus.IMPLEMENTED_NOT_TESTED,
+            ControlCoverageStatus.DESIGN_EFFECTIVE,
+            ControlCoverageStatus.INEFFECTIVE,
+            ControlCoverageStatus.EXCEPTION,
+            ControlCoverageStatus.STALE,
+        }
+        coverage_status_counts = {
+            status.value: sum(item.status is status for item in coverage)
+            for status in ControlCoverageStatus
+        }
+        applicability_counts = {
+            code.value: sum(item.applicability_code == code.value for item in obligations)
+            for code in ApplicabilityCode
+        }
+        review_queue_counts = {
+            queue: sum(item.queue == queue for item in obligations)
+            for queue in ("overdue", "upcoming", "none")
+        }
+        control_actions = [
+            {
+                "kind": "control",
+                "reference": f"{item.control_item.framework_key}:{item.control_item.catalog_identifier}",
+                "status": item.status.value,
+                "next_action": next_action_for_coverage(item.status),
+            }
+            for item in coverage
+            if item.status in unresolved
+        ]
+        obligation_actions = [
+            {
+                "kind": "obligation",
+                "reference": item.obligation.obligation_code,
+                "status": item.applicability_code,
+                "queue": item.queue,
+                "next_action": item.next_action,
+            }
+            for item in obligations
+            if item.applicability_code in {
+                ApplicabilityCode.UNKNOWN.value,
+                ApplicabilityCode.PENDING_REVIEW.value,
+            }
+            or item.queue != "none"
+        ]
+        gap_actions = [
+            {
+                "kind": "policy_gap",
+                "reference": f"{gap.policy_document_id}:{gap.catalog_identifier}",
+                "status": gap.coverage_status,
+                "next_action": next_action_for_coverage(gap.coverage_status),
+            }
+            for gap in policy_gaps
+        ]
+        return {
+            "projection": "controls_obligations_policy_gaps",
+            "posture": {
+                "control_total": len(coverage),
+                "control_unresolved": sum(item.status in unresolved for item in coverage),
+                "coverage_status_counts": coverage_status_counts,
+                "obligation_total": len(obligations),
+                "applicability_counts": applicability_counts,
+                "review_queue_counts": review_queue_counts,
+                "policy_gap_total": len(policy_gaps),
+            },
+            "controls": [
+                serialize_control(item.control_item, coverage_status=item.status)
+                for item in coverage
+            ],
+            "obligations": [_serialize_obligation_item(item) for item in obligations],
+            "policy_gaps": [serialize_gap(gap) for gap in policy_gaps],
+            "next_actions": control_actions + obligation_actions + gap_actions,
+            "not_yet_projected": [
+                "evidence_requests",
+                "risk_register",
+                "audit_programs",
+                "controlled_exports",
+            ],
+        }
+
     @app.post("/obligations/{compliance_obligation_id}/applicability-decisions", status_code=201)
     def post_applicability_decision(
         compliance_obligation_id: str,

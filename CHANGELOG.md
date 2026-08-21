@@ -31,6 +31,7 @@
 - Tenant-scoped internal-control model: immutable definition versions, scoped implementations and owners, reviewed many-to-many catalog mappings, design/operating tests, exceptions, deficiencies, evidence usage, and explicit coverage statuses.
 - Additive migration that classifies preexisting direct evidence bindings as `unassessed` without inventing effectiveness.
 - Tenant-scoped obligation register: source revisions, jurisdictions, applicability decisions, legal references, commitments, proposed policy/control links awaiting independent review, regulatory changes, immutable impact assessments, and overdue/upcoming worklists for Issue #28.
+- Tenant-scoped `/compliance-workspace` read model that composes existing control, obligation, and policy-gap projections without a duplicate persistence model; evidence requests, risks, audits, and exports remain explicit gaps.
 
 ### Security
 
@@ -71,3 +72,4 @@
 - `docs/adr/0010-slo-and-error-budget-contract.md` — proposed SLO, error-budget, and multi-window alert contract pending collector acceptance.
 - `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — separate external requirements, internal controls, scoped implementations, testing, evidence usage, and explicit effectiveness projection.
 - `docs/adr/0012-obligation-applicability-and-regulatory-change.md` — source-backed obligation, applicability, commitment, and change-impact history separate from control effectiveness.
+- `docs/adr/0013-compliance-workspace-read-model.md` — tenant-scoped posture composition and explicit projection ceiling.
