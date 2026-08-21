@@ -9,7 +9,6 @@ from cryptography.fernet import Fernet
 
 import cwl_grc.database as database_module
 from cwl_grc import create_app
-from cwl_grc.database import migrate_database
 
 
 def test_runtime_never_invokes_reference_seed_functions(
@@ -18,7 +17,7 @@ def test_runtime_never_invokes_reference_seed_functions(
 ) -> None:
     """A compatible runtime checks reference truth without entering seed code."""
     database_url = f"sqlite:///{tmp_path / 'runtime-no-seed.sqlite'}"
-    migrate_database(database_url)
+    database_module.migrate_database(database_url)
 
     def unexpected_seed(_session: object) -> None:
         """Fail if application startup enters migration-owned seed behavior."""
