@@ -45,7 +45,7 @@ The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `
 | Liveness probe | `GET /healthz` (dependency-free) |
 | Readiness probe | `GET /readyz` (returns `503` with stable reason codes when traffic is unsafe) |
 | Startup probe | `GET /startupz` (reports the checks completed before admission) |
-| OpenTelemetry telemetry | Standard OTLP endpoint from `OTEL_EXPORTER_OTLP_ENDPOINT`; request, session-transaction, and database-pool metrics use bounded attributes; no endpoint means bounded local collection for tests/developer diagnostics |
+| OpenTelemetry telemetry | Standard OTLP endpoint from `OTEL_EXPORTER_OTLP_ENDPOINT`; request, session-transaction, database-pool, and declared-recovery metrics use bounded attributes; no endpoint means bounded local collection for tests/developer diagnostics |
 
 Policy authoring requires the declared purpose `policy_authoring`. Evidence create and bind require `evidence_binding`. Policies map only to seeded official identifiers: CSAP, SOC 2 TSC, ISMS-P, ISO/IEC 27001:2022, NIST SP 800-53 Rev. 5, COSO 2013, and COSO 2017.
 

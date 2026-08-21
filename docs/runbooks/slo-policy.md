@@ -48,6 +48,10 @@ database transaction outcome/duration, audit-write outcome, and bounded
 database pool gauges through OpenTelemetry. The pool gauges are
 `cwl_grc.database.pool.size`, `cwl_grc.database.pool.checked_out`,
 `cwl_grc.database.pool.checked_in`, and `cwl_grc.database.pool.overflow`; each
-uses only `db.system.name`. Recovery event recording, collector delivery,
-recording rules, dashboards, paging integration, and restore/rollback rehearsal
-remain the next actions. `/readyz` remains the first operator check.
+uses only `db.system.name`. The recovery event contract emits
+`cwl_grc.recovery.event.count` and `cwl_grc.recovery.duration` with only
+`replacement`/`read_only` modes and `success`/`failure` outcomes after an
+external coordinator declares an event. This is not recovery evidence by
+itself. Collector delivery, recording rules, dashboards, paging integration,
+and restore/rollback rehearsal remain the next actions. `/readyz` remains the
+first operator check.

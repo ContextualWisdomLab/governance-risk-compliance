@@ -123,6 +123,27 @@ def test_database_pool_metrics_use_bounded_database_labels(tmp_path: Path) -> No
         assert {point.attributes["db.system.name"] for point in points} == {"sqlite"}
 
 
+def test_recovery_event_metrics_use_bounded_modes_and_outcomes() -> None:
+    """Recovery telemetry accepts only the documented bounded contract."""
+    app = _app()
+    telemetry = app.state.telemetry
+    telemetry.record_recovery_event("replacement", "success", 12.5)
+    metrics = _metrics(app)
+
+    count_points = metrics["cwl_grc.recovery.event.count"].data.data_points  # type: ignore[attr-defined]
+    duration_points = metrics["cwl_grc.recovery.duration"].data.data_points  # type: ignore[attr-defined]
+    assert count_points[0].value == 1
+    assert count_points[0].attributes == {
+        "cwl_grc.recovery.mode": "replacement",
+        "cwl_grc.outcome": "success",
+    }
+    assert duration_points[0].sum == 12.5
+    with pytest.raises(ValueError, match="Recovery mode"):
+        telemetry.record_recovery_event("unknown", "success", 1.0)
+    with pytest.raises(ValueError, match="Recovery outcome"):
+        telemetry.record_recovery_event("read_only", "unknown", 1.0)
+
+
 def test_session_dependency_records_failed_audit_commit() -> None:
     """A failed transaction records audit failure without changing rollback behavior."""
     class Dialect:

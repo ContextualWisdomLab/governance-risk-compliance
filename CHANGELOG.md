@@ -26,6 +26,7 @@
 - OpenTelemetry request traces, request rate/duration metrics, authorization-denial metrics, and route-template cardinality protection with standard OTLP export configuration.
 - Database session transaction outcome/duration metrics with rollback-safe request dependency instrumentation.
 - Bounded SQLAlchemy database-pool size, checked-in, checked-out, and overflow gauges labeled only by database system.
+- Declared recovery-event count and duration metrics with bounded replacement/read-only modes and success/failure outcomes.
 - Proposed availability, mutation-success, audit-write, and recovery SLO/error-budget policy with bounded-label burn-rate alert thresholds.
 
 ### Security
