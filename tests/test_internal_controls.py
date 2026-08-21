@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -316,6 +317,44 @@ def test_internal_control_status_projection_covers_failure_exception_stale_and_n
     for status in ControlCoverageStatus:
         assert next_action_for_coverage(status)
     assert next_action_for_coverage("not-a-status") == next_action_for_coverage(ControlCoverageStatus.UNKNOWN)
+
+
+def test_latest_operating_effective_result_does_not_inherit_old_staleness() -> None:
+    """A fresh operating pass must not be downgraded by an older overdue pass."""
+    factory = _factory()
+    decision = _decision()
+    with factory() as session:
+        foundation = _foundation(session, decision, "IC-LATEST-OPERATING-1")
+        _map(session, decision, foundation, "10.2.1")
+        old_plan = _plan(session, decision, foundation, "operating", due=datetime(2025, 12, 31))
+        with patch("cwl_grc.internal_controls.datetime") as old_clock:
+            old_clock.now.return_value = datetime(2026, 1, 15)
+            record_control_test_result(
+                session,
+                decision,
+                _execution(session, decision, old_plan).test_execution_id,
+                ControlTestResultCode.EFFECTIVE.value,
+                "The older sample passed.",
+            )
+        recent_plan = _plan(session, decision, foundation, "operating", due=datetime(2026, 3, 31))
+        with patch("cwl_grc.internal_controls.datetime") as recent_clock:
+            recent_clock.now.return_value = datetime(2026, 2, 15)
+            record_control_test_result(
+                session,
+                decision,
+                _execution(session, decision, recent_plan).test_execution_id,
+                ControlTestResultCode.EFFECTIVE.value,
+                "The current sample passed.",
+            )
+        session.flush()
+        control = get_control_item(session, FrameworkCode.CSAP_2026, "10.2.1")
+        assert control is not None
+        assert control_coverage_status(
+            session,
+            control.control_item_id,
+            decision.tenant_id,
+            datetime(2026, 2, 20),
+        ) is ControlCoverageStatus.OPERATING_EFFECTIVE
 
 
 def test_internal_control_rejections_are_tenant_and_purpose_bound() -> None:
