@@ -20,6 +20,7 @@ class PurposeCode(StrEnum):
 
     COVERAGE_REVIEW = "coverage_review"
     EVIDENCE_BINDING = "evidence_binding"
+    EVIDENCE_RETENTION = "evidence_retention"
     HEALTH_PROBE = "health_probe"
     POLICY_AUTHORING = "policy_authoring"
 
@@ -54,6 +55,8 @@ def purpose_label(code: PurposeCode) -> str:
             return "Review control coverage"
         case PurposeCode.EVIDENCE_BINDING:
             return "Attach or bind evidence"
+        case PurposeCode.EVIDENCE_RETENTION:
+            return "Manage evidence retention and legal hold"
         case PurposeCode.HEALTH_PROBE:
             return "Probe service health"
         case PurposeCode.POLICY_AUTHORING:

@@ -38,12 +38,27 @@ def create_evidence_record(
     decision: AuthorizationDecision,
     evidence_title: str,
     payload_text: str,
+    *,
+    retention_class: str = "standard",
+    retention_started_at: datetime | None = None,
+    disposition_due_at: datetime | None = None,
 ) -> EvidenceRecord:
     """Store one evidence artifact under an exact tenant and purpose-limited actor."""
+    if not isinstance(evidence_title, str) or not isinstance(payload_text, str):
+        raise HTTPException(status_code=400, detail="Evidence title and artifact text must be text.")
     title = evidence_title.strip()
     payload = payload_text.strip()
     if not title or not payload:
         raise HTTPException(status_code=400, detail="Evidence needs a title and the next artifact text.")
+    if not isinstance(retention_class, str) or not retention_class.strip():
+        raise HTTPException(status_code=400, detail="Evidence needs a retention class.")
+    started_at = _normalize_utc(retention_started_at or datetime.now(timezone.utc))
+    due_at = _normalize_utc(disposition_due_at) if disposition_due_at else None
+    if due_at is not None and due_at < started_at:
+        raise HTTPException(
+            status_code=400,
+            detail="The disposition date cannot precede the retention start.",
+        )
     evidence_record_id = uuid4().hex
     encrypted = cipher.encrypt_record(
         payload,
@@ -61,6 +76,9 @@ def create_evidence_record(
         encryption_context_digest=encrypted.encryption_context_digest,
         source_content_digest=encrypted.source_content_digest,
         integrity_digest=encrypted.integrity_digest,
+        retention_class=retention_class.strip(),
+        retention_started_at=started_at,
+        disposition_due_at=due_at,
         collected_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     session.add(record)
@@ -73,6 +91,84 @@ def create_evidence_record(
     )
     session.flush()
     return record
+
+
+def place_evidence_legal_hold(
+    session: Session,
+    decision: AuthorizationDecision,
+    evidence_record_id: str,
+    hold_reason: str,
+    hold_authority: str,
+) -> EvidenceRecord:
+    """Place or update a tenant evidence record's legal hold without changing its payload."""
+    if not isinstance(hold_reason, str) or not isinstance(hold_authority, str):
+        raise HTTPException(status_code=400, detail="Legal hold fields must be text.")
+    reason = hold_reason.strip()
+    authority = hold_authority.strip()
+    if not reason or not authority:
+        raise HTTPException(
+            status_code=400,
+            detail="A legal hold needs its reason and authority.",
+        )
+    record = _get_evidence_record(session, decision, evidence_record_id)
+    record.legal_hold_active = True
+    record.legal_hold_reason = reason
+    record.legal_hold_authority = authority
+    record_audit_event(
+        session,
+        decision,
+        action_name="place_legal_hold",
+        resource_kind="evidence_record",
+        resource_identifier=record.evidence_record_id,
+    )
+    session.flush()
+    return record
+
+
+def release_evidence_legal_hold(
+    session: Session,
+    decision: AuthorizationDecision,
+    evidence_record_id: str,
+) -> EvidenceRecord:
+    """Release a tenant evidence legal hold while retaining its hold metadata."""
+    record = _get_evidence_record(session, decision, evidence_record_id)
+    if record.legal_hold_active:
+        record.legal_hold_active = False
+        record_audit_event(
+            session,
+            decision,
+            action_name="release_legal_hold",
+            resource_kind="evidence_record",
+            resource_identifier=record.evidence_record_id,
+        )
+        session.flush()
+    return record
+
+
+def _get_evidence_record(
+    session: Session,
+    decision: AuthorizationDecision,
+    evidence_record_id: str,
+) -> EvidenceRecord:
+    """Return one exact-tenant evidence record or hide its existence."""
+    record = (
+        session.query(EvidenceRecord)
+        .filter_by(
+            evidence_record_id=evidence_record_id,
+            tenant_id=decision.tenant_id,
+        )
+        .one_or_none()
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="That evidence artifact is not on file.")
+    return record
+
+
+def _normalize_utc(value: datetime) -> datetime:
+    """Store timestamps as naive UTC values used by the existing schema."""
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def record_encryption_envelope(record: EvidenceRecord) -> EncryptedEvidence:

@@ -11,6 +11,7 @@ from sqlalchemy import Connection, Engine, inspect, text
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
 TENANT_ISOLATION_MIGRATION = "0002_tenant_isolation"
 EVIDENCE_ENCRYPTION_MIGRATION = "0003_evidence_encryption"
+EVIDENCE_RETENTION_MIGRATION = "0004_evidence_retention"
 TENANT_COLUMN_ADDITIONS = (
     (
         "policy_document",
@@ -67,6 +68,9 @@ def apply_schema_migrations(engine: Engine) -> None:
         if not _migration_applied(connection, EVIDENCE_ENCRYPTION_MIGRATION):
             _apply_evidence_encryption_migration(connection)
             _record_migration(connection, EVIDENCE_ENCRYPTION_MIGRATION)
+        if not _migration_applied(connection, EVIDENCE_RETENTION_MIGRATION):
+            _apply_evidence_retention_migration(connection)
+            _record_migration(connection, EVIDENCE_RETENTION_MIGRATION)
 
 
 def _migration_applied(connection: Connection, migration_key: str) -> bool:
@@ -192,6 +196,56 @@ def _apply_evidence_encryption_migration(connection: Connection) -> None:
         if column_name not in columns:
             connection.execute(text(statement))
             inspector = inspect(connection)
+
+
+def _apply_evidence_retention_migration(connection: Connection) -> None:
+    """Add retention metadata while preserving legacy evidence timestamps."""
+    inspector = inspect(connection)
+    if not inspector.has_table("evidence_record"):
+        return
+    additions = (
+        (
+            "retention_class",
+            "ALTER TABLE evidence_record ADD COLUMN retention_class VARCHAR(64) "
+            "NOT NULL DEFAULT 'standard'",
+        ),
+        (
+            "retention_started_at",
+            "ALTER TABLE evidence_record ADD COLUMN retention_started_at TIMESTAMP "
+            "NOT NULL DEFAULT '1970-01-01 00:00:00'",
+        ),
+        (
+            "disposition_due_at",
+            "ALTER TABLE evidence_record ADD COLUMN disposition_due_at TIMESTAMP",
+        ),
+        (
+            "legal_hold_active",
+            "ALTER TABLE evidence_record ADD COLUMN legal_hold_active BOOLEAN "
+            "NOT NULL DEFAULT FALSE",
+        ),
+        (
+            "legal_hold_reason",
+            "ALTER TABLE evidence_record ADD COLUMN legal_hold_reason TEXT",
+        ),
+        (
+            "legal_hold_authority",
+            "ALTER TABLE evidence_record ADD COLUMN legal_hold_authority VARCHAR(255)",
+        ),
+        (
+            "disposition_outcome",
+            "ALTER TABLE evidence_record ADD COLUMN disposition_outcome VARCHAR(64)",
+        ),
+    )
+    for column_name, statement in additions:
+        columns = {column["name"] for column in inspect(connection).get_columns("evidence_record")}
+        if column_name not in columns:
+            connection.execute(text(statement))
+    connection.execute(
+        text(
+            "UPDATE evidence_record SET retention_started_at = collected_at "
+            "WHERE retention_started_at = '1970-01-01 00:00:00'"
+        )
+    )
 
 
 def install_integrity_guards(engine: Engine) -> None:

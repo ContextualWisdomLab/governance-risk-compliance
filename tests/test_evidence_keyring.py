@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
 
 import pytest
 from cryptography.fernet import Fernet
+from fastapi import HTTPException
+from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 import cwl_grc.encryption as encryption_module
@@ -27,8 +30,10 @@ from cwl_grc.encryption import (
 )
 from cwl_grc.evidence import (
     create_evidence_record,
+    place_evidence_legal_hold,
     record_encryption_envelope,
     rewrap_evidence_records,
+    release_evidence_legal_hold,
 )
 from cwl_grc.migrations import apply_schema_migrations
 from cwl_grc.models import EvidenceRecord
@@ -397,3 +402,110 @@ def test_legacy_evidence_migration_adds_key_metadata(tmp_path: Path) -> None:
     assert "encryption_key_id" in columns
     assert "encryption_algorithm_version" in columns
     assert "integrity_digest" in columns
+    assert "retention_class" in columns
+    assert "retention_started_at" in columns
+    assert "disposition_due_at" in columns
+    assert "legal_hold_active" in columns
+    assert "legal_hold_reason" in columns
+    assert "legal_hold_authority" in columns
+    assert "disposition_outcome" in columns
+
+
+def test_retention_metadata_and_legal_hold_lifecycle() -> None:
+    """Retention metadata and legal holds preserve exact evidence through HTTP and SQL."""
+    client = TestClient(create_app(database_url="sqlite://", evidence_key=None))
+    headers = {
+        "X-Actor-Id": "retention-officer",
+        "X-Purpose": "evidence_binding",
+    }
+    for invalid_due_at in (123, "not-a-date"):
+        invalid = client.post(
+            "/evidence-records",
+            headers=headers,
+            json={
+                "evidence_title": "Invalid retention input",
+                "payload_text": "Exact officer evidence.",
+                "disposition_due_at": invalid_due_at,
+            },
+        )
+        assert invalid.status_code == 400
+    created = client.post(
+        "/evidence-records",
+        headers=headers,
+        json={
+            "evidence_title": "Quarterly access review",
+            "payload_text": "Exact officer evidence.",
+            "retention_class": "regulatory",
+            "disposition_due_at": "2026-09-01T00:00:00+00:00",
+        },
+    )
+    assert created.status_code == 201
+    body = created.json()
+    assert body["retention_class"] == "regulatory"
+    assert body["disposition_due_at"] == "2026-09-01T00:00:00"
+    assert body["legal_hold_active"] is False
+    record_id = body["evidence_record_id"]
+
+    hold = client.post(
+        f"/evidence-records/{record_id}/legal-hold",
+        headers={**headers, "X-Purpose": "evidence_retention"},
+        json={"hold_reason": "Active audit", "hold_authority": "audit-2026-08"},
+    )
+    assert hold.status_code == 200
+    assert hold.json()["legal_hold_active"] is True
+    assert hold.json()["legal_hold_authority"] == "audit-2026-08"
+
+    released = client.post(
+        f"/evidence-records/{record_id}/legal-hold/release",
+        headers={**headers, "X-Purpose": "evidence_retention"},
+    )
+    assert released.status_code == 200
+    assert released.json()["legal_hold_active"] is False
+    assert released.json()["legal_hold_reason"] == "Active audit"
+    assert (
+        client.post(
+            f"/evidence-records/{record_id}/legal-hold/release",
+            headers={**headers, "X-Purpose": "evidence_retention"},
+        ).json()["legal_hold_active"]
+        is False
+    )
+
+
+def test_retention_validation_and_tenant_scoped_legal_hold() -> None:
+    """Retention dates, hold fields, and missing tenant records fail closed."""
+    factory = _seeded_factory()
+    decision = AuthorizationDecision("retention-officer", PurposeCode.EVIDENCE_RETENTION, TENANT_ID)
+    with factory() as session:
+        with pytest.raises(HTTPException, match="must be text"):
+            create_evidence_record(
+                session,
+                EvidenceCipher(None, allow_ephemeral=True),
+                decision,
+                1,  # type: ignore[arg-type]
+                "Exact text.",
+            )
+        with pytest.raises(HTTPException, match="retention class"):
+            create_evidence_record(
+                session,
+                EvidenceCipher(None, allow_ephemeral=True),
+                decision,
+                "Evidence",
+                "Exact text.",
+                retention_class=" ",
+            )
+        with pytest.raises(HTTPException, match="disposition date"):
+            create_evidence_record(
+                session,
+                EvidenceCipher(None, allow_ephemeral=True),
+                AuthorizationDecision("officer-a", PurposeCode.EVIDENCE_BINDING, TENANT_ID),
+                "Evidence",
+                "Exact text.",
+                retention_started_at=datetime(2026, 8, 20),
+                disposition_due_at=datetime(2026, 8, 19, tzinfo=timezone.utc),
+            )
+        with pytest.raises(HTTPException, match="not on file"):
+            release_evidence_legal_hold(session, decision, "missing")
+        with pytest.raises(HTTPException, match="hold fields"):
+            place_evidence_legal_hold(session, decision, "missing", 1, "authority")  # type: ignore[arg-type]
+        with pytest.raises(HTTPException, match="needs its reason"):
+            place_evidence_legal_hold(session, decision, "missing", "", "authority")

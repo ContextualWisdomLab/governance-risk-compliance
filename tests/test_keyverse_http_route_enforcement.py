@@ -163,3 +163,42 @@ def test_verified_bearer_requires_action_scope_before_mutation() -> None:
     )
 
     assert response.status_code == 403
+
+
+def test_legal_hold_requires_verified_retention_scope() -> None:
+    """Legal-hold changes require the signed retention scope, not evidence-write scope."""
+    private_key, public_jwk = _material()
+    client = _client(_verifier(public_jwk))
+    created = client.post(
+        "/evidence-records",
+        headers={
+            "Authorization": f"Bearer {_token(private_key, scope='grc.evidence.write')}",
+            "X-Purpose": "evidence_binding",
+        },
+        json={"evidence_title": "Retention evidence", "payload_text": "Exact evidence."},
+    )
+    assert created.status_code == 201
+    record_id = created.json()["evidence_record_id"]
+
+    denied = client.post(
+        f"/evidence-records/{record_id}/legal-hold",
+        headers={
+            "Authorization": f"Bearer {_token(private_key, scope='grc.evidence.write')}",
+            "X-Actor-Id": "spoofed-officer",
+            "X-Purpose": "evidence_retention",
+        },
+        json={"hold_reason": "Active audit", "hold_authority": "audit-2026-08"},
+    )
+    assert denied.status_code == 403
+
+    allowed = client.post(
+        f"/evidence-records/{record_id}/legal-hold",
+        headers={
+            "Authorization": f"Bearer {_token(private_key, scope='grc.evidence.retention')}",
+            "X-Actor-Id": "spoofed-officer",
+            "X-Purpose": "evidence_retention",
+        },
+        json={"hold_reason": "Active audit", "hold_authority": "audit-2026-08"},
+    )
+    assert allowed.status_code == 200
+    assert allowed.json()["legal_hold_active"] is True

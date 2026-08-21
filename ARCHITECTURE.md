@@ -18,6 +18,9 @@ flowchart LR
     preview --> kernel[cwl_grc kernel]
     cli --> kernel
     probe[/healthz] --> preview
+    ready_probe[/readyz] --> preview
+    startup_probe[/startupz] --> preview
+    preview --> telemetry[Correlated JSON logs + OpenTelemetry]
     kernel --> policy[(tenant-owned policy records)]
     kernel --> catalog[(shared control catalog)]
     kernel --> evidence[(tenant-owned evidence records)]
@@ -29,12 +32,13 @@ flowchart LR
 ## Runtime layers
 
 1. **Local officer home**: buyer-oriented HTML that authors a policy, lists policy gaps, and attaches the next evidence under the fixed `local_development` tenant.
-2. **HTTP API**: policy author/revise/list, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, and `/healthz`.
+2. **HTTP API**: policy author/revise/list, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, and dependency-separated `/healthz`, `/readyz`, and `/startupz` probes.
 3. **Keyverse security adapter**: optional closed-profile JWT verification plus bounded OIDC Discovery/JWKS loading. When configured, protected policy and evidence routes derive actor and tenant from the signed principal and enforce action-specific scopes.
 4. **Preview network boundary**: always rejects proxy-forwarded and non-loopback traffic. Keyverse authentication inside the process does not enable customer or Internet exposure by itself.
 5. **CLI tools**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and the local Uvicorn `cwl-grc serve`.
 6. **Kernel package**: `create_app()` for modular composition; `python -m cwl_grc` for standalone local HTTP.
 7. **Store**: 3NF SQLite by default, PostgreSQL-ready URL via `CWL_GRC_DATABASE_URL`, versioned schema upgrades, and database guards that protect tenant relationships, audit history, and finalized policy history.
+8. **Operations boundary**: bounded PostgreSQL connection setup, startup admission checks, drain state, W3C request correlation, redaction-safe structured request logs, and low-cardinality OpenTelemetry request traces/metrics. Collector configuration, database instrumentation, dashboards, SLOs, and alert rules remain platform integration work.
 
 ## Data ownership
 
