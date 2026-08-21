@@ -13,7 +13,7 @@ The public control catalog is shared reference data. Policy bodies, policy mappi
 ## Decision
 
 1. Persist a non-null `tenant_id` on every GRC-owned policy, evidence, binding, and audit record. In Keyverse mode it comes only from the verified signed principal. The fixed `local_development` tenant exists solely for the loopback-only standalone compatibility profile and for backfilling pre-tenant preview data.
-2. Require `grc.policy.read` for policy and policy-gap reads whenever Keyverse authentication is configured. Filter every protected read by the verified tenant.
+2. Require `grc.policy.read` for policy, policy-gap, coverage-gap, and officer-console reads whenever Keyverse authentication is configured. Filter every protected read by the verified tenant.
 3. Return `404 Not Found` for cross-tenant policy or evidence identifiers so an authorized caller cannot distinguish another tenant's object from a nonexistent object.
 4. Define tenant-parent relationships as paired keys. New schemas use named composite `ForeignKeyConstraint` relationships for policy document → policy version → policy mapping and evidence record → evidence binding. Pairing the columns is essential; independent single-column keys do not express that both values belong to the same parent row.
 5. Install idempotent SQLite and PostgreSQL tenant-parent guards so databases created before the composite constraints receive the same fail-closed behavior without rewriting protected history.
