@@ -242,6 +242,23 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
             "The GRC schema is behind this binary; required tables are missing: "
             + ", ".join(sorted(missing_tables))
         )
+    missing_columns: dict[str, tuple[str, ...]] = {}
+    for table_name, table in Base.metadata.tables.items():
+        actual_columns = {column["name"] for column in inspector.get_columns(table_name)}
+        required = tuple(
+            column.name for column in table.columns if column.name not in actual_columns
+        )
+        if required:
+            missing_columns[table_name] = required
+    if missing_columns:
+        details = "; ".join(
+            f"{table_name}: {', '.join(columns)}"
+            for table_name, columns in sorted(missing_columns.items())
+        )
+        raise SchemaCompatibilityError(
+            "The GRC schema is behind this binary; required columns are missing: "
+            + details
+        )
     with engine.connect() as connection:
         receipts = tuple(
             connection.execute(

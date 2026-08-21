@@ -111,6 +111,20 @@ def test_runtime_rejects_schema_missing_required_table(tmp_path: Path) -> None:
         engine.dispose()
 
 
+def test_runtime_rejects_schema_missing_required_column(tmp_path: Path) -> None:
+    """Migration receipts cannot hide a table with a missing required column."""
+    database_url = f"sqlite:///{tmp_path / 'missing-column.sqlite'}"
+    database_module.migrate_database(database_url)
+    engine = database_module.build_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE control_framework DROP COLUMN source_url"))
+        with pytest.raises(database_module.SchemaCompatibilityError, match="required columns"):
+            database_module.assert_schema_compatible(engine)
+    finally:
+        engine.dispose()
+
+
 def test_integrity_guard_installer_accepts_engine(tmp_path: Path) -> None:
     """The public guard installer remains idempotent for engine-owning callers."""
     database_url = f"sqlite:///{tmp_path / 'guard-engine.sqlite'}"
