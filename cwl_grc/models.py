@@ -206,3 +206,26 @@ class PolicyControlMapping(Base):
     )
     policy_version: Mapped[PolicyVersion] = relationship(back_populates="policy_control_mappings")
     control_item: Mapped[ControlItem] = relationship()
+
+
+class IdempotencyRecord(Base):
+    """Durable replay record for one purpose-scoped API mutation."""
+
+    __tablename__ = "idempotency_record"
+    __table_args__ = (
+        UniqueConstraint(
+            "actor_identifier",
+            "operation_name",
+            "idempotency_key",
+            name="idempotency_record_scope",
+        ),
+    )
+
+    idempotency_record_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    actor_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
+    operation_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    request_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    response_status: Mapped[int] = mapped_column(nullable=False)
+    response_payload: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import base64
 from datetime import datetime, timezone
+import json
 from typing import Any
 from uuid import uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import update
+from sqlalchemy import and_, or_, update
 from sqlalchemy.orm import Session
 
 from cwl_grc.audit import record_audit_event
@@ -168,6 +170,151 @@ def current_version(session: Session, document: PolicyDocument) -> PolicyVersion
 def list_policy_documents(session: Session) -> list[PolicyDocument]:
     """List authored policy documents, newest first."""
     return list(session.query(PolicyDocument).order_by(PolicyDocument.created_at.desc()).all())
+
+
+def encode_page_cursor(*parts: str) -> str:
+    """Encode stable page-sort values as an opaque cursor."""
+    payload = json.dumps(list(parts), separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(payload).decode().rstrip("=")
+
+
+def decode_page_cursor(cursor: str, part_count: int) -> tuple[str, ...]:
+    """Decode a cursor and reject malformed or incorrectly shaped values."""
+    try:
+        padded = cursor + "=" * (-len(cursor) % 4)
+        parts = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail="The page cursor is invalid.") from exc
+    if not isinstance(parts, list) or len(parts) != part_count or not all(
+        isinstance(part, str) for part in parts
+    ):
+        raise HTTPException(status_code=400, detail="The page cursor is invalid.")
+    return tuple(parts)
+
+
+def list_policy_documents_page(
+    session: Session,
+    limit: int,
+    cursor: str | None,
+) -> tuple[list[PolicyDocument], str | None]:
+    """Return a deterministic keyset page of policy documents."""
+    query = session.query(PolicyDocument)
+    if cursor:
+        created_at_text, policy_document_id = decode_page_cursor(cursor, 2)
+        try:
+            created_at = datetime.fromisoformat(created_at_text)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="The page cursor is invalid.") from exc
+        query = query.filter(
+            or_(
+                PolicyDocument.created_at < created_at,
+                and_(
+                    PolicyDocument.created_at == created_at,
+                    PolicyDocument.policy_document_id < policy_document_id,
+                ),
+            )
+        )
+    documents = query.order_by(
+        PolicyDocument.created_at.desc(),
+        PolicyDocument.policy_document_id.desc(),
+    ).limit(limit + 1).all()
+    next_cursor = None
+    if len(documents) > limit:
+        last = documents[limit - 1]
+        next_cursor = encode_page_cursor(
+            last.created_at.isoformat(),
+            last.policy_document_id,
+        )
+        documents = documents[:limit]
+    return documents, next_cursor
+
+
+def list_policy_gaps_page(
+    session: Session,
+    policy_document_id: str | None,
+    limit: int,
+    cursor: str | None,
+) -> tuple[list[PolicyGap], str | None]:
+    """Return a deterministic keyset page of uncovered policy controls."""
+    query = (
+        session.query(PolicyDocument, PolicyVersion, ControlItem)
+        .join(
+            PolicyVersion,
+            and_(
+                PolicyVersion.policy_document_id == PolicyDocument.policy_document_id,
+                PolicyVersion.version_number == PolicyDocument.current_version_number,
+                PolicyVersion.is_finalized.is_(True),
+            ),
+        )
+        .join(
+            PolicyControlMapping,
+            PolicyControlMapping.policy_version_id == PolicyVersion.policy_version_id,
+        )
+        .join(ControlItem, ControlItem.control_item_id == PolicyControlMapping.control_item_id)
+        .outerjoin(
+            ControlEvidenceBinding,
+            ControlEvidenceBinding.control_item_id == ControlItem.control_item_id,
+        )
+        .filter(ControlEvidenceBinding.binding_id.is_(None))
+    )
+    if policy_document_id:
+        query = query.filter(PolicyDocument.policy_document_id == policy_document_id)
+    if cursor:
+        created_at_text, document_id, framework, catalog_identifier = decode_page_cursor(
+            cursor, 4
+        )
+        try:
+            created_at = datetime.fromisoformat(created_at_text)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="The page cursor is invalid.") from exc
+        query = query.filter(
+            or_(
+                PolicyDocument.created_at < created_at,
+                and_(
+                    PolicyDocument.created_at == created_at,
+                    PolicyDocument.policy_document_id < document_id,
+                ),
+                and_(
+                    PolicyDocument.created_at == created_at,
+                    PolicyDocument.policy_document_id == document_id,
+                    ControlItem.framework_key > framework,
+                ),
+                and_(
+                    PolicyDocument.created_at == created_at,
+                    PolicyDocument.policy_document_id == document_id,
+                    ControlItem.framework_key == framework,
+                    ControlItem.catalog_identifier > catalog_identifier,
+                ),
+            )
+        )
+    rows = query.order_by(
+        PolicyDocument.created_at.desc(),
+        PolicyDocument.policy_document_id.desc(),
+        ControlItem.framework_key.asc(),
+        ControlItem.catalog_identifier.asc(),
+    ).limit(limit + 1).all()
+    next_cursor = None
+    if len(rows) > limit:
+        last_document, last_version, last_item = rows[limit - 1]
+        next_cursor = encode_page_cursor(
+            last_document.created_at.isoformat(),
+            last_document.policy_document_id,
+            last_item.framework_key,
+            last_item.catalog_identifier,
+        )
+        rows = rows[:limit]
+    gaps = [
+        PolicyGap(
+            policy_document_id=document.policy_document_id,
+            policy_title=document.policy_title,
+            version_number=version.version_number,
+            framework=item.framework_key,
+            catalog_identifier=item.catalog_identifier,
+            control_title=item.control_title,
+        )
+        for document, version, item in rows
+    ]
+    return gaps, next_cursor
 
 
 def list_policy_gaps(session: Session, policy_document_id: str | None) -> list[PolicyGap]:

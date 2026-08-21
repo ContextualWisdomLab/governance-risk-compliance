@@ -19,6 +19,7 @@ flowchart LR
     kernel --> evidence[(evidence_record)]
     kernel --> binding[(control_evidence_binding)]
     kernel --> audit[(audit_event)]
+    kernel --> replay[(idempotency_record)]
     keyverse[Keyverse OIDC / tenant authorization] -. required before remote deployment .-> preview
     consumers[Orgmetra / Keyverse / AIS / Billing / naruon / EA / SDP] -. future authenticated contracts .-> api
 ```
@@ -26,7 +27,7 @@ flowchart LR
 ## Runtime layers
 
 1. **Officer home**: buyer-oriented HTML that authors a policy, lists policy gaps, and attaches the next evidence in a local preview.
-2. **HTTP API**: policy author/revise/list, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, `/healthz`.
+2. **HTTP API**: strict `/v1` policy author/revise/list and policy-gap pages with idempotency, ETags, If-Match, and RFC 9457 problem details; deprecated preview routes remain for compatibility alongside catalog, evidence, and `/healthz` routes.
 3. **Preview network boundary**: always rejects proxy-forwarded and non-loopback traffic; no runtime override exists before Keyverse authentication.
 4. **CLI tools**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and the local Uvicorn `cwl-grc serve`.
 5. **Kernel package**: `create_app()` for modular composition; `python -m cwl_grc` for standalone local HTTP.
@@ -45,6 +46,7 @@ flowchart LR
 | `evidence_record` | Encrypted-at-rest artifact; exact values remain usable in an authorized workflow |
 | `control_evidence_binding` | Many-to-many bind of artifact to control |
 | `audit_event` | Append-only action record protected at the database boundary |
+| `idempotency_record` | Purpose-scoped request digest and response for safe version-one retries |
 | `schema_migration` | Applied schema-upgrade receipt |
 
 A policy gap is a latest finalized-edition mapping whose control has zero `control_evidence_binding` rows. There is no second evidence-binding table.
@@ -57,12 +59,20 @@ Policy creation writes an unfinalized `policy_version`, writes its official-cont
 
 `policy_document.current_version_number` is the optimistic concurrency token. A revision advances it with a conditional SQL update. A stale writer receives `409 Conflict` and must reload the current edition; the service never guesses a replacement version number.
 
+The version-one HTTP contract adds a strong representation ETag and requires
+`If-Match` for revisions, so a caller cannot publish from an unobserved
+edition. Mutations require a durable `Idempotency-Key`; an exact retry returns
+the stored response and a changed request body returns `409 Conflict`. List
+routes use opaque keyset cursors and a maximum page size of 100. Version-one
+errors use `application/problem+json`; the error handler excludes reflected
+request values and adds a request reference.
+
 ## Security posture
 
-The current HTTP surface is an unauthenticated developer preview. `X-Actor-Id` and `X-Purpose` are audit and purpose declarations, not proof of identity. The application binds its command-line server to loopback and always denies non-loopback or proxy-forwarded traffic. There is no unauthenticated remote-preview override.
+The current HTTP surface, including `/v1`, is an unauthenticated developer preview. `X-Actor-Id` and `X-Purpose` are audit and purpose declarations, not proof of identity. The application binds its command-line server to loopback and always denies non-loopback or proxy-forwarded traffic. There is no unauthenticated remote-preview override.
 
 Production exposure requires Keyverse-backed OIDC signature, issuer, audience, token-type, tenant, actor, and purpose authorization, plus encrypted transport and deployment controls. Evidence payloads remain encrypted at rest. Every persistent store requires explicit Fernet key material; ephemeral keys exist only for explicitly selected in-memory tests. The product does not destructively mask operational evidence; authenticated views and exports must select only the fields required for the approved purpose and omit unrelated fields. SAST remains a CWL Security lane. OPA/Rego is not part of this kernel.
 
 ## Service extraction
 
-The kernel is already a separately importable package. Extracting the process onto its own host must preserve `/healthz`, `/policy-documents`, `/policy-gaps`, `/controls`, `/controls/uncovered`, and the evidence bind contract while replacing the preview boundary with the authenticated Keyverse and tenant-authorization adapter.
+The kernel is already a separately importable package. Extracting the process onto its own host must preserve `/healthz`, the deprecated preview routes, `/v1/policy-documents`, `/v1/policy-gaps`, `/controls`, `/controls/uncovered`, and the evidence bind contract while replacing the preview boundary with the authenticated Keyverse and tenant-authorization adapter.

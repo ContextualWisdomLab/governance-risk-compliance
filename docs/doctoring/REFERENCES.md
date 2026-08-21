@@ -18,6 +18,20 @@ Open Policy Agent. (n.d.). *Policy language*. https://www.openpolicyagent.org/do
 
 Ross, R., & Pillitteri, V. (2020). *Security and privacy controls for information systems and organizations* (NIST Special Publication 800-53 Rev. 5). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-53r5
 
+Fielding, R., Nottingham, M., & Reschke, J. (Eds.). (2022). *HTTP semantics* (RFC 9110). RFC Editor. https://www.rfc-editor.org/rfc/rfc9110.html
+
+Fielding, R., Nottingham, M., & Reschke, J. (Eds.). (2022). *HTTP caching* (RFC 9111). RFC Editor. https://www.rfc-editor.org/rfc/rfc9111.html
+
+Nottingham, M., Wilde, E., & Dalal, S. (2023). *Problem details for HTTP APIs* (RFC 9457). RFC Editor. https://www.rfc-editor.org/rfc/rfc9457.html
+
 Policy authoring in this slice follows ISO/IEC 27001:2022 clause 5.2 (information security policy as documented information) and Annex A control A.5.1 (policies for information security); COSO (2013) Principle 12 and AICPA (2022) SOC 2 CC5.3 (deploy control activities through policies and procedures); KISA (2023) ISMS-P 1.1.5; and KISA (2026) CSAP 1.1.1. Open Policy Agent Rego was reviewed and not adopted: it is an authorization PDP language, not a policy-document or evidence-binding store.
 
 The CSAP catalog stores the edition-specific KISA resource notice rather than the generic CSAP introduction page. A content digest is not claimed in this slice because the original attachment bytes were not independently captured and hashed in the repository; adding a digest requires an immutable source-artifact ingestion workflow and reviewable byte-level evidence.
+
+The version-one HTTP contract uses RFC 9457 problem details and the
+`application/problem+json` media type, and uses RFC 9110 conditional-request
+semantics for `ETag`/`If-Match`. RFC 9111 caching guidance informed the choice
+to keep the policy ETag representation-specific and strong. These references
+define HTTP interoperability; they do not provide authentication, tenant
+authorization, or a general idempotency standard. Those remain explicit
+Keyverse and product-contract work.

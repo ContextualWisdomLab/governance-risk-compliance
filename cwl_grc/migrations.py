@@ -9,6 +9,7 @@ from sqlalchemy import Engine, inspect, text
 
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
+API_IDEMPOTENCY_MIGRATION = "0005_api_idempotency"
 
 
 def apply_schema_migrations(engine: Engine) -> None:
@@ -24,67 +25,102 @@ def apply_schema_migrations(engine: Engine) -> None:
                 """
             )
         )
-        applied = connection.execute(
+        policy_integrity_applied = connection.execute(
             text(
                 "SELECT migration_key FROM schema_migration "
                 "WHERE migration_key = :migration_key"
             ),
             {"migration_key": POLICY_INTEGRITY_MIGRATION},
         ).scalar_one_or_none()
-        if applied is not None:
-            return
-
-        inspector = inspect(connection)
-        additions = (
-            (
-                "policy_document",
-                "current_version_number",
-                "ALTER TABLE policy_document ADD COLUMN "
-                "current_version_number INTEGER NOT NULL DEFAULT 0",
-            ),
-            (
-                "policy_version",
-                "is_finalized",
-                "ALTER TABLE policy_version ADD COLUMN "
-                "is_finalized BOOLEAN NOT NULL DEFAULT TRUE",
-            ),
-        )
-        for table_name, column_name, statement in additions:
-            columns = {column["name"] for column in inspector.get_columns(table_name)}
-            if column_name not in columns:
-                connection.execute(text(statement))
-                inspector = inspect(connection)
-
-        connection.execute(
-            text(
-                """
-                UPDATE policy_document
-                SET current_version_number = COALESCE(
-                    (
-                        SELECT MAX(policy_version.version_number)
-                        FROM policy_version
-                        WHERE policy_version.policy_document_id =
-                              policy_document.policy_document_id
-                    ),
-                    0
-                )
-                WHERE current_version_number = 0
-                """
+        if policy_integrity_applied is None:
+            inspector = inspect(connection)
+            additions = (
+                (
+                    "policy_document",
+                    "current_version_number",
+                    "ALTER TABLE policy_document ADD COLUMN "
+                    "current_version_number INTEGER NOT NULL DEFAULT 0",
+                ),
+                (
+                    "policy_version",
+                    "is_finalized",
+                    "ALTER TABLE policy_version ADD COLUMN "
+                    "is_finalized BOOLEAN NOT NULL DEFAULT TRUE",
+                ),
             )
-        )
-        connection.execute(
-            text("UPDATE policy_version SET is_finalized = TRUE WHERE is_finalized IS NULL")
-        )
-        connection.execute(
+            for table_name, column_name, statement in additions:
+                columns = {column["name"] for column in inspector.get_columns(table_name)}
+                if column_name not in columns:
+                    connection.execute(text(statement))
+                    inspector = inspect(connection)
+
+            connection.execute(
+                text(
+                    """
+                    UPDATE policy_document
+                    SET current_version_number = COALESCE(
+                        (
+                            SELECT MAX(policy_version.version_number)
+                            FROM policy_version
+                            WHERE policy_version.policy_document_id =
+                                  policy_document.policy_document_id
+                        ),
+                        0
+                    )
+                    WHERE current_version_number = 0
+                    """
+                )
+            )
+            connection.execute(
+                text("UPDATE policy_version SET is_finalized = TRUE WHERE is_finalized IS NULL")
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO schema_migration (migration_key, applied_at) "
+                    "VALUES (:migration_key, :applied_at)"
+                ),
+                {
+                    "migration_key": POLICY_INTEGRITY_MIGRATION,
+                    "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
+                },
+            )
+
+        api_idempotency_applied = connection.execute(
             text(
-                "INSERT INTO schema_migration (migration_key, applied_at) "
-                "VALUES (:migration_key, :applied_at)"
+                "SELECT migration_key FROM schema_migration "
+                "WHERE migration_key = :migration_key"
             ),
-            {
-                "migration_key": POLICY_INTEGRITY_MIGRATION,
-                "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
-            },
-        )
+            {"migration_key": API_IDEMPOTENCY_MIGRATION},
+        ).scalar_one_or_none()
+        if api_idempotency_applied is None:
+            connection.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS idempotency_record (
+                        idempotency_record_id VARCHAR(64) PRIMARY KEY,
+                        actor_identifier VARCHAR(128) NOT NULL,
+                        operation_name VARCHAR(64) NOT NULL,
+                        idempotency_key VARCHAR(255) NOT NULL,
+                        request_digest VARCHAR(64) NOT NULL,
+                        response_status INTEGER NOT NULL,
+                        response_payload TEXT NOT NULL,
+                        created_at TIMESTAMP NOT NULL,
+                        CONSTRAINT idempotency_record_scope
+                            UNIQUE (actor_identifier, operation_name, idempotency_key)
+                    )
+                    """
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO schema_migration (migration_key, applied_at) "
+                    "VALUES (:migration_key, :applied_at)"
+                ),
+                {
+                    "migration_key": API_IDEMPOTENCY_MIGRATION,
+                    "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
+                },
+            )
 
 
 def install_integrity_guards(engine: Engine) -> None:
