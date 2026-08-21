@@ -39,8 +39,9 @@ tables.
 
 - Operators can run an overlap window with old and new keys, then remove the old
   key and receive a fail-closed error for any unrewrapped record.
-- Rewrap progress is bounded by batch size and can resume after a cursor; a
-  failed record is not silently rewritten.
+- Rewrap progress is bounded by batch size and the result returns the last
+  scanned record ID for complete cursor-based resumption; a failed record is
+  not silently rewritten.
 - Existing preview evidence remains readable during migration as declared legacy
   data.
 - KMS/HSM retrieval, persistent job scheduling, retention/disposition/legal

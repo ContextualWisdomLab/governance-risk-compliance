@@ -354,6 +354,58 @@ def test_rewrap_records_fail_closed_and_validates_batch_size() -> None:
         session.rollback()
 
 
+def test_rewrap_returns_cursor_for_following_batches() -> None:
+    """A bounded rewrap exposes the last scanned record for complete resumption."""
+    factory = _seeded_factory()
+    old_key = _key()
+    old_cipher = EvidenceCipher(
+        None,
+        keyring=EvidenceKeyring({"key-2026-07": old_key}, "key-2026-07"),
+    )
+    decision = AuthorizationDecision("officer-a", PurposeCode.EVIDENCE_BINDING, TENANT_ID)
+    with factory() as session:
+        records = [
+            create_evidence_record(session, old_cipher, decision, f"Evidence {index}", f"Text {index}")
+            for index in range(3)
+        ]
+        session.commit()
+        record_ids = sorted(record.evidence_record_id for record in records)
+
+    rotated = EvidenceCipher(
+        None,
+        keyring=EvidenceKeyring(
+            {"key-2026-07": old_key, "key-2026-08": _key()},
+            "key-2026-08",
+        ),
+    )
+    with factory() as session:
+        first = rewrap_evidence_records(session, rotated, decision, batch_size=2)
+        assert first.scanned_count == 2
+        assert first.rewrapped_count == 2
+        assert first.last_scanned_record_id == record_ids[1]
+        session.commit()
+
+    with factory() as session:
+        second = rewrap_evidence_records(
+            session,
+            rotated,
+            decision,
+            batch_size=2,
+            after_record_id=first.last_scanned_record_id,
+        )
+        assert second.scanned_count == 1
+        assert second.rewrapped_count == 1
+        assert second.last_scanned_record_id == record_ids[2]
+        empty = rewrap_evidence_records(
+            session,
+            rotated,
+            decision,
+            after_record_id=second.last_scanned_record_id,
+        )
+        assert empty.scanned_count == 0
+        assert empty.last_scanned_record_id is None
+
+
 def test_legacy_evidence_migration_adds_key_metadata(tmp_path: Path) -> None:
     """Existing evidence rows receive explicit legacy metadata during upgrade."""
     from sqlalchemy import create_engine, inspect

@@ -21,6 +21,7 @@
 - Verified-principal HTTP authorization for protected policy and evidence mutations.
 - Non-null tenant ownership on policy, evidence, binding, and audit records, including a migration backfill for pre-tenant local-preview data.
 - Versioned evidence encryption metadata, bounded old/new key overlap, and audited idempotent rewrap support.
+- Evidence rewrap results now expose the last scanned record ID so operators can resume every bounded batch.
 
 ### Security
 

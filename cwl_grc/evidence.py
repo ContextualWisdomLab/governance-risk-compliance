@@ -30,6 +30,7 @@ class EvidenceRewrapResult:
     rewrapped_count: int
     failed_count: int
     failed_record_ids: tuple[str, ...]
+    last_scanned_record_id: str | None
 
 
 def create_evidence_record(
@@ -150,6 +151,7 @@ def rewrap_evidence_records(
         rewrapped_count=rewrapped,
         failed_count=len(failed_ids),
         failed_record_ids=tuple(failed_ids),
+        last_scanned_record_id=records[-1].evidence_record_id if records else None,
     )
 
 
