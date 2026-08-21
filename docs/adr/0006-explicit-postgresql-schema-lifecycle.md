@@ -17,6 +17,8 @@ The repository also described a PostgreSQL-ready URL without an approved DBAPI d
 3. Runtime startup fails closed when:
    - `schema_migration` is absent;
    - required tables are missing;
+   - a declared column type, nullability, server default, primary key,
+     unique constraint, or foreign key differs from the reviewed metadata;
    - a required migration receipt is missing;
    - an unknown future migration receipt is present; or
    - the shared framework, control-identity, or authorization-purpose set differs from the reviewed application contract.
@@ -52,6 +54,7 @@ The exact-head acceptance set must prove:
 - a missing schema remains untouched by runtime startup;
 - explicit migration followed by runtime compatibility succeeds;
 - missing tables, missing receipts, unknown future receipts, and reference-data drift fail closed;
+- declared column and integrity-definition drift fails closed before runtime sessions are opened;
 - a concurrent PostgreSQL migration owner loses before DDL;
 - PostgreSQL append-only and finalized-history guards behave like SQLite;
 - PostgreSQL session timeouts and pool bounds are active;

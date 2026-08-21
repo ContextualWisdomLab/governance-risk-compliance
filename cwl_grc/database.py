@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 from ipaddress import ip_address
+from typing import Any
 
-from sqlalchemy import Engine, create_engine, inspect, text
+from sqlalchemy import Engine, ForeignKeyConstraint, UniqueConstraint, create_engine, inspect, text
 from sqlalchemy.engine import Connection, URL, make_url
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -259,6 +260,12 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
             "The GRC schema is behind this binary; required columns are missing: "
             + details
         )
+    definition_mismatches = _schema_definition_mismatches(engine, inspector)
+    if definition_mismatches:
+        raise SchemaCompatibilityError(
+            "The GRC schema has incompatible definitions: "
+            + "; ".join(definition_mismatches)
+        )
     with engine.connect() as connection:
         receipts = tuple(
             connection.execute(
@@ -317,6 +324,94 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
             f"control_rows={len(control_rows)}, purpose_rows={len(purpose_rows)}."
         )
     return receipts
+
+
+def _schema_definition_mismatches(engine: Engine, inspector: Any) -> tuple[str, ...]:
+    """Return declared column and integrity definitions that differ from storage."""
+    mismatches: list[str] = []
+    for table_name, table in Base.metadata.tables.items():
+        actual_columns = {
+            column["name"]: column for column in inspector.get_columns(table_name)
+        }
+        for column in table.columns:
+            actual = actual_columns[column.name]
+            expected_type = _schema_type_signature(engine, column.type)
+            actual_type = _schema_type_signature(engine, actual["type"])
+            if actual_type != expected_type:
+                mismatches.append(
+                    f"{table_name}.{column.name} type expected={expected_type} actual={actual_type}"
+                )
+            if bool(actual.get("nullable")) != bool(column.nullable):
+                mismatches.append(f"{table_name}.{column.name} nullable definition differs")
+            expected_default = (
+                _schema_literal_signature(
+                    column.server_default.arg.compile(dialect=engine.dialect)
+                    if hasattr(column.server_default.arg, "compile")
+                    else column.server_default.arg
+                )
+                if column.server_default is not None
+                else None
+            )
+            actual_default = _schema_literal_signature(actual.get("default"))
+            if actual_default != expected_default:
+                mismatches.append(f"{table_name}.{column.name} server default definition differs")
+
+        expected_primary_key = tuple(column.name for column in table.primary_key.columns)
+        actual_primary_key = tuple(
+            inspector.get_pk_constraint(table_name).get("constrained_columns") or ()
+        )
+        if actual_primary_key != expected_primary_key:
+            mismatches.append(f"{table_name} primary key definition differs")
+
+        expected_unique = {
+            tuple(constraint.columns.keys())
+            for constraint in table.constraints
+            if isinstance(constraint, UniqueConstraint)
+        }
+        actual_unique = {
+            tuple(constraint.get("column_names") or ())
+            for constraint in inspector.get_unique_constraints(table_name)
+        }
+        if actual_unique != expected_unique:
+            mismatches.append(f"{table_name} unique constraints differ")
+
+        expected_foreign_keys = {
+            (
+                tuple(constraint.column_keys),
+                constraint.referred_table.name,
+                tuple(element.column.name for element in constraint.elements),
+            )
+            for constraint in table.constraints
+            if isinstance(constraint, ForeignKeyConstraint)
+        }
+        actual_foreign_keys = {
+            (
+                tuple(constraint.get("constrained_columns") or ()),
+                constraint.get("referred_table"),
+                tuple(constraint.get("referred_columns") or ()),
+            )
+            for constraint in inspector.get_foreign_keys(table_name)
+        }
+        if actual_foreign_keys != expected_foreign_keys:
+            mismatches.append(f"{table_name} foreign keys differ")
+    return tuple(mismatches)
+
+
+def _schema_type_signature(engine: Engine, type_: Any) -> str:
+    """Compile one SQLAlchemy type through the active dialect for stable comparison."""
+    return str(type_.compile(dialect=engine.dialect)).strip().casefold()
+
+
+def _schema_literal_signature(value: Any) -> str | None:
+    """Normalize inspector and model default literals without changing their meaning."""
+    if value is None:
+        return None
+    normalized = str(value).strip().casefold()
+    while len(normalized) > 1 and normalized.startswith("(") and normalized.endswith(")"):
+        normalized = normalized[1:-1].strip()
+    if len(normalized) > 1 and normalized[0] == normalized[-1] and normalized[0] in {"'", '"'}:
+        normalized = normalized[1:-1].strip()
+    return normalized
 
 
 def create_session_factory(

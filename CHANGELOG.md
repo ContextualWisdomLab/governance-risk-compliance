@@ -21,6 +21,7 @@
 - Product CI for lint, docstring coverage, and 100% statement/branch test coverage.
 - Hash-locked `uv.lock` dependency graph for runtime and development dependencies.
 - Versioned schema-upgrade receipts for existing first-slice stores.
+- Runtime schema checks for declared column types, nullability, defaults, primary keys, unique constraints, and foreign keys.
 
 ### Changed
 
@@ -39,6 +40,7 @@
 - Require remote PostgreSQL `sslmode=verify-full`; permit disabled TLS only in an explicit loopback integration-test profile.
 - Bound PostgreSQL connect, statement, lock, idle-transaction, pool-acquisition, overflow, and recycle behavior; require `lock_timeout < statement_timeout`.
 - Refuse uninitialized, behind, ahead, table-incomplete, or reference-incompatible schemas before runtime sessions are opened.
+- Refuse runtime startup when stored schema definitions drift from the reviewed SQLAlchemy metadata.
 - Preserve exact operational evidence values while requiring purpose-specific field selection, encryption, retention, and audit for the future production boundary.
 - Pin the CSAP 2026.07 catalog provenance to the official KISA resource notice rather than a generic product page.
 - Pin every Product and PostgreSQL workflow action and service image to immutable identities and verify the exact pull-request head before testing.

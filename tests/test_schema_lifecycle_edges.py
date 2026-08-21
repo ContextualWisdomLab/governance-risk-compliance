@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import Integer, inspect, text
 
 import cwl_grc.database as database_module
 from cwl_grc import create_app
@@ -120,6 +120,84 @@ def test_runtime_rejects_schema_missing_required_column(tmp_path: Path) -> None:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE control_framework DROP COLUMN source_url"))
         with pytest.raises(database_module.SchemaCompatibilityError, match="required columns"):
+            database_module.assert_schema_compatible(engine)
+    finally:
+        engine.dispose()
+
+
+class _SchemaInspectorProxy:
+    """Delegate schema inspection while applying one deterministic drift fixture."""
+
+    def __init__(self, inspector: Any, drift: str) -> None:
+        self._inspector = inspector
+        self._drift = drift
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate unmodified inspector methods and attributes."""
+        return getattr(self._inspector, name)
+
+    def get_columns(self, table_name: str, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        """Return one column drift fixture when the selected table is inspected."""
+        columns = [dict(column) for column in self._inspector.get_columns(table_name, *args, **kwargs)]
+        if self._drift == "type" and table_name == "audit_event":
+            next(column for column in columns if column["name"] == "action_name")["type"] = Integer()
+        if self._drift == "nullable" and table_name == "audit_event":
+            next(column for column in columns if column["name"] == "action_name")["nullable"] = True
+        if self._drift == "default" and table_name == "policy_document":
+            next(column for column in columns if column["name"] == "current_version_number")["default"] = "(1)"
+        return columns
+
+    def get_pk_constraint(self, table_name: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        """Return a primary-key deletion fixture for one table."""
+        constraint = dict(self._inspector.get_pk_constraint(table_name, *args, **kwargs))
+        if self._drift == "primary_key" and table_name == "audit_event":
+            constraint["constrained_columns"] = []
+        return constraint
+
+    def get_unique_constraints(self, table_name: str, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        """Return a unique-constraint deletion fixture for one table."""
+        constraints = self._inspector.get_unique_constraints(table_name, *args, **kwargs)
+        if self._drift == "unique" and table_name == "control_evidence_binding":
+            return []
+        return constraints
+
+    def get_foreign_keys(self, table_name: str, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        """Return a foreign-key deletion fixture for one table."""
+        constraints = self._inspector.get_foreign_keys(table_name, *args, **kwargs)
+        if self._drift == "foreign_key" and table_name == "control_evidence_binding":
+            return []
+        return constraints
+
+
+@pytest.mark.parametrize(
+    ("drift", "message"),
+    [
+        ("type", "type expected"),
+        ("nullable", "nullable definition"),
+        ("default", "server default definition"),
+        ("primary_key", "primary key definition"),
+        ("unique", "unique constraints"),
+        ("foreign_key", "foreign keys"),
+    ],
+)
+def test_runtime_rejects_schema_definition_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    drift: str,
+    message: str,
+) -> None:
+    """Runtime startup rejects type, default, and integrity-definition drift."""
+    database_url = f"sqlite:///{tmp_path / f'{drift}-schema.sqlite'}"
+    database_module.migrate_database(database_url)
+    engine = database_module.build_engine(database_url)
+    real_inspector = inspect(engine)
+    monkeypatch.setattr(
+        database_module,
+        "inspect",
+        lambda _engine: _SchemaInspectorProxy(real_inspector, drift),
+    )
+    try:
+        with pytest.raises(database_module.SchemaCompatibilityError, match=message):
             database_module.assert_schema_compatible(engine)
     finally:
         engine.dispose()
