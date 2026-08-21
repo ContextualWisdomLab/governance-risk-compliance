@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 import cwl_grc.production_readiness as production_readiness
-from cwl_grc.production_readiness import load_manifest, main
+from cwl_grc.production_readiness import load_manifest
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -80,7 +80,7 @@ def test_release_mode_rejects_opaque_success_words_as_evidence(
     path = tmp_path / "manifest.json"
     _write_manifest(path, _all_ready_manifest(["verified"]))
 
-    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2
+    assert production_readiness.main(_main_arguments(path, REPOSITORY_ROOT)) == 2
 
 
 def test_release_mode_accepts_hash_bound_repository_file_evidence(
@@ -99,7 +99,7 @@ def test_release_mode_accepts_hash_bound_repository_file_evidence(
 
     monkeypatch.setattr(production_readiness.os, "open", capture_open)
 
-    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 0
+    assert production_readiness.main(_main_arguments(path, REPOSITORY_ROOT)) == 0
     assert opened_flags
     assert all(flags & os.O_NOFOLLOW for flags in opened_flags)
 
@@ -111,7 +111,7 @@ def test_release_mode_accepts_current_readiness_index_component_oids(
     path = tmp_path / "manifest.json"
     _write_manifest(path, _all_ready_manifest([_bound_index_evidence()]))
 
-    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 0
+    assert production_readiness.main(_main_arguments(path, REPOSITORY_ROOT)) == 0
 
 
 def test_release_mode_rejects_stale_readiness_index_component_oid(
@@ -142,7 +142,7 @@ def test_release_mode_rejects_stale_readiness_index_component_oid(
     }
     _write_manifest(path, _all_ready_manifest([evidence]))
 
-    assert main(_main_arguments(path, root)) == 2
+    assert production_readiness.main(_main_arguments(path, root)) == 2
 
 
 def test_release_mode_rejects_malformed_readiness_index(tmp_path: Path) -> None:
@@ -159,7 +159,7 @@ def test_release_mode_rejects_malformed_readiness_index(tmp_path: Path) -> None:
     }
     _write_manifest(path, _all_ready_manifest([evidence]))
 
-    assert main(_main_arguments(path, root)) == 2
+    assert production_readiness.main(_main_arguments(path, root)) == 2
 
 
 def test_release_mode_rejects_wrong_repository_file_digest(
@@ -172,7 +172,7 @@ def test_release_mode_rejects_wrong_repository_file_digest(
         _all_ready_manifest([_bound_repository_evidence(digest="0" * 64)]),
     )
 
-    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2
+    assert production_readiness.main(_main_arguments(path, REPOSITORY_ROOT)) == 2
 
 
 def test_release_mode_rejects_repository_path_escape(
@@ -184,7 +184,7 @@ def test_release_mode_rejects_repository_path_escape(
     evidence["path"] = "../outside.txt"
     _write_manifest(path, _all_ready_manifest([evidence]))
 
-    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2
+    assert production_readiness.main(_main_arguments(path, REPOSITORY_ROOT)) == 2
 
 
 def test_release_mode_rejects_backslash_repository_path(
@@ -196,7 +196,7 @@ def test_release_mode_rejects_backslash_repository_path(
     evidence["path"] = r"tests\evidence.py"
     _write_manifest(path, _all_ready_manifest([evidence]))
 
-    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2
+    assert production_readiness.main(_main_arguments(path, REPOSITORY_ROOT)) == 2
 
 
 def test_release_mode_rejects_embedded_null_repository_path(
@@ -208,7 +208,7 @@ def test_release_mode_rejects_embedded_null_repository_path(
     evidence["path"] = "tests/\u0000evidence.py"
     _write_manifest(path, _all_ready_manifest([evidence]))
 
-    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2
+    assert production_readiness.main(_main_arguments(path, REPOSITORY_ROOT)) == 2
 
 
 def test_release_mode_rejects_missing_repository_root(tmp_path: Path) -> None:
@@ -216,7 +216,7 @@ def test_release_mode_rejects_missing_repository_root(tmp_path: Path) -> None:
     path = tmp_path / "manifest.json"
     _write_manifest(path, _all_ready_manifest([_bound_repository_evidence()]))
 
-    assert main(_main_arguments(path, tmp_path / "missing-root")) == 2
+    assert production_readiness.main(_main_arguments(path, tmp_path / "missing-root")) == 2
 
 
 def test_release_mode_rejects_non_directory_repository_root(tmp_path: Path) -> None:
@@ -226,7 +226,7 @@ def test_release_mode_rejects_non_directory_repository_root(tmp_path: Path) -> N
     root.write_text("not a repository", encoding="utf-8")
     _write_manifest(path, _all_ready_manifest([_bound_repository_evidence()]))
 
-    assert main(_main_arguments(path, root)) == 2
+    assert production_readiness.main(_main_arguments(path, root)) == 2
 
 
 def test_release_mode_rejects_missing_repository_evidence_file(
@@ -243,7 +243,7 @@ def test_release_mode_rejects_missing_repository_evidence_file(
     }
     _write_manifest(path, _all_ready_manifest([evidence]))
 
-    assert main(_main_arguments(path, root)) == 2
+    assert production_readiness.main(_main_arguments(path, root)) == 2
 
 
 def test_release_mode_rejects_evidence_symlink_escape(tmp_path: Path) -> None:
@@ -261,7 +261,7 @@ def test_release_mode_rejects_evidence_symlink_escape(tmp_path: Path) -> None:
     }
     _write_manifest(path, _all_ready_manifest([evidence]))
 
-    assert main(_main_arguments(path, root)) == 2
+    assert production_readiness.main(_main_arguments(path, root)) == 2
 
 
 def test_release_mode_rejects_directory_as_evidence(tmp_path: Path) -> None:
@@ -276,7 +276,7 @@ def test_release_mode_rejects_directory_as_evidence(tmp_path: Path) -> None:
     }
     _write_manifest(path, _all_ready_manifest([evidence]))
 
-    assert main(_main_arguments(path, root)) == 2
+    assert production_readiness.main(_main_arguments(path, root)) == 2
 
 
 def test_release_mode_rejects_unreadable_evidence(
@@ -292,4 +292,4 @@ def test_release_mode_rejects_unreadable_evidence(
         raise OSError("simulated read failure")
 
     monkeypatch.setattr(production_readiness.os, "open", fail_open)
-    assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2
+    assert production_readiness.main(_main_arguments(path, REPOSITORY_ROOT)) == 2

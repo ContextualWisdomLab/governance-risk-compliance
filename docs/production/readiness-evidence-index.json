@@ -13,7 +13,7 @@
     },
     {
       "path": "tests/test_production_readiness_evidence_binding.py",
-      "git_blob_oid": "a49e397e8dc09bbffae102e986d2c3b9b4c4da1f"
+      "git_blob_oid": "2461c89c3eb80b27b0094827dc48a8c95a3b273d"
     },
     {
       "path": ".github/workflows/production-readiness.yml",

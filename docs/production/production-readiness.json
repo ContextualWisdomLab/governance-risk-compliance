@@ -179,7 +179,7 @@
         {
           "kind": "repository_file",
           "path": "docs/production/readiness-evidence-index.json",
-          "sha256": "d458686b4ec70d6d9a1df920ff42f20590ed06f8d6bcf87bbc8a53366dfe5d08"
+          "sha256": "9a546235549619b7d907f7036fa966b1a8232c49b8a63c8400e36a67158b7ca4"
         }
       ]
     }
