@@ -34,10 +34,11 @@ closure; all earlier assessments and disposition records remain available.
 The compliance workspace also publishes tenant-scoped portfolio indicators.
 They count total, assessed, unassessed, above-appetite, within-appetite,
 overdue, treatment, active-acceptance, closure, and closed-risk states, with
-status and category breakdowns. Overdue counts exclude closed risks, and an
-active acceptance is counted only when it belongs to the latest assessment and
-is inside its validity window. The read model deliberately does not add or
-average residual scores across methodology versions.
+status and category breakdowns. Overdue counts and actionable risk items
+exclude closed risks, and an active acceptance is counted only when it belongs
+to the latest assessment and is inside its validity window. The read model
+deliberately does not add or average residual scores across methodology
+versions.
 
 ## API
 

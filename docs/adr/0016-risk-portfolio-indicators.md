@@ -27,7 +27,9 @@ references the latest assessment and its validity interval contains the
 observation time. Closed risks are excluded from overdue counts. The
 projection does not sum, average, rank, or otherwise compare residual scores
 across methodology versions, and it creates no database table or cross-service
-copy of authoritative data.
+copy of authoritative data. Closed risks remain visible in `risks` for audit
+retention but are excluded from both the overdue indicator and actionable risk
+queue.
 
 The customer-facing UI remains the separately governed Figma/Storybook
 authority in PR34; this ADR defines the backend read contract only and has no

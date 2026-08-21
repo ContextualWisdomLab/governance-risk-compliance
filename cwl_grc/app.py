@@ -672,14 +672,18 @@ def create_app(
                 ),
             }
             for risk in risks
-            if risk_assessments[risk.risk_id] is None
-            or risk_assessments[risk.risk_id].appetite_status == "above_appetite"
-            or (
-                risk_treatments[risk.risk_id] is not None
-                and risk_treatments[risk.risk_id].plan_status in {"proposed", "approved", "in_progress"}
+            if risk.risk_status != "closed"
+            and (
+                risk_assessments[risk.risk_id] is None
+                or risk_assessments[risk.risk_id].appetite_status == "above_appetite"
+                or (
+                    risk_treatments[risk.risk_id] is not None
+                    and risk_treatments[risk.risk_id].plan_status
+                    in {"proposed", "approved", "in_progress"}
+                )
+                or risk_acceptances[risk.risk_id] is not None
+                or risk.next_review_at < datetime.now(timezone.utc).replace(tzinfo=None)
             )
-            or risk_acceptances[risk.risk_id] is not None
-            or risk.next_review_at < datetime.now(timezone.utc).replace(tzinfo=None)
         ]
         control_actions = [
             {

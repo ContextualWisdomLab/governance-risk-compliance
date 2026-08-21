@@ -392,6 +392,10 @@ def test_risk_http_workspace_and_input_boundaries() -> None:
     assert closed_portfolio["risk_total"] == 2
     assert closed_portfolio["active_acceptance_total"] == 1
     assert closed_portfolio["closed_total"] == 1
+    assert not any(
+        action["kind"] == "risk" and action["reference"] == "RISK-CLOSURE-HTTP-001"
+        for action in client.get("/compliance-workspace", headers=_headers("reader")).json()["next_actions"]
+    )
     reassessment = client.post(
         f"/risks/{risk.json()['risk_id']}/assessments",
         headers=headers,

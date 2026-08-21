@@ -54,7 +54,7 @@ exact rows behind every count and provide a keyboard-accessible empty/loading/
 error state; the Figma/Storybook buyer-workspace authority remains PR34.
 Risk portfolio indicators are read-only counts, not a cross-methodology risk
 score: active acceptance counts require the latest assessment and valid period,
-and overdue counts exclude closed risks.
+and overdue counts and actionable risk items exclude closed risks.
 
 ## UML
 
