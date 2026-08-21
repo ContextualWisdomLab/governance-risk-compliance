@@ -39,7 +39,8 @@ Keyverse currently uses closed relying-party profiles with an exact audience and
 9. Do not fetch discovery metadata or JWKs over the network in this slice. Offline key input cannot silently introduce SSRF, redirects, unbounded responses, or runtime issuer drift.
 10. Keep Keyverse as the issuer and relying-party authority. GRC stores no password, passkey, client secret, refresh token, raw bearer token, or Keyverse administrator credential.
 11. Add an explicit `require_access_scopes` policy primitive. Authentication alone never authorizes a GRC action.
-12. Keep remote traffic disabled until tenant-owned persistence, route dependencies, OpenAPI security, discovery/JWK refresh, service-principal handling, and deployment acceptance tests are complete.
+12. Accept an optional caller-owned atomic JTI replay guard. Without that guard, this offline kernel preserves normal reusable bearer-token semantics; it does not create an unsafe process-local replay cache.
+13. Keep remote traffic disabled until tenant-owned persistence, route dependencies, OpenAPI security, discovery/JWK refresh, service-principal handling, and deployment acceptance tests are complete.
 
 ## Consequences
 
@@ -48,6 +49,8 @@ A forged issuer, wrong audience, ID token, unsigned token, unsupported algorithm
 Reviewed old and new public keys can coexist during a rotation window. Removing the old key from the reviewed set revokes its future acceptance on the next verifier construction. This is configuration-level rotation evidence, not yet a live discovery or cache-refresh implementation.
 
 The verifier is intentionally independent of FastAPI and SQLAlchemy. Later route and tenant-storage slices can consume the same typed principal without changing cryptographic validation semantics.
+
+The optional replay guard lets a route or durable authorization service enforce one-time use where its action contract requires it. The guard receives the verified `jti` and must perform an atomic check-and-record operation; the verifier does not retain token state itself.
 
 The strict RFC 9068 `client_id` requirement may require a Keyverse relying-party mapper or issuer configuration because vendor-native tokens often expose `azp` instead. GRC does not alias `azp` to `client_id`; the issuer profile must converge to the reviewed contract.
 
@@ -60,6 +63,7 @@ The strict RFC 9068 `client_id` requirement may require a Keyverse relying-party
 - **Infer human versus service from `sub == client_id`:** RFC 9700 identifies this namespace confusion as unsafe; the profile requires an explicit principal kind and currently accepts humans only.
 - **Fetch arbitrary discovery/JWKS URLs immediately:** widens the network and rotation boundary before URL pinning, response bounds, cache semantics, and outage behavior have tests.
 - **Store raw bearer tokens for audit:** creates replayable credential material; audit records should store verified opaque identifiers such as `jti`, actor, client, tenant, and the authorization decision.
+- **Create a process-local replay cache:** it is not correct across workers or restarts; use the optional JTI guard with a durable atomic store when one-time use is required.
 
 ## References
 
