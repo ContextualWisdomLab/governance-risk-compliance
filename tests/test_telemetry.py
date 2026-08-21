@@ -135,6 +135,8 @@ def test_exporter_configuration_and_error_status(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(telemetry_module, "OTLPSpanExporter", lambda: span_exporter)
 
     telemetry = RequestTelemetry("local_preview")
+    memory_exporter = InMemorySpanExporter()
+    telemetry._tracer_provider.add_span_processor(SimpleSpanProcessor(memory_exporter))
     with pytest.raises(RuntimeError, match="telemetry failure"):
         with telemetry.server_span("GET", "/healthz", {}):
             raise RuntimeError("telemetry failure")
@@ -143,6 +145,8 @@ def test_exporter_configuration_and_error_status(monkeypatch: pytest.MonkeyPatch
 
     assert metric_exporter.shutdown.called
     assert span_exporter.shutdown.called
+    finished_span = memory_exporter.get_finished_spans()[-1]
+    assert not finished_span.events
 
 
 def test_span_traceparent_identifies_the_started_span() -> None:

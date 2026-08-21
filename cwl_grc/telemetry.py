@@ -86,6 +86,8 @@ class RequestTelemetry:
         with self._tracer.start_as_current_span(
             f"HTTP {method}",
             context=parent_context,
+            record_exception=False,
+            set_status_on_exception=False,
         ) as span:
             span.set_attribute("http.request.method", method)
             span.set_attribute("http.route", route)
