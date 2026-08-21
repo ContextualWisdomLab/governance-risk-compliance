@@ -59,6 +59,13 @@ Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `n
 
 Evidence may need exact officer names, contact details, or other PII to remain operationally useful. This product does not destructively mask stored evidence. Instead, the production boundary must enforce authenticated identity, tenant and purpose authorization, encrypted storage and transport, immutable audit, retention, and purpose-specific field selection. Views and exports should omit unrelated fields rather than alter values that an authorized workflow needs. The current local preview does not yet satisfy that production boundary.
 
+## Hourly review repair
+
+The repository has a read-only caller at `.github/workflows/hourly-review-repair.yml`.
+It invokes the central CWL scheduler once per UTC hour for bounded review repair;
+inspect the latest Actions run, then review the exact head and required checks before
+requesting independent approval. The caller never approves, merges, or releases.
+
 ## Product boundary
 
 | This repo owns | Other CWL homes consume only |

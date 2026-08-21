@@ -1,0 +1,25 @@
+name: Hourly GRC Review Repair
+
+on:
+  schedule:
+    # Offset the heartbeat from other CWL callers and the top-of-hour surge.
+    - cron: "53 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: hourly-grc-review-repair
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  dispatch-review-repair:
+    uses: ContextualWisdomLab/.github/.github/workflows/pr-review-fix-scheduler.yml@55a8b576725451dfe0a21a57d36a2f1a41619b24 # central main exact source
+    with:
+      target_repository: ContextualWisdomLab/governance-risk-compliance
+      base_branch: develop
+      max_prs: "50"
+      max_dispatches: "1"
+      retry_hours: "2"

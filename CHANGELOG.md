@@ -4,6 +4,8 @@
 
 ### Added
 
+- Hourly central review-repair caller for the `develop`-based GRC pull-request queue;
+  it dispatches at most one bounded repair per hour and never approves or merges.
 - Versioned policy authoring: `policy_document`, `policy_version`, and `policy_control_mapping` mapped only to official catalog identifiers.
 - Policy-gap query that reuses `control_evidence_binding` (no second evidence model).
 - Officer home form to author a policy and see uncovered policy requirements.
