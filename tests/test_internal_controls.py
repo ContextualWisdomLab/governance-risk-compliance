@@ -43,6 +43,7 @@ from cwl_grc.models import (
     ControlOwnerAssignment,
     ControlTestPlan,
     ControlTestExecution,
+    ControlTestResult,
     EvidenceRecord,
     EvidenceUsage,
 )
@@ -344,7 +345,6 @@ def test_internal_control_status_projection_covers_failure_exception_stale_and_n
         assert not_tested_control is not None
         assert control_coverage_status(session, not_tested_control.control_item_id, decision.tenant_id) is ControlCoverageStatus.IMPLEMENTED_NOT_TESTED
 
-
 def test_retired_definition_and_inactive_plan_cannot_project_effectiveness() -> None:
     """Coverage excludes historical conclusions outside the active control scope."""
     factory = _factory()
@@ -384,6 +384,41 @@ def test_retired_definition_and_inactive_plan_cannot_project_effectiveness() -> 
         inactive_plan.active = False
         session.flush()
         assert control_coverage_status(session, inactive_control.control_item_id, decision.tenant_id) is ControlCoverageStatus.IMPLEMENTED_NOT_TESTED
+
+        in_progress = _foundation(session, decision, "IC-IN-PROGRESS-1")
+        _map(session, decision, in_progress, "12.3.2")
+        in_progress_plan = _plan(session, decision, in_progress, "operating")
+        in_progress_execution = ControlTestExecution(
+            test_execution_id=uuid4().hex,
+            tenant_id=decision.tenant_id,
+            test_plan_id=in_progress_plan.test_plan_id,
+            control_implementation_id=in_progress.implementation.control_implementation_id,
+            test_period_start=_JANUARY_START,
+            test_period_end=_JANUARY_END,
+            executed_at=_JANUARY_START,
+            performed_by=decision.actor_identifier,
+            sample_description="In-progress sample",
+            execution_status="in_progress",
+            rationale="The test is still running.",
+            created_at=_JANUARY_START,
+        )
+        session.add(in_progress_execution)
+        session.add(
+            ControlTestResult(
+                test_result_id=uuid4().hex,
+                tenant_id=decision.tenant_id,
+                test_execution_id=in_progress_execution.test_execution_id,
+                result_code=ControlTestResultCode.INEFFECTIVE.value,
+                result_rationale="An in-progress execution result must not affect current coverage.",
+                determined_by=decision.actor_identifier,
+                determined_at=_JANUARY_START,
+                created_at=_JANUARY_START,
+            )
+        )
+        session.flush()
+        in_progress_control = get_control_item(session, FrameworkCode.CSAP_2026, "12.3.2")
+        assert in_progress_control is not None
+        assert control_coverage_status(session, in_progress_control.control_item_id, decision.tenant_id) is ControlCoverageStatus.IMPLEMENTED_NOT_TESTED
 
     for status in ControlCoverageStatus:
         assert next_action_for_coverage(status)
