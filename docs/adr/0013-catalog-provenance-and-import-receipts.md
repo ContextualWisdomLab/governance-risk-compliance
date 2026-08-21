@@ -21,12 +21,12 @@ Add a global, tenant-neutral provenance chain:
 - Make source versions, parser runs/receipts, and releases append-only at the SQLite and PostgreSQL database boundary.
 - Make import identity idempotent by source version plus parser version; release publication requires a successful receipt.
 - Require the declared `catalog_governance` purpose. It is an audit-purpose declaration in the local preview, not authentication.
-- Expose a governed release list and metadata-only comparison endpoint so officers can review source/version/receipt changes without implying a requirement-level diff.
+- Expose a bounded published-release list with deterministic pagination and a metadata-only comparison endpoint so officers can review source/version/receipt changes without implying a requirement-level diff.
 - Keep provenance separate from `control_framework` and `control_item`. A later importer may create or update an official framework edition only after verified source bytes, parser output, official identifiers, mapping evidence, and independent review exist.
 
 ## Consequences
 
-The current API can explain which source edition and parser receipt produced a candidate release and compare those metadata fields between two releases without overstating acquisition or catalog completeness. It cannot yet retrieve a catalog, parse OSCAL/OLIR, bind imported requirements to a framework, or answer requirement-level impact/diff questions. Those remain explicit follow-on work.
+The current API can explain which source edition and parser receipt produced a candidate release, page through published identities, and compare metadata fields between two releases without overstating acquisition or catalog completeness. It cannot yet retrieve a catalog, parse OSCAL/OLIR, bind imported requirements to a framework, or answer requirement-level impact/diff questions. Those remain explicit follow-on work.
 
 ## References
 
