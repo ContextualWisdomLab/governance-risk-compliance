@@ -30,6 +30,7 @@
 - Proposed availability, mutation-success, audit-write, and recovery SLO/error-budget policy with bounded-label burn-rate alert thresholds.
 - Tenant-scoped internal-control model: immutable definition versions, scoped implementations and owners, reviewed many-to-many catalog mappings, design/operating tests, exceptions, deficiencies, evidence usage, and explicit coverage statuses.
 - Additive migration that classifies preexisting direct evidence bindings as `unassessed` without inventing effectiveness.
+- Tenant-scoped obligation register: source revisions, jurisdictions, applicability decisions, legal references, commitments, proposed policy/control links awaiting independent review, regulatory changes, immutable impact assessments, and overdue/upcoming worklists for Issue #28.
 - Organization OpenTelemetry evidence boundary: GRC governs aggregate collector acceptance for `cwl-grc`, `lineageweave`, `contextual-orchestrator`, and Valkey access without storing raw spans or payloads.
 
 ### Security
@@ -53,6 +54,9 @@
 - Require retention metadata and a verified `grc.evidence.retention` purpose for legal-hold changes; leave destructive disposition and remote access disabled until their operating contracts exist.
 - Keep `/healthz` dependency-free; require database, schema receipts, seed rows, integrity guards, key round-trip, and environment checks before startup admits traffic.
 - Enable SQLite foreign-key enforcement and require PostgreSQL-compatible boolean constraints for the internal-control schema.
+- Add SQLite/PostgreSQL composite tenant guards and immutable-history triggers for obligation and regulatory-change records; require the dedicated `compliance_governance` purpose on the new JSON workflow.
+- Enforce null-safe obligation-target uniqueness, savepoint-backed concurrent-create conflicts, and proposed-only obligation-link insertion so creation cannot self-assert approval.
+- Construct migration tenant DDL and compatibility indexes through SQLAlchemy's quoted schema APIs instead of interpolated SQL identifiers.
 
 ### ADR
 
@@ -67,5 +71,6 @@
 - `docs/adr/0009-opentelemetry-request-telemetry.md` — isolated OpenTelemetry request spans/metrics, standard OTLP export, and bounded route attributes.
 - `docs/adr/0010-slo-and-error-budget-contract.md` — proposed SLO, error-budget, and multi-window alert contract pending collector acceptance.
 - `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — separate external requirements, internal controls, scoped implementations, testing, evidence usage, and explicit effectiveness projection.
+- `docs/adr/0012-obligation-applicability-and-regulatory-change.md` — source-backed obligation, applicability, commitment, and change-impact history separate from control effectiveness.
 - `docs/adr/0012-organization-opentelemetry-evidence-boundary.md` — GRC-owned aggregate OTel acceptance evidence with raw telemetry retained only in the approved observability platform.
 - `docs/doctoring/opentelemetry-evidence-references.md` — APA 7 references for the OpenTelemetry and W3C Trace Context boundary.
