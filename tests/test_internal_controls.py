@@ -794,6 +794,7 @@ def test_migration_backfills_preexisting_direct_binding_as_unassessed() -> None:
         seed_control_catalog(session)
         seed_authorization_purposes(session)
         evidence = _evidence(session, "migration-evidence", _JANUARY_START)
+        long_evidence = _evidence(session, "migration-evidence-long", _JANUARY_START)
         control = get_control_item(session, FrameworkCode.CSAP_2026, "10.2.1")
         assert control is not None
         session.add(
@@ -802,6 +803,17 @@ def test_migration_backfills_preexisting_direct_binding_as_unassessed() -> None:
                 tenant_id="local_development",
                 control_item_id=control.control_item_id,
                 evidence_record_id=evidence.evidence_record_id,
+                bound_by_actor="legacy-officer",
+                purpose_code=PurposeCode.EVIDENCE_BINDING.value,
+                bound_at=_JANUARY_START,
+            )
+        )
+        session.add(
+            ControlEvidenceBinding(
+                binding_id="b" * 64,
+                tenant_id="local_development",
+                control_item_id=control.control_item_id,
+                evidence_record_id=long_evidence.evidence_record_id,
                 bound_by_actor="legacy-officer",
                 purpose_code=PurposeCode.EVIDENCE_BINDING.value,
                 bound_at=_JANUARY_START,
@@ -818,3 +830,8 @@ def test_migration_backfills_preexisting_direct_binding_as_unassessed() -> None:
             )
         ).one()
         assert usage == ("unassessed", "migration-binding", None)
+        long_usage_id = session.execute(
+            text("SELECT evidence_usage_id FROM evidence_usage WHERE legacy_binding_id = :binding_id"),
+            {"binding_id": "b" * 64},
+        ).scalar_one()
+        assert len(long_usage_id) == 64
