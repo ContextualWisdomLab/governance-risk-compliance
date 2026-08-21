@@ -151,16 +151,14 @@ disables SDK automatic exception events/status so raw exception text is not
 recorded in spans. The exact current tree passes 55 tests with 100%
 statement/branch/docstring coverage, Ruff, compile, lock, package build/install
 smoke, actionlint, Semgrep (187 rules, zero findings), and diff checks; hosted
-security and review lanes were recreated after the latest fork push and remain
-pending. An older Security Scan at predecessor
-head `b222cbf1cebe227fae95b3c53406e0604af4e797` failed at `Require OSV scan
-output` because the central workflow passed deprecated `--output` flags to
-OSV v2.3.8, leaving the result files absent; this is central control-plane
-evidence, not a source vulnerability verdict. The current-head OSV run is
-pending and is not represented as hosted success. The normal-path central
+product and security lanes are terminal success except `osv-scan`, which
+failed at `Require OSV scan output` because the central workflow passed
+deprecated `--output` flags to OSV v2.3.8, leaving the result files absent.
+The exact hosted failure is central control-plane evidence, not a source
+vulnerability verdict; no source revert is inferred. The normal-path central
 repair is `.github` PR #1208 at exact head
-`9f0845517010f2c4695de83dd2bd50385c068a15`; its hosted checks are still
-progressing and independent approval is absent.
+`9f0845517010f2c4695de83dd2bd50385c068a15`; its replacement OSV and required
+lanes are queued on that current head, with independent approval absent.
 
 PR #53 stages the first buyer-visible G-06 API-contract slice directly on
 `develop`. Its exact head is `976945dbbe22b0b8fa7893150e2723738a0ff484` on
