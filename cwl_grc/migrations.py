@@ -10,14 +10,37 @@ from sqlalchemy import Connection, Engine, inspect, text
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
 TENANT_ISOLATION_MIGRATION = "0002_tenant_isolation"
-LOCAL_DEVELOPMENT_TENANT = "local_development"
-TENANT_OWNED_TABLES = (
-    "policy_document",
-    "policy_version",
-    "policy_control_mapping",
-    "evidence_record",
-    "control_evidence_binding",
-    "audit_event",
+TENANT_COLUMN_ADDITIONS = (
+    (
+        "policy_document",
+        "ALTER TABLE policy_document ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "policy_version",
+        "ALTER TABLE policy_version ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "policy_control_mapping",
+        "ALTER TABLE policy_control_mapping ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "evidence_record",
+        "ALTER TABLE evidence_record ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "control_evidence_binding",
+        "ALTER TABLE control_evidence_binding ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "audit_event",
+        "ALTER TABLE audit_event ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
 )
 
 
@@ -118,18 +141,13 @@ def _apply_policy_integrity_migration(connection: Connection) -> None:
 def _apply_tenant_isolation_migration(connection: Connection) -> None:
     """Backfill tenant keys onto existing tenant-owned rows without inventing identities."""
     inspector = inspect(connection)
-    for table_name in TENANT_OWNED_TABLES:
+    for table_name, statement in TENANT_COLUMN_ADDITIONS:
         if not inspector.has_table(table_name):
             continue
         columns = {column["name"] for column in inspector.get_columns(table_name)}
         if "tenant_id" in columns:
             continue
-        connection.execute(
-            text(
-                f"ALTER TABLE {table_name} ADD COLUMN tenant_id VARCHAR(128) "
-                f"NOT NULL DEFAULT '{LOCAL_DEVELOPMENT_TENANT}'"
-            )
-        )
+        connection.execute(text(statement))
         inspector = inspect(connection)
 
 
