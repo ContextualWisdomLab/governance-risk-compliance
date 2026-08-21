@@ -10,7 +10,7 @@ import re
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Mapping
+from typing import Any, Mapping, MutableMapping
 from uuid import uuid4
 
 
@@ -22,6 +22,11 @@ _verified_principal: contextvars.ContextVar[tuple[str, str] | None] = contextvar
     "cwl_grc_verified_principal",
     default=None,
 )
+_request_state: contextvars.ContextVar[MutableMapping[str, Any] | None] = contextvars.ContextVar(
+    "cwl_grc_request_state",
+    default=None,
+)
+_PRINCIPAL_STATE_KEY = "verified_principal"
 
 
 @dataclass(frozen=True)
@@ -39,12 +44,25 @@ def build_request_context(request_id: str | None, traceparent: str | None) -> Re
     return RequestContext(safe_request_id, safe_traceparent)
 
 
+def set_request_state(state: MutableMapping[str, Any]) -> contextvars.Token:
+    """Bind the shared ASGI request state across synchronous worker calls."""
+    return _request_state.set(state)
+
+
+def reset_request_state(token: contextvars.Token) -> None:
+    """Restore the previous request-state binding after request logging."""
+    _request_state.reset(token)
+
+
 def set_verified_principal(
     tenant_id: str | None,
     actor_id: str | None,
 ) -> contextvars.Token:
     """Store a request-local principal reference without retaining raw values in logs."""
     principal = None if tenant_id is None or actor_id is None else (tenant_id, actor_id)
+    state = _request_state.get()
+    if state is not None:
+        state[_PRINCIPAL_STATE_KEY] = principal
     return _verified_principal.set(principal)
 
 
@@ -55,7 +73,8 @@ def reset_verified_principal(token: contextvars.Token) -> None:
 
 def principal_reference() -> str | None:
     """Return a short one-way reference for the verified tenant and actor pair."""
-    principal = _verified_principal.get()
+    state = _request_state.get()
+    principal = _verified_principal.get() if state is None else state.get(_PRINCIPAL_STATE_KEY)
     if principal is None:
         return None
     return hashlib.sha256(f"{principal[0]}:{principal[1]}".encode("utf-8")).hexdigest()[:16]
