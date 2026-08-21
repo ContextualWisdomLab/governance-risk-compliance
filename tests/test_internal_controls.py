@@ -41,6 +41,7 @@ from cwl_grc.models import (
     ControlDefinitionVersion,
     ControlTestExecution,
     EvidenceRecord,
+    EvidenceUsage,
 )
 from cwl_grc.policy import ControlRef, author_policy, list_policy_gaps
 
@@ -248,6 +249,16 @@ def test_internal_control_status_projection_covers_failure_exception_stale_and_n
         assert control_coverage_status(session, failed_control.control_item_id, decision.tenant_id) is ControlCoverageStatus.EXCEPTION
         exception.exception_status = "expired"
         session.flush()
+        assert control_coverage_status(session, failed_control.control_item_id, decision.tenant_id) is ControlCoverageStatus.INEFFECTIVE
+        open_exception = record_control_exception(
+            session,
+            decision,
+            failed.implementation.control_implementation_id,
+            "Pending review does not authorize masking the failed result.",
+            _JANUARY_START,
+            exception_status="open",
+        )
+        assert open_exception.approved_by is None
         assert control_coverage_status(session, failed_control.control_item_id, decision.tenant_id) is ControlCoverageStatus.INEFFECTIVE
 
         stale = _foundation(session, decision, "IC-STALE-1")
@@ -784,6 +795,7 @@ def test_migration_backfills_preexisting_direct_binding_as_unassessed() -> None:
         seed_control_catalog(session)
         seed_authorization_purposes(session)
         evidence = _evidence(session, "migration-evidence", _JANUARY_START)
+        long_evidence = _evidence(session, "migration-evidence-long", _JANUARY_START)
         control = get_control_item(session, FrameworkCode.CSAP_2026, "10.2.1")
         assert control is not None
         session.add(
@@ -797,8 +809,33 @@ def test_migration_backfills_preexisting_direct_binding_as_unassessed() -> None:
                 bound_at=_JANUARY_START,
             )
         )
+        session.add(
+            EvidenceUsage(
+                evidence_usage_id="legacy-existing",
+                tenant_id="local_development",
+                evidence_record_id=evidence.evidence_record_id,
+                legacy_binding_id="migration-binding",
+                purpose_code=PurposeCode.EVIDENCE_BINDING.value,
+                usage_status="unassessed",
+                usage_note="Already backfilled.",
+                used_by_actor="legacy-officer",
+                used_at=_JANUARY_START,
+            )
+        )
+        session.add(
+            ControlEvidenceBinding(
+                binding_id="b" * 64,
+                tenant_id="local_development",
+                control_item_id=control.control_item_id,
+                evidence_record_id=long_evidence.evidence_record_id,
+                bound_by_actor="legacy-officer",
+                purpose_code=PurposeCode.EVIDENCE_BINDING.value,
+                bound_at=_JANUARY_START,
+            )
+        )
         session.commit()
 
+    apply_schema_migrations(engine)
     apply_schema_migrations(engine)
     with session_factory() as session:
         usage = session.execute(
@@ -808,3 +845,8 @@ def test_migration_backfills_preexisting_direct_binding_as_unassessed() -> None:
             )
         ).one()
         assert usage == ("unassessed", "migration-binding", None)
+        long_usage_id = session.execute(
+            text("SELECT evidence_usage_id FROM evidence_usage WHERE legacy_binding_id = :binding_id"),
+            {"binding_id": "b" * 64},
+        ).scalar_one()
+        assert len(long_usage_id) == 64

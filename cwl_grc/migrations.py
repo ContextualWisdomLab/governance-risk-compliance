@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime, timezone
+from hashlib import sha256
 
-from sqlalchemy import Connection, Engine, Index, MetaData, Table, inspect, text
+from sqlalchemy import Connection, Engine, Index, MetaData, Table, insert, inspect, select, text
 from sqlalchemy.schema import CreateIndex
 
 
@@ -298,39 +299,29 @@ def _apply_internal_control_model_migration(connection: Connection) -> None:
                 CreateIndex(index, if_not_exists=True)
             )
     Base.metadata.create_all(connection)
-    connection.execute(
-        text(
-            """
-            INSERT INTO evidence_usage (
-                evidence_usage_id,
-                tenant_id,
-                evidence_record_id,
-                legacy_binding_id,
-                purpose_code,
-                usage_status,
-                usage_note,
-                used_by_actor,
-                used_at
+    binding_table = Base.metadata.tables["control_evidence_binding"]
+    usage_table = Base.metadata.tables["evidence_usage"]
+    for binding in connection.execute(select(binding_table)).mappings():
+        if connection.execute(
+            select(usage_table.c.legacy_binding_id).where(
+                usage_table.c.legacy_binding_id == binding["binding_id"]
             )
-            SELECT
-                'legacy_' || binding_id,
-                tenant_id,
-                evidence_record_id,
-                binding_id,
-                purpose_code,
-                'unassessed',
-                'Legacy direct evidence binding; effectiveness not assessed.',
-                bound_by_actor,
-                bound_at
-            FROM control_evidence_binding
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM evidence_usage
-                WHERE legacy_binding_id = control_evidence_binding.binding_id
+        ).first() is not None:
+            continue
+        usage_id = f"legacy_{sha256(binding['binding_id'].encode('utf-8')).hexdigest()[:57]}"
+        connection.execute(
+            insert(usage_table).values(
+                evidence_usage_id=usage_id,
+                tenant_id=binding["tenant_id"],
+                evidence_record_id=binding["evidence_record_id"],
+                legacy_binding_id=binding["binding_id"],
+                purpose_code=binding["purpose_code"],
+                usage_status="unassessed",
+                usage_note="Legacy direct evidence binding; effectiveness not assessed.",
+                used_by_actor=binding["bound_by_actor"],
+                used_at=binding["bound_at"],
             )
-            """
         )
-    )
 
 
 def _apply_obligation_model_migration(connection: Connection) -> None:

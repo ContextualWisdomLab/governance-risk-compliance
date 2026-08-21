@@ -92,7 +92,7 @@ def _source(session, decision):  # noqa: ANN001
         "Digital operational resilience reference",
         "European Union",
         "https://example.test/dora",
-        "identifier_only",
+        "lawfully_stored",
         source_artifact_reference="artifact://dora-1",
     )
     revision = create_source_revision(
@@ -400,7 +400,7 @@ def test_obligation_can_link_internal_control_and_worklist_unknown() -> None:
         assert requirement.internal_control_definition_id == foundation.definition.internal_control_definition_id
         unknown = list_obligation_worklist(session, compliance, as_of=JANUARY)
         assert unknown[0].applicability_code == "unknown"
-        decide_applicability(
+        first_decision = decide_applicability(
             session,
             compliance,
             obligation.compliance_obligation_id,
@@ -427,6 +427,21 @@ def test_obligation_can_link_internal_control_and_worklist_unknown() -> None:
         scoped = list_obligation_worklist(session, compliance, as_of=JANUARY)
         assert len(scoped) == 2
         assert {item.scope_reference for item in scoped} == {"tenant-1", "app-1"}
+        decide_applicability(
+            session,
+            compliance,
+            obligation.compliance_obligation_id,
+            "applicable",
+            "application",
+            "app-2",
+            "The newer decision supersedes the organization scope decision.",
+            "evidence://app-2",
+            FEBRUARY,
+            MARCH,
+            supersedes_decision_id=first_decision.applicability_decision_id,
+        )
+        superseded = list_obligation_worklist(session, compliance, as_of=JANUARY)
+        assert {item.scope_reference for item in superseded} == {"app-1", "app-2"}
         assert obligation_next_action("unexpected") == obligation_next_action("unknown")
 
 
@@ -493,6 +508,40 @@ def test_obligation_rejects_wrong_purpose_bad_periods_and_cross_tenant_targets()
     with factory() as session:
         with pytest.raises(HTTPException, match="compliance_governance"):
             create_regulatory_source(session, _decision(PurposeCode.COVERAGE_REVIEW), "X", "regulation", "X", "A", "u", "unknown")
+        with pytest.raises(HTTPException, match="artifact reference"):
+            create_regulatory_source(
+                session,
+                compliance,
+                "IDENTIFIER-SOURCE",
+                "regulation",
+                "Identifier-only source",
+                "Authority",
+                "https://example.test/identifier",
+                "identifier_only",
+                source_artifact_reference="artifact://forbidden",
+            )
+        identifier_source = create_regulatory_source(
+            session,
+            compliance,
+            "IDENTIFIER-SOURCE",
+            "regulation",
+            "Identifier-only source",
+            "Authority",
+            "https://example.test/identifier",
+            "identifier_only",
+        )
+        with pytest.raises(HTTPException, match="artifact reference"):
+            create_source_revision(
+                session,
+                compliance,
+                identifier_source.regulatory_source_id,
+                1,
+                JANUARY,
+                FEBRUARY,
+                "sha256:identifier",
+                "Identifier-only edition",
+                immutable_artifact_reference="artifact://forbidden",
+            )
         source, revision = _source(session, compliance)
         with pytest.raises(HTTPException, match="already exists"):
             create_regulatory_source(session, compliance, source.source_code, "regulation", "X", "A", "u", "unknown")

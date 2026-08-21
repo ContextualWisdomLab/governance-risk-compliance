@@ -193,6 +193,10 @@ def create_regulatory_source(
     code = _text(source_code, "source code")
     if session.query(RegulatorySource).filter_by(tenant_id=decision.tenant_id, source_code=code).first():
         raise HTTPException(status_code=409, detail="That source code already exists.")
+    classification = _controlled(license_classification, {"identifier_only", "lawfully_stored", "restricted", "unknown"}, "license classification")
+    artifact = source_artifact_reference.strip() if isinstance(source_artifact_reference, str) and source_artifact_reference.strip() else None
+    if artifact and classification in {"identifier_only", "unknown"}:
+        raise HTTPException(status_code=400, detail="This license classification does not permit an artifact reference.")
     source = RegulatorySource(
         regulatory_source_id=uuid4().hex,
         tenant_id=decision.tenant_id,
@@ -201,8 +205,8 @@ def create_regulatory_source(
         source_title=_text(source_title, "source title"),
         issuing_authority=_text(issuing_authority, "issuing authority"),
         official_reference_url=_text(official_reference_url, "official reference URL"),
-        license_classification=_controlled(license_classification, {"identifier_only", "lawfully_stored", "restricted", "unknown"}, "license classification"),
-        source_artifact_reference=source_artifact_reference.strip() if isinstance(source_artifact_reference, str) and source_artifact_reference.strip() else None,
+        license_classification=classification,
+        source_artifact_reference=artifact,
         created_by_actor=decision.actor_identifier,
         created_at=_utc(),
     )
@@ -234,6 +238,9 @@ def create_source_revision(
     start = _utc(effective_from)
     withdrawn = _utc(withdrawn_at) if withdrawn_at else None
     _period(start, withdrawn, "source withdrawal period")
+    artifact = immutable_artifact_reference.strip() if isinstance(immutable_artifact_reference, str) and immutable_artifact_reference.strip() else None
+    if artifact and source.license_classification in {"identifier_only", "unknown"}:
+        raise HTTPException(status_code=400, detail="This license classification does not permit an artifact reference.")
     revision = SourceRevision(
         source_revision_id=uuid4().hex,
         tenant_id=decision.tenant_id,
@@ -243,7 +250,7 @@ def create_source_revision(
         effective_from=start,
         withdrawn_at=withdrawn,
         content_digest=_text(content_digest, "source content digest"),
-        immutable_artifact_reference=immutable_artifact_reference.strip() if isinstance(immutable_artifact_reference, str) and immutable_artifact_reference.strip() else None,
+        immutable_artifact_reference=artifact,
         revision_summary=_text(revision_summary, "revision summary"),
         created_by_actor=decision.actor_identifier,
         created_at=_utc(),
@@ -654,13 +661,21 @@ def list_obligation_worklist(
     current = _utc(as_of)
     horizon = current + timedelta(days=upcoming_days)
     items: list[ObligationWorkItem] = []
-    decisions_by_obligation: dict[str, dict[tuple[str, str], ApplicabilityDecision]] = {}
-    for candidate in (
+    candidates = (
         session.query(ApplicabilityDecision)
         .filter_by(tenant_id=decision.tenant_id)
         .order_by(ApplicabilityDecision.decided_at.desc(), ApplicabilityDecision.applicability_decision_id.desc())
         .all()
-    ):
+    )
+    superseded_ids = {
+        candidate.supersedes_decision_id
+        for candidate in candidates
+        if candidate.supersedes_decision_id is not None
+    }
+    decisions_by_obligation: dict[str, dict[tuple[str, str], ApplicabilityDecision]] = {}
+    for candidate in candidates:
+        if candidate.applicability_decision_id in superseded_ids:
+            continue
         decisions_by_obligation.setdefault(candidate.compliance_obligation_id, {}).setdefault(
             (candidate.scope_type, candidate.scope_reference), candidate
         )
