@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from cwl_grc.authorization import (
+    LOCAL_DEVELOPMENT_ACTOR,
     LOCAL_DEVELOPMENT_TENANT,
     PurposeCode,
     require_purpose,
@@ -155,13 +156,12 @@ def create_app(
 
     def require_request_actor(
         authorization: str | None,
-        declared_actor: str | None,
         purpose_value: str | None,
         required_purpose: PurposeCode,
         required_scope: str,
     ):
-        """Return a tenant-bound purpose decision from signed identity when enabled."""
-        actor_identifier = declared_actor
+        """Return a tenant-bound decision using fixed local or signed identity."""
+        actor_identifier = LOCAL_DEVELOPMENT_ACTOR
         tenant_id = LOCAL_DEVELOPMENT_TENANT
         if access_token_verifier is not None:
             if authorization is None:
@@ -208,7 +208,6 @@ def create_app(
             return LOCAL_DEVELOPMENT_TENANT
         return require_request_actor(
             authorization,
-            None,
             purpose_value,
             PurposeCode.COVERAGE_REVIEW,
             "grc.policy.read",
@@ -223,7 +222,6 @@ def create_app(
             return LOCAL_DEVELOPMENT_TENANT
         return require_request_actor(
             authorization,
-            None,
             purpose_value,
             PurposeCode.COVERAGE_REVIEW,
             "grc.control.read",
@@ -432,13 +430,11 @@ def create_app(
         body: dict[str, Any],
         session: Session = Depends(get_session),
         authorization: str | None = Header(default=None),
-        x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Author a policy mapped only to official catalog identifiers."""
         decision = require_request_actor(
             authorization,
-            x_actor_id,
             x_purpose,
             PurposeCode.POLICY_AUTHORING,
             "grc.policy.write",
@@ -458,13 +454,11 @@ def create_app(
         body: dict[str, Any],
         session: Session = Depends(get_session),
         authorization: str | None = Header(default=None),
-        x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Publish the next immutable policy edition and replacement mappings."""
         decision = require_request_actor(
             authorization,
-            x_actor_id,
             x_purpose,
             PurposeCode.POLICY_AUTHORING,
             "grc.policy.write",
@@ -520,13 +514,11 @@ def create_app(
         body: dict[str, Any],
         session: Session = Depends(get_session),
         authorization: str | None = Header(default=None),
-        x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Store the next evidence artifact without masking PII."""
         decision = require_request_actor(
             authorization,
-            x_actor_id,
             x_purpose,
             PurposeCode.EVIDENCE_BINDING,
             "grc.evidence.write",
@@ -548,13 +540,11 @@ def create_app(
         body: dict[str, Any],
         session: Session = Depends(get_session),
         authorization: str | None = Header(default=None),
-        x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Place a verified legal hold without deleting or masking evidence."""
         decision = require_request_actor(
             authorization,
-            x_actor_id,
             x_purpose,
             PurposeCode.EVIDENCE_RETENTION,
             "grc.evidence.retention",
@@ -573,13 +563,11 @@ def create_app(
         evidence_record_id: str,
         session: Session = Depends(get_session),
         authorization: str | None = Header(default=None),
-        x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Release a verified legal hold and leave disposition to a later workflow."""
         decision = require_request_actor(
             authorization,
-            x_actor_id,
             x_purpose,
             PurposeCode.EVIDENCE_RETENTION,
             "grc.evidence.retention",
@@ -592,13 +580,11 @@ def create_app(
         body: dict[str, str],
         session: Session = Depends(get_session),
         authorization: str | None = Header(default=None),
-        x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Bind same-tenant stored evidence to one official control identifier."""
         decision = require_request_actor(
             authorization,
-            x_actor_id,
             x_purpose,
             PurposeCode.EVIDENCE_BINDING,
             "grc.evidence.write",
@@ -648,14 +634,12 @@ def create_app(
         session: Session = Depends(get_session),
         policy_title: str = Form(),
         policy_body: str = Form(),
-        actor_identifier: str = Form(),
         control_refs: list[str] = Form(default=[]),
         authorization: str | None = Header(default=None),
     ) -> RedirectResponse:
         """Author a local-development policy from the officer home."""
         decision = require_request_actor(
             authorization,
-            actor_identifier,
             PurposeCode.POLICY_AUTHORING.value,
             PurposeCode.POLICY_AUTHORING,
             "grc.policy.write",
@@ -677,7 +661,6 @@ def create_app(
     @app.post("/officer/evidence")
     def officer_attach(
         session: Session = Depends(get_session),
-        actor_identifier: str = Form(),
         evidence_title: str = Form(),
         payload_text: str = Form(),
         framework: str | None = Form(default=None),
@@ -702,7 +685,6 @@ def create_app(
             )
         decision = require_request_actor(
             authorization,
-            actor_identifier,
             PurposeCode.EVIDENCE_BINDING.value,
             PurposeCode.EVIDENCE_BINDING,
             "grc.evidence.write",

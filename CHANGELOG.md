@@ -14,6 +14,7 @@
 - Uncovered-control query and officer home that states the next action.
 - `/healthz` probe, standalone `python -m cwl_grc` entry, and `create_app()` module factory.
 - Product CI for lint, docstring coverage, and 100% statement/branch test coverage.
+- Local HTTP preview mutations use a fixed audit actor instead of trusting `X-Actor-Id` or officer-form actor input.
 - Hash-locked `uv.lock` dependency graph for runtime and development dependencies.
 - Versioned schema-upgrade receipts for existing first-slice stores.
 - Provider-neutral Keyverse JWT access-token verification kernel and typed authenticated-principal contract.

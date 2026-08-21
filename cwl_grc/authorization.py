@@ -13,6 +13,7 @@ from cwl_grc.models import AuthorizationPurpose
 
 
 LOCAL_DEVELOPMENT_TENANT = "local_development"
+LOCAL_DEVELOPMENT_ACTOR = "local_development_actor"
 
 
 class PurposeCode(StrEnum):
