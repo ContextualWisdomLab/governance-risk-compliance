@@ -28,6 +28,8 @@ flowchart LR
     kernel --> controls[(internal control definitions, tests, and status projection)]
     kernel --> audit[(tenant-owned audit events)]
     consumers[Orgmetra / AIS / Billing / naruon / EA / SDP] -. future authenticated contracts .-> api
+    collector[Approved OTLP collector] --> telemetry
+    telemetry -. aggregate acceptance evidence .-> evidence
 ```
 
 ## Runtime layers
@@ -39,7 +41,7 @@ flowchart LR
 5. **CLI tools**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and the local Uvicorn `cwl-grc serve`.
 6. **Kernel package**: `create_app()` for modular composition; `python -m cwl_grc` for standalone local HTTP.
 7. **Store**: 3NF SQLite by default, PostgreSQL-ready URL via `CWL_GRC_DATABASE_URL`, versioned schema upgrades, and database guards that protect tenant relationships, audit history, finalized policy history, and internal-control test history.
-8. **Operations boundary**: bounded PostgreSQL connection setup, startup admission checks, drain state, W3C request correlation, redaction-safe structured request logs, and low-cardinality OpenTelemetry request/session-transaction traces plus request/session-transaction/pool/recovery-event metrics. Collector configuration, dashboards, SLOs, and alert rules remain platform integration work.
+8. **Operations boundary**: bounded PostgreSQL connection setup, startup admission checks, drain state, W3C request correlation, redaction-safe structured request logs, and low-cardinality OpenTelemetry request/session-transaction traces plus request/session-transaction/pool/recovery-event metrics. GRC owns aggregate collector acceptance evidence; raw spans remain in the approved observability platform, while dashboards, SLOs, and alert rules remain platform integration work.
 
 ## Data ownership
 
