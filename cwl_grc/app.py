@@ -374,12 +374,15 @@ def create_app(
     def list_controls(
         session: Session = Depends(get_session),
         framework: str | None = None,
+        authorization: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        """List official controls, optionally limited to one catalog."""
+        """List official controls and tenant-scoped effectiveness statuses."""
+        tenant_id = tenant_for_policy_read(authorization, x_purpose)
         coverage = list_control_coverage(
             session,
             parse_framework(framework),
-            tenant_id=LOCAL_DEVELOPMENT_TENANT,
+            tenant_id=tenant_id,
         )
         return {
             "controls": [
