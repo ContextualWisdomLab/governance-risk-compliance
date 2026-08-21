@@ -25,7 +25,9 @@ from cwl_grc.observability import (
     build_request_context,
     emit_request_log,
     principal_reference,
+    reset_request_state,
     reset_verified_principal,
+    set_request_state,
     set_verified_principal,
 )
 
@@ -235,6 +237,19 @@ def test_structured_logs_hash_principals_and_handle_uncaught_errors(caplog) -> N
     response = TestClient(app, raise_server_exceptions=False).get("/test-explode")
     assert response.status_code == 500
     assert "secret plaintext" not in caplog.text
+
+
+def test_request_state_preserves_authenticated_principal_across_worker_boundary() -> None:
+    """A shared ASGI state object carries verified identity into request logging."""
+    state: dict[str, Any] = {}
+    state_token = set_request_state(state)
+    principal_token = set_verified_principal("tenant-secret", "actor-secret")
+    try:
+        assert principal_reference() is not None
+        assert state["verified_principal"] == ("tenant-secret", "actor-secret")
+    finally:
+        reset_verified_principal(principal_token)
+        reset_request_state(state_token)
 
 
 def test_postgresql_engine_timeout_and_invalid_timeout(monkeypatch) -> None:  # noqa: ANN001

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime, timezone
 
-from sqlalchemy import Connection, DDL, Engine, Index, MetaData, String, Table, inspect, text
+from sqlalchemy import Connection, Engine, Index, MetaData, Table, inspect, text
 from sqlalchemy.schema import CreateIndex
 
 
@@ -16,39 +16,6 @@ EVIDENCE_RETENTION_MIGRATION = "0004_evidence_retention"
 INTERNAL_CONTROL_MODEL_MIGRATION = "0005_internal_control_model"
 OBLIGATION_MODEL_MIGRATION = "0006_obligation_applicability"
 OBLIGATION_REQUIREMENT_TARGET_MIGRATION = "0007_obligation_requirement_target"
-LOCAL_DEVELOPMENT_TENANT = "local_development"
-TENANT_OWNED_TABLES = (
-    "policy_document",
-    "policy_version",
-    "policy_control_mapping",
-    "evidence_record",
-    "control_evidence_binding",
-    "audit_event",
-    "control_objective",
-    "internal_control_definition",
-    "control_definition_version",
-    "control_implementation",
-    "control_owner_assignment",
-    "control_requirement_mapping",
-    "control_test_plan",
-    "control_test_execution",
-    "control_test_result",
-    "control_exception",
-    "control_deficiency",
-    "evidence_usage",
-    "jurisdiction_record",
-    "regulatory_source",
-    "source_revision",
-    "compliance_obligation",
-    "obligation_requirement",
-    "applicability_rule",
-    "applicability_decision",
-    "legal_interpretation",
-    "compliance_commitment",
-    "obligation_owner_assignment",
-    "regulatory_change",
-    "change_impact_assessment",
-)
 OBLIGATION_HISTORY_TABLES = (
     "source_revision",
     "compliance_obligation",
@@ -57,6 +24,38 @@ OBLIGATION_HISTORY_TABLES = (
     "legal_interpretation",
     "regulatory_change",
     "change_impact_assessment",
+)
+TENANT_COLUMN_ADDITIONS = (
+    (
+        "policy_document",
+        "ALTER TABLE policy_document ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "policy_version",
+        "ALTER TABLE policy_version ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "policy_control_mapping",
+        "ALTER TABLE policy_control_mapping ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "evidence_record",
+        "ALTER TABLE evidence_record ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "control_evidence_binding",
+        "ALTER TABLE control_evidence_binding ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
+    (
+        "audit_event",
+        "ALTER TABLE audit_event ADD COLUMN tenant_id VARCHAR(128) "
+        "NOT NULL DEFAULT 'local_development'",
+    ),
 )
 
 
@@ -172,23 +171,13 @@ def _apply_policy_integrity_migration(connection: Connection) -> None:
 def _apply_tenant_isolation_migration(connection: Connection) -> None:
     """Backfill tenant keys onto existing tenant-owned rows without inventing identities."""
     inspector = inspect(connection)
-    metadata = MetaData()
-    tenant_default = String(128).literal_processor(connection.dialect)(
-        LOCAL_DEVELOPMENT_TENANT
-    )
-    for table_name in TENANT_OWNED_TABLES:
+    for table_name, statement in TENANT_COLUMN_ADDITIONS:
         if not inspector.has_table(table_name):
             continue
         columns = {column["name"] for column in inspector.get_columns(table_name)}
         if "tenant_id" in columns:
             continue
-        connection.execute(
-            DDL(
-                "ALTER TABLE %(table)s ADD COLUMN tenant_id VARCHAR(128) "
-                "NOT NULL DEFAULT %(tenant_default)s",
-                context={"tenant_default": tenant_default},
-            ).against(Table(table_name, metadata))
-        )
+        connection.execute(text(statement))
         inspector = inspect(connection)
 
 

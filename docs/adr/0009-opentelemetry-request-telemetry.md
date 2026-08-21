@@ -21,13 +21,17 @@ telemetry must use registered route templates and low-cardinality attributes.
    outcome/duration metrics.
 3. Use only method, registered route template, response status, and service
    environment as request telemetry attributes. Do not attach tenant, actor,
-   evidence, token, request-body, or arbitrary exception identifiers.
+   evidence, token, request-body, exception messages, stacktraces, or arbitrary
+   exception identifiers.
 4. Export through the standard `OTEL_EXPORTER_OTLP_ENDPOINT` configuration when
    an approved collector is configured. Keep a bounded in-process metric reader
    for local tests and developer diagnostics when no collector is configured.
 5. Keep database/pool/transaction instrumentation, SLO targets, error budgets,
    dashboards, alert thresholds, paging, and collector acceptance evidence as
    explicit follow-up work. This ADR does not authorize production exposure.
+6. Mark failed spans with OpenTelemetry error status only. Do not export
+   exception events because messages and stacktraces can contain SQL, tenant,
+   actor, or evidence values.
 
 ## Consequences
 
@@ -41,6 +45,6 @@ telemetry must use registered route templates and low-cardinality attributes.
 
 Tests assert request count/duration, authorization-denial, and database
 transaction metric attributes, W3C-parented span execution, route-template
-redaction, exporter configuration, rollback behavior, and exception recording.
-A live PostgreSQL probe also verified readiness and request metrics against
-PostgreSQL 18.6.
+redaction, exporter configuration, rollback behavior, and error status without
+exception events. A live PostgreSQL probe also verified readiness and request
+metrics against PostgreSQL 18.6.
