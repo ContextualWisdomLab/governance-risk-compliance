@@ -686,12 +686,19 @@ def control_coverage_status(
         .order_by(ControlTestResult.determined_at.desc())
         .all()
     )
-    if any(result.result_code == ControlTestResultCode.INEFFECTIVE.value for _, result in results):
+    latest_results_by_plan: dict[str, tuple[ControlTestPlan, ControlTestResult]] = {}
+    for plan, result in results:
+        latest_results_by_plan.setdefault(plan.test_plan_id, (plan, result))
+    latest_results = tuple(latest_results_by_plan.values())
+    if any(
+        result.result_code == ControlTestResultCode.INEFFECTIVE.value
+        for _, result in latest_results
+    ):
         return ControlCoverageStatus.INEFFECTIVE
     saw_operating = False
     saw_design = False
     saw_not_applicable = False
-    for plan, result in results:
+    for plan, result in latest_results:
         if result.result_code == ControlTestResultCode.NOT_APPLICABLE.value:
             saw_not_applicable = True
         elif result.result_code == ControlTestResultCode.EFFECTIVE.value:
