@@ -123,3 +123,12 @@ class RequestTelemetry:
         """Flush configured exporters and release provider resources."""
         self._tracer_provider.shutdown()
         self._meter_provider.shutdown()
+
+
+def span_traceparent(span: Span) -> str:
+    """Serialize the started span context as a W3C traceparent value."""
+    context = span.get_span_context()
+    return (
+        f"00-{context.trace_id:032x}-{context.span_id:016x}-"
+        f"{int(context.trace_flags):02x}"
+    )

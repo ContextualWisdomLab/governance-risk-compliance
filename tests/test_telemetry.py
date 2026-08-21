@@ -19,7 +19,11 @@ from cwl_grc.observability import (
     route_template,
     set_verified_principal,
 )
-from cwl_grc.telemetry import OTEL_ENDPOINT_ENVIRONMENT_VARIABLE, RequestTelemetry
+from cwl_grc.telemetry import (
+    OTEL_ENDPOINT_ENVIRONMENT_VARIABLE,
+    RequestTelemetry,
+    span_traceparent,
+)
 
 
 def _app():
@@ -135,6 +139,23 @@ def test_exporter_configuration_and_error_status(monkeypatch: pytest.MonkeyPatch
 
     assert metric_exporter.shutdown.called
     assert span_exporter.shutdown.called
+
+
+def test_span_traceparent_identifies_the_started_span() -> None:
+    """A generated response context points to the actual local server span."""
+    telemetry = RequestTelemetry("local_preview")
+    try:
+        with telemetry.server_span("GET", "/healthz", {}) as span:
+            traceparent = span_traceparent(span)
+            span_context = span.get_span_context()
+
+        version, trace_id, span_id, flags = traceparent.split("-")
+        assert version == "00"
+        assert trace_id == f"{span_context.trace_id:032x}"
+        assert span_id == f"{span_context.span_id:016x}"
+        assert flags == f"{int(span_context.trace_flags):02x}"
+    finally:
+        telemetry.shutdown()
 
 
 def test_route_template_uses_registered_path_only() -> None:

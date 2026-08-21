@@ -9,6 +9,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from opentelemetry.trace import Status, StatusCode
 from sqlalchemy.orm import Session
 
 from cwl_grc.authorization import PurposeCode, require_purpose, seed_authorization_purposes
@@ -20,6 +21,7 @@ from cwl_grc.evidence import bind_control_evidence, create_evidence_record
 from cwl_grc.health import health_payload
 from cwl_grc.models import ControlItem, EvidenceRecord
 from cwl_grc.observability import (
+    RequestContext,
     build_request_context,
     emit_request_log,
     reset_verified_principal,
@@ -38,7 +40,7 @@ from cwl_grc.policy import (
     serialize_policy,
 )
 from cwl_grc.remote_access import request_is_local
-from cwl_grc.telemetry import RequestTelemetry
+from cwl_grc.telemetry import RequestTelemetry, span_traceparent
 
 
 def parse_framework(value: str | None) -> FrameworkCode | None:
@@ -118,6 +120,15 @@ def create_app(
             route,
             request.headers,
         ) as span:
+            response_traceparent = (
+                context.traceparent
+                if context.traceparent == request.headers.get("traceparent")
+                else span_traceparent(span)
+            )
+            response_context = RequestContext(
+                context.request_id,
+                response_traceparent,
+            )
             try:
                 client_host = getattr(request.client, "host", None)
                 local_request = request_is_local(
@@ -139,20 +150,21 @@ def create_app(
                 else:
                     response = await call_next(request)
                 status_code = response.status_code
-                response.headers["X-Request-ID"] = context.request_id
-                response.headers["traceparent"] = context.traceparent
+                response.headers["X-Request-ID"] = response_context.request_id
+                response.headers["traceparent"] = response_context.traceparent
                 return response
             except Exception as exc:
                 error_class = type(exc).__name__
+                span.set_status(Status(StatusCode.ERROR, error_class))
                 response = JSONResponse(
                     status_code=500,
                     content={
                         "detail": "Internal server error.",
-                        "request_reference": context.request_id,
+                        "request_reference": response_context.request_id,
                     },
                 )
-                response.headers["X-Request-ID"] = context.request_id
-                response.headers["traceparent"] = context.traceparent
+                response.headers["X-Request-ID"] = response_context.request_id
+                response.headers["traceparent"] = response_context.traceparent
                 return response
             finally:
                 route = route_template(request.scope)
@@ -166,7 +178,7 @@ def create_app(
                     elapsed_seconds,
                 )
                 emit_request_log(
-                    context,
+                    response_context,
                     request.method,
                     route,
                     status_code,
