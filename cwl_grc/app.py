@@ -47,8 +47,10 @@ from cwl_grc.observability import (
     build_request_context,
     emit_request_log,
     reset_verified_principal,
+    reset_request_state,
     route_template,
     set_verified_principal,
+    set_request_state,
 )
 from cwl_grc.officer_console import parse_control_ref, render_officer_home
 from cwl_grc.policy import (
@@ -260,6 +262,7 @@ def create_app(
             request.headers.get("traceparent"),
         )
         request.state.request_reference = context.request_id
+        request_state_token = set_request_state(request.scope["state"])
         principal_token = set_verified_principal(None, None)
         started_at = time.perf_counter()
         status_code = 500
@@ -326,6 +329,7 @@ def create_app(
                     error_class,
                 )
                 reset_verified_principal(principal_token)
+                reset_request_state(request_state_token)
 
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:
