@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
+from opentelemetry.trace import StatusCode
 
 import cwl_grc.telemetry as telemetry_module
 from cwl_grc import database as database_module
@@ -153,8 +154,10 @@ def test_telemetry_exception_and_otlp_exporter_configuration(monkeypatch) -> Non
     monkeypatch.setattr(telemetry_module, "OTLPSpanExporter", lambda: span_exporter)
     telemetry = RequestTelemetry("local_preview")
     with pytest.raises(RuntimeError, match="telemetry failure"):
-        with telemetry.server_span("GET", "/healthz", {}):
+        with telemetry.server_span("GET", "/healthz", {}) as span:
             raise RuntimeError("telemetry failure")
+    assert span.status.status_code is StatusCode.ERROR
+    assert span.events == ()
     telemetry.record_request("GET", "/healthz", 403, 0.01)
     telemetry.shutdown()
     assert metric_exporter.shutdown.called
