@@ -203,12 +203,18 @@ def test_internal_control_full_lifecycle_separates_design_and_operating_effectiv
             "All sampled access changes matched approved requests.",
         )
         assert result.result_code == "effective"
-        assert control_coverage_status(session, control.control_item_id, decision.tenant_id) is ControlCoverageStatus.OPERATING_EFFECTIVE
+        assert control_coverage_status(
+            session,
+            control.control_item_id,
+            decision.tenant_id,
+            now=datetime(2026, 2, 1),
+        ) is ControlCoverageStatus.OPERATING_EFFECTIVE
 
         coverage = list_control_coverage(
             session,
             FrameworkCode.CSAP_2026,
             tenant_id=decision.tenant_id,
+            now=datetime(2026, 2, 1),
         )
         projected = next(item for item in coverage if item.control_item.control_item_id == control.control_item_id)
         assert projected.status is ControlCoverageStatus.OPERATING_EFFECTIVE
@@ -249,10 +255,20 @@ def test_internal_control_status_projection_covers_failure_exception_stale_and_n
             datetime(2027, 1, 31),
         )
         assert exception.exception_status == "approved"
-        assert control_coverage_status(session, failed_control.control_item_id, decision.tenant_id) is ControlCoverageStatus.EXCEPTION
+        assert control_coverage_status(
+            session,
+            failed_control.control_item_id,
+            decision.tenant_id,
+            now=datetime(2026, 1, 15),
+        ) is ControlCoverageStatus.EXCEPTION
         exception.exception_status = "expired"
         session.flush()
-        assert control_coverage_status(session, failed_control.control_item_id, decision.tenant_id) is ControlCoverageStatus.INEFFECTIVE
+        assert control_coverage_status(
+            session,
+            failed_control.control_item_id,
+            decision.tenant_id,
+            now=datetime(2027, 2, 1),
+        ) is ControlCoverageStatus.INEFFECTIVE
         open_exception = record_control_exception(
             session,
             decision,
