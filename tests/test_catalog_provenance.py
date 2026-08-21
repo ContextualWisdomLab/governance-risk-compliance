@@ -107,6 +107,17 @@ def test_license_seed_and_source_registration_are_idempotent() -> None:
                 license_policy_code="identifier_only",
                 allowed_source_hosts={"csrc.nist.gov"},
             )
+        normalized = register_source_artifact(
+            session,
+            _DECISION,
+            publisher_name="NIST",
+            source_reference="Whitespace-normalized source",
+            source_url=" https://pages.nist.gov/OSCAL/ ",
+            artifact_content_class="identifier_only",
+            license_policy_code="identifier_only",
+            allowed_source_hosts={"pages.nist.gov"},
+        )
+        assert normalized.source_url == "https://pages.nist.gov/OSCAL/"
 
 
 @pytest.mark.parametrize(
@@ -601,7 +612,13 @@ def test_import_race_recovery_returns_winner(monkeypatch: pytest.MonkeyPatch) ->
         winner = SimpleNamespace(
             run_status="succeeded",
             importer_commit="f" * 40,
-            receipt=receipt,
+            failure_code=None,
+            receipt=SimpleNamespace(
+                catalog_import_receipt_id=receipt.catalog_import_receipt_id,
+                requirement_count=0,
+                changed_requirement_count=0,
+                warning_count=0,
+            ),
             catalog_import_run_id="winner-run",
         )
         original_query = session.query
@@ -638,7 +655,13 @@ def test_import_race_recovery_returns_winner(monkeypatch: pytest.MonkeyPatch) ->
         winner = SimpleNamespace(
             run_status="succeeded",
             importer_commit="different-commit",
-            receipt=SimpleNamespace(catalog_import_receipt_id="conflicting-receipt"),
+            failure_code=None,
+            receipt=SimpleNamespace(
+                catalog_import_receipt_id="conflicting-receipt",
+                requirement_count=0,
+                changed_requirement_count=0,
+                warning_count=0,
+            ),
             catalog_import_run_id="conflicting-run",
         )
         original_query = session.query
@@ -878,6 +901,17 @@ def test_import_failures_and_conflicts_are_explicit() -> None:
                 parser_version="oscal-json-1",
                 importer_commit="b" * 40,
                 run_status="succeeded",
+            )
+        with pytest.raises(HTTPException, match="immutable parser receipt"):
+            record_catalog_import(
+                session,
+                _DECISION,
+                version.source_artifact_version_id,
+                parser_version="oscal-json-1",
+                importer_commit="b" * 40,
+                run_status="failed",
+                requirement_count=1,
+                failure_code="different_failure",
             )
         assert failed.run.run_status == "failed"
 

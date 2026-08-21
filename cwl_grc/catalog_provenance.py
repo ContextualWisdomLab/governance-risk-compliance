@@ -145,6 +145,7 @@ def register_source_artifact(
     _require_catalog_purpose(decision)
     publisher_name = _required_text(publisher_name, "publisher name")
     source_reference = _required_text(source_reference, "source reference")
+    source_url = _required_text(source_url, "source URL")
     content_class = _controlled_text(
         artifact_content_class, _CONTENT_CLASSES, "artifact content class"
     )
@@ -304,14 +305,29 @@ def record_catalog_import(
         .one_or_none()
     )
     if existing is not None:
-        if existing.run_status != status or existing.importer_commit != importer_commit:
+        existing_receipt = existing.receipt
+        if existing_receipt is None:
+            raise HTTPException(status_code=409, detail="The existing import has no receipt.")
+        if (
+            existing.run_status,
+            existing.importer_commit,
+            existing.failure_code,
+            existing_receipt.requirement_count,
+            existing_receipt.changed_requirement_count,
+            existing_receipt.warning_count,
+        ) != (
+            status,
+            importer_commit,
+            failure_code,
+            requirement_count,
+            changed_requirement_count,
+            warning_count,
+        ):
             raise HTTPException(
                 status_code=409,
                 detail="That source digest already has an immutable parser receipt.",
             )
-        if existing.receipt is None:
-            raise HTTPException(status_code=409, detail="The existing import has no receipt.")
-        return CatalogImportResult(existing, existing.receipt, False)
+        return CatalogImportResult(existing, existing_receipt, False)
     now = _utc_now()
     run = CatalogImportRun(
         catalog_import_run_id=uuid4().hex,
@@ -355,12 +371,27 @@ def record_catalog_import(
         )
         if existing is None or existing.receipt is None:
             raise
-        if existing.run_status != status or existing.importer_commit != importer_commit:
+        existing_receipt = existing.receipt
+        if (
+            existing.run_status,
+            existing.importer_commit,
+            existing.failure_code,
+            existing_receipt.requirement_count,
+            existing_receipt.changed_requirement_count,
+            existing_receipt.warning_count,
+        ) != (
+            status,
+            importer_commit,
+            failure_code,
+            requirement_count,
+            changed_requirement_count,
+            warning_count,
+        ):
             raise HTTPException(
                 status_code=409,
                 detail="That source digest already has an immutable parser receipt.",
             )
-        return CatalogImportResult(existing, existing.receipt, False)
+        return CatalogImportResult(existing, existing_receipt, False)
     return CatalogImportResult(run, receipt, True)
 
 
