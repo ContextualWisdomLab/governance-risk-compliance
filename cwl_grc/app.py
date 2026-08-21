@@ -214,21 +214,6 @@ def create_app(
             "grc.policy.read",
         ).tenant_id
 
-    def tenant_for_coverage_read(
-        authorization: str | None,
-        purpose_value: str | None,
-    ) -> str:
-        """Resolve the exact tenant for protected catalog and coverage reads."""
-        if access_token_verifier is None:
-            return LOCAL_DEVELOPMENT_TENANT
-        return require_request_actor(
-            authorization,
-            None,
-            purpose_value,
-            PurposeCode.COVERAGE_REVIEW,
-            "grc.control.read",
-        ).tenant_id
-
     app = FastAPI(title="CWL GRC", version="0.1.0")
     app.state.evidence_cipher = cipher
     app.state.session_factory = factory
@@ -385,14 +370,12 @@ def create_app(
     def list_controls(
         session: Session = Depends(get_session),
         framework: str | None = None,
-        authorization: str | None = Header(default=None),
-        x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """List official controls, optionally limited to one catalog."""
         coverage = list_control_coverage(
             session,
             parse_framework(framework),
-            tenant_id=tenant_for_coverage_read(authorization, x_purpose),
+            tenant_id=LOCAL_DEVELOPMENT_TENANT,
         )
         return {
             "controls": [
@@ -405,8 +388,6 @@ def create_app(
     def uncovered_controls(
         session: Session = Depends(get_session),
         framework: str | None = None,
-        authorization: str | None = Header(default=None),
-        x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """List official controls that still need evidence."""
         coverage = [
@@ -414,7 +395,7 @@ def create_app(
             for item in list_control_coverage(
                 session,
                 parse_framework(framework),
-                tenant_id=tenant_for_coverage_read(authorization, x_purpose),
+                tenant_id=LOCAL_DEVELOPMENT_TENANT,
             )
             if item.status
             not in {ControlCoverageStatus.OPERATING_EFFECTIVE, ControlCoverageStatus.NOT_APPLICABLE}

@@ -34,7 +34,7 @@ flowchart LR
 
 1. **Local officer home**: buyer-oriented HTML that authors a policy, lists explicit control statuses and policy gaps, and stores evidence for a future control test under the fixed `local_development` tenant.
 2. **HTTP API**: policy author/revise/list, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, and dependency-separated `/healthz`, `/readyz`, and `/startupz` probes.
-3. **Keyverse security adapter**: optional closed-profile JWT verification plus bounded OIDC Discovery/JWKS loading. When configured, protected policy, catalog, coverage, and evidence routes derive actor and tenant from the signed principal and enforce action-specific scopes.
+3. **Keyverse security adapter**: optional closed-profile JWT verification plus bounded OIDC Discovery/JWKS loading. When configured, protected policy and evidence routes derive actor and tenant from the signed principal and enforce action-specific scopes.
 4. **Preview network boundary**: always rejects proxy-forwarded and non-loopback traffic. Keyverse authentication inside the process does not enable customer or Internet exposure by itself.
 5. **CLI tools**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and the local Uvicorn `cwl-grc serve`.
 6. **Kernel package**: `create_app()` for modular composition; `python -m cwl_grc` for standalone local HTTP.
@@ -85,7 +85,6 @@ Application filtering is not the sole control. New schemas pair tenant and paren
 - `control_definition_version(tenant_id, internal_control_definition_id)` → `internal_control_definition(tenant_id, internal_control_definition_id)`;
 - `control_implementation(tenant_id, internal_control_definition_id)` → `internal_control_definition(tenant_id, internal_control_definition_id)`;
 - test plans, executions, results, deficiencies, exceptions, and evidence usage pair every tenant key with their parent identifier.
-- database graph guards also require each test plan's definition version and implementation to share one definition, each execution to use its plan's implementation, and each deficiency to use its execution's implementation.
 
 Existing SQLite and PostgreSQL stores receive idempotent tenant-parent guards at startup, and SQLite foreign-key enforcement is enabled on every product connection. The guards fail closed on mismatched parent inserts or updates without destructively rewriting evidence.
 
@@ -100,7 +99,7 @@ Policy creation writes an unfinalized `policy_version`, writes its same-tenant o
 The application has two loopback-only execution profiles:
 
 - **Local development** uses the fixed `local_development` tenant and explicit actor/purpose declarations for the local officer UI and CLI. Those declarations are not authentication.
-- **Keyverse-enabled composition** requires verified bearer identity and action scope for protected policy, catalog/coverage, and evidence routes. Caller-supplied `X-Actor-Id` never overrides the signed principal. Policy and policy-gap reads require `grc.policy.read`; catalog and coverage reads require `grc.control.read`; mutations require their corresponding policy or evidence write scope.
+- **Keyverse-enabled composition** requires verified bearer identity and action scope for protected policy and evidence routes. Caller-supplied `X-Actor-Id` never overrides the signed principal. Policy and policy-gap reads require `grc.policy.read`; mutations require their corresponding policy or evidence write scope.
 
 Both profiles remain behind the same loopback-only boundary, which rejects non-loopback and proxy-forwarded traffic. Remote exposure still requires production issuer configuration, complete purpose/resource authorization, deployment identity, encrypted transport, operational controls, and acceptance evidence.
 
