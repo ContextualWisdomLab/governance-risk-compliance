@@ -157,7 +157,10 @@ head `b222cbf1cebe227fae95b3c53406e0604af4e797` failed at `Require OSV scan
 output` because the central workflow passed deprecated `--output` flags to
 OSV v2.3.8, leaving the result files absent; this is central control-plane
 evidence, not a source vulnerability verdict. The current-head OSV run is
-pending and is not represented as hosted success.
+pending and is not represented as hosted success. The normal-path central
+repair is `.github` PR #1208 at exact head
+`518219fd9d6d81481b96b5ceaaff7ebbc7e69aed`; its hosted checks are still
+progressing and independent approval is absent.
 
 PR #53 stages the first buyer-visible G-06 API-contract slice directly on
 `develop`. Its exact head is `31fff06c96517e3cb9b7df82ab567d11f4d07323` on
