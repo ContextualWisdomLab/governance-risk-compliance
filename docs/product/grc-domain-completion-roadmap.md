@@ -286,15 +286,19 @@ deficiency state, and applicability decision remain separate versioned facts.
 The compatibility projection reads the latest authorized facts for the same
 tenant, requirement mapping, and as-of time, and recalculates when one of those
 facts changes. If one display token is required, precedence is:
-`not_applicable` for an authorized applicability decision; `exception` for an
-active accepted exception; `stale` for expired evidence; `ineffective` for a
-current failed effectiveness result; `operating_effective` for a current passed
-operating test; `design_effective` for a current passed design test;
-`implemented_not_tested` for an implementation without a current test;
-`unassessed` for a legacy or present evidence link without an assessment; and
-`unknown` when no authoritative applicability, implementation, or evidence
-fact exists. The projection records its source fact identifiers, as-of time,
-and recalculation event so history is reproducible.
+`not_applicable` only when the authorized applicability decision result is
+exactly `not_applicable`; `exception` for an active accepted exception;
+`stale` for expired evidence; `ineffective` for a current failed effectiveness
+result; `operating_effective` for a current passed operating test;
+`design_effective` for a current passed design test; `implemented_not_tested`
+for an implementation without a current test; `unassessed` for a legacy or
+present evidence link without an assessment; and `unknown` when an authorized
+applicability result is `applicable` but no implementation or evidence fact
+exists, or when no authoritative applicability, implementation, or evidence
+fact exists. Applicability facts and the `not_applicable` display token are
+validated separately. The projection records `projection_rule_version`
+(`posture-projection-v1`), input fact versions and identifiers, as-of time, and
+recalculation event so history is reproducible after rule changes.
 
 ### Wave 2 — Obligation and catalog intelligence
 
@@ -381,8 +385,13 @@ current on the exact artifact:
 
 - The complete buyer loop works end to end.
 - Evidence presence and control effectiveness remain distinguishable.
-- Applicability, `not_applicable`, `unknown`, `stale`, and `unassessed` remain
-  distinguishable.
+- The complete display-token set—`unknown`, `stale`, `unassessed`,
+  `not_applicable`, `implemented_not_tested`, `design_effective`,
+  `operating_effective`, `ineffective`, and `exception`—remains
+  distinguishable. The Applicability fact is validated separately, and
+  `not_applicable` is emitted only for an authorized decision whose result is
+  exactly `not_applicable`; an authorized `applicable` result without
+  implementation or evidence is `unknown`.
 - Risk, finding, deficiency, exception, remediation, retest, and acceptance
   state transitions are deterministic and historically reproducible.
 
