@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import cwl_grc.database as database_module
 from cwl_grc import create_app
@@ -99,6 +100,29 @@ def test_error_references_are_safe_and_validation_body_is_not_echoed() -> None:
     assert invalid.status_code == 422
     assert invalid.json()["request_reference"]
     assert "secret plaintext" not in invalid.text
+
+
+def test_router_errors_preserve_request_reference_and_exception_headers() -> None:
+    """Router and Starlette errors use the same safe correlation response contract."""
+    app = _app()
+
+    def throttled() -> None:
+        """Raise a router-compatible error with a retry instruction."""
+        raise StarletteHTTPException(status_code=429, detail="retry", headers={"Retry-After": "3"})
+
+    app.add_api_route("/test-throttled", throttled)
+    client = TestClient(app, raise_server_exceptions=False)
+
+    missing = client.get("/not-registered", headers={"X-Request-ID": "missing-route"})
+    assert missing.status_code == 404
+    assert missing.json()["request_reference"] == "missing-route"
+    assert missing.headers["X-Request-ID"] == "missing-route"
+
+    limited = client.get("/test-throttled", headers={"X-Request-ID": "limited-route"})
+    assert limited.status_code == 429
+    assert limited.json()["request_reference"] == "limited-route"
+    assert limited.headers["Retry-After"] == "3"
+    assert limited.headers["X-Request-ID"] == "limited-route"
 
 
 def test_drain_preserves_liveness_and_rejects_new_mutations() -> None:
@@ -258,6 +282,11 @@ def test_structured_logs_hash_principals_and_handle_uncaught_errors(caplog) -> N
     assert record["request_id"] == "log-request"
     assert record["principal_reference"] != "tenant-secret"
     assert "actor-secret" not in caplog.text
+
+    emit_request_log(context, "GET", "/healthz", 500, 1.25, LOCAL_PREVIEW_ENVIRONMENT)
+    error_record = json.loads(caplog.records[-1].message)
+    assert error_record["severity"] == "ERROR"
+    assert caplog.records[-1].levelno == logging.ERROR
 
     app = _app()
 

@@ -31,6 +31,10 @@ telemetry must use registered route templates and low-cardinality attributes.
 6. Mark failed spans with OpenTelemetry error status only. Do not export
    exception events because messages and stacktraces can contain SQL, tenant,
    actor, or evidence values.
+7. Emit request records for application and router HTTP exceptions through the
+   shared Starlette exception boundary, preserving safe response headers and
+   `X-Request-ID`. Emit 5xx request records at logger `ERROR` so standard log
+   level routing cannot discard server failures; keep the JSON payload bounded.
 
 ## Consequences
 
