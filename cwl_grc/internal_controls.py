@@ -652,6 +652,8 @@ def control_coverage_status(
         .filter(
             ControlTestPlan.tenant_id == tenant_id,
             ControlTestPlan.control_implementation_id.in_(implementation_ids),
+            ControlTestPlan.active.is_(True),
+            ControlTestExecution.execution_status == "completed",
         )
         .order_by(
             ControlTestResult.determined_at.desc(),
