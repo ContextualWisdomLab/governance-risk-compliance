@@ -7,7 +7,7 @@ CWL GRC is a modular microservice that must run alone or be imported as `cwl_grc
 ```mermaid
 flowchart LR
     officer[Compliance officer] --> home[Local officer home /]
-    officer --> api[Policy, control, and evidence API]
+    officer --> api[Policy, obligation, control, and evidence API]
     officer --> cli[cwl-grc CLI]
     home --> preview[Loopback-only preview boundary]
     api --> preview
@@ -26,20 +26,23 @@ flowchart LR
     kernel --> evidence[(tenant-owned evidence records)]
     kernel --> binding[(legacy evidence bindings)]
     kernel --> controls[(internal control definitions, tests, and status projection)]
+    kernel --> obligations[(sources, obligations, applicability, and change impact)]
     kernel --> audit[(tenant-owned audit events)]
     consumers[Orgmetra / AIS / Billing / naruon / EA / SDP] -. future authenticated contracts .-> api
+    collector[Approved OTLP collector] --> telemetry
+    telemetry -. aggregate acceptance evidence .-> evidence
 ```
 
 ## Runtime layers
 
 1. **Local officer home**: buyer-oriented HTML that authors a policy, lists explicit control statuses and policy gaps, and stores evidence for a future control test under the fixed `local_development` tenant.
-2. **HTTP API**: policy author/revise/list, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, and dependency-separated `/healthz`, `/readyz`, and `/startupz` probes.
-3. **Keyverse security adapter**: optional closed-profile JWT verification plus bounded OIDC Discovery/JWKS loading. When configured, protected policy, catalog, coverage, and evidence routes derive actor and tenant from the signed principal and enforce action-specific scopes.
+2. **HTTP API**: policy author/revise/list, obligation source/revision/register/decision/link/change/impact workflows, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, and dependency-separated `/healthz`, `/readyz`, and `/startupz` probes.
+3. **Keyverse security adapter**: optional closed-profile JWT verification plus bounded OIDC Discovery/JWKS loading. When configured, protected policy, catalog, coverage, evidence, and obligation routes derive actor and tenant from the signed principal and enforce action-specific scopes.
 4. **Preview network boundary**: always rejects proxy-forwarded and non-loopback traffic. Keyverse authentication inside the process does not enable customer or Internet exposure by itself.
 5. **CLI tools**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and the local Uvicorn `cwl-grc serve`.
 6. **Kernel package**: `create_app()` for modular composition; `python -m cwl_grc` for standalone local HTTP.
 7. **Store**: 3NF SQLite by default, PostgreSQL-ready URL via `CWL_GRC_DATABASE_URL`, versioned schema upgrades, and database guards that protect tenant relationships, audit history, finalized policy history, and internal-control test history.
-8. **Operations boundary**: bounded PostgreSQL connection setup, startup admission checks, drain state, W3C request correlation, redaction-safe structured request logs, and low-cardinality OpenTelemetry request/session-transaction traces plus request/session-transaction/pool/recovery-event metrics. Collector configuration, dashboards, SLOs, and alert rules remain platform integration work.
+8. **Operations boundary**: bounded PostgreSQL connection setup, startup admission checks, drain state, W3C request correlation, redaction-safe structured request logs, and low-cardinality OpenTelemetry request/session-transaction traces plus request/session-transaction/pool/recovery-event metrics. GRC owns aggregate collector acceptance evidence; raw spans remain in the approved observability platform, while dashboards, SLOs, and alert rules remain platform integration work.
 
 ## Data ownership
 
@@ -66,6 +69,18 @@ flowchart LR
 | `control_deficiency` | Open or resolved failure requiring remediation |
 | `evidence_usage` | Purpose-approved evidence use for one implementation and completed test; legacy rows are `unassessed` |
 | `audit_event` | Tenant-owned append-only action record protected at the database boundary |
+| `jurisdiction_record` | Tenant-scoped jurisdiction reference, not a copied legal body |
+| `regulatory_source` | Authoritative legal, contractual, voluntary, or internal source pointer |
+| `source_revision` | Immutable source edition, date, digest, and lawful artifact reference |
+| `compliance_obligation` | Immutable source-backed obligation for one precise scope and period |
+| `obligation_requirement` | Reviewed obligation link to a finalized policy or internal control |
+| `applicability_rule` | Reviewable rule proposal for one obligation |
+| `applicability_decision` | Immutable evidenced applicability conclusion and next review |
+| `legal_interpretation` | Attributed interpretation reference, not legal advice |
+| `compliance_commitment` | Separate contractual or voluntary commitment |
+| `obligation_owner_assignment` | Temporal obligation owner reference |
+| `regulatory_change` | Immutable source change intake and diff reference |
+| `change_impact_assessment` | Immutable owner, due date, implementation, and re-approval assessment |
 | `schema_migration` | Applied schema-upgrade receipt |
 
 Every tenant-owned row has a non-null `tenant_id`. In Keyverse mode it comes from the verified `org` claim. The `local_development` value is reserved for the loopback-only compatibility profile and migration of pre-tenant preview data.
@@ -81,6 +96,9 @@ Application filtering is not the sole control. New schemas pair tenant and paren
 - `policy_version(tenant_id, policy_document_id)` → `policy_document(tenant_id, policy_document_id)`;
 - `policy_control_mapping(tenant_id, policy_version_id)` → `policy_version(tenant_id, policy_version_id)`;
 - `control_evidence_binding(tenant_id, evidence_record_id)` → `evidence_record(tenant_id, evidence_record_id)`.
+- `source_revision(tenant_id, regulatory_source_id)` → `regulatory_source(tenant_id, regulatory_source_id)`;
+- `compliance_obligation(tenant_id, source_revision_id)` → `source_revision(tenant_id, source_revision_id)`;
+- applicability, owner, requirement, change, and impact rows pair tenant keys with their parent identifiers.
 - `internal_control_definition(tenant_id, objective_id)` → `control_objective(tenant_id, objective_id)`;
 - `control_definition_version(tenant_id, internal_control_definition_id)` → `internal_control_definition(tenant_id, internal_control_definition_id)`;
 - `control_implementation(tenant_id, internal_control_definition_id)` → `internal_control_definition(tenant_id, internal_control_definition_id)`;
@@ -91,7 +109,7 @@ Existing SQLite and PostgreSQL stores receive idempotent tenant-parent guards at
 
 ## Integrity and concurrency
 
-Policy creation writes an unfinalized `policy_version`, writes its same-tenant official-control mappings, and then performs the only permitted transition to `is_finalized=true`. SQLite and PostgreSQL guards reject later policy-version mutation or deletion, mapping insertion after finalization, mapping update/delete, audit-event update/delete, and mutation of published internal-control versions, reviewed mappings, test executions/results, or evidence usage.
+Policy creation writes an unfinalized `policy_version`, writes its same-tenant official-control mappings, and then performs the only permitted transition to `is_finalized=true`. SQLite and PostgreSQL guards reject later policy-version mutation or deletion, mapping insertion after finalization, mapping update/delete, audit-event update/delete, and mutation of published internal-control or obligation history, reviewed mappings, test executions/results, or evidence usage.
 
 `policy_document.current_version_number` is the optimistic concurrency token. A revision advances it with a tenant-bound conditional SQL update. A stale writer receives `409 Conflict` and must reload the current edition; the service never guesses a replacement version number.
 
@@ -102,7 +120,7 @@ The application has two loopback-only execution profiles:
 - **Local development** uses the fixed `local_development` tenant and `local_development_actor` for HTTP audit records, with an explicit purpose declaration. The local officer UI does not accept an actor field, and those declarations are not authentication.
 - **Keyverse-enabled composition** requires verified bearer identity and action scope for protected policy, catalog/coverage, and evidence routes. Caller-supplied `X-Actor-Id` is ignored and never overrides the signed principal. Policy and policy-gap reads require `grc.policy.read`; catalog and coverage reads require `grc.control.read`; mutations require their corresponding policy or evidence write scope.
 
-Both profiles remain behind the same loopback-only boundary, which rejects non-loopback and proxy-forwarded traffic. Remote exposure still requires production issuer configuration, complete purpose/resource authorization, deployment identity, encrypted transport, operational controls, and acceptance evidence.
+Both profiles remain behind the same loopback-only boundary, which rejects non-loopback and proxy-forwarded traffic. Remote exposure still requires production issuer configuration, complete purpose/resource authorization for obligation routes as well as policy/evidence routes, deployment identity, encrypted transport, operational controls, and acceptance evidence.
 
 Evidence payloads remain encrypted at rest. Every persistent store requires explicit Fernet key material; ephemeral keys exist only for explicitly selected in-memory tests. The product does not destructively mask operational evidence. Authenticated views and exports must select only the fields required for the approved purpose and omit unrelated fields. SAST remains a CWL Security lane. OPA/Rego is not part of this kernel.
 

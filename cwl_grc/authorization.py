@@ -20,6 +20,7 @@ class PurposeCode(StrEnum):
     """Declared purposes that may touch GRC records."""
 
     COVERAGE_REVIEW = "coverage_review"
+    COMPLIANCE_GOVERNANCE = "compliance_governance"
     EVIDENCE_BINDING = "evidence_binding"
     EVIDENCE_RETENTION = "evidence_retention"
     HEALTH_PROBE = "health_probe"
@@ -54,6 +55,8 @@ def purpose_label(code: PurposeCode) -> str:
     match code:
         case PurposeCode.COVERAGE_REVIEW:
             return "Review control coverage"
+        case PurposeCode.COMPLIANCE_GOVERNANCE:
+            return "Govern obligations and applicability"
         case PurposeCode.EVIDENCE_BINDING:
             return "Attach or bind evidence"
         case PurposeCode.EVIDENCE_RETENTION:

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 
 from sqlalchemy import Connection, Engine, Index, MetaData, Table, insert, inspect, select, text
+from sqlalchemy.schema import CreateIndex
 
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
@@ -14,26 +15,16 @@ TENANT_ISOLATION_MIGRATION = "0002_tenant_isolation"
 EVIDENCE_ENCRYPTION_MIGRATION = "0003_evidence_encryption"
 EVIDENCE_RETENTION_MIGRATION = "0004_evidence_retention"
 INTERNAL_CONTROL_MODEL_MIGRATION = "0005_internal_control_model"
-LOCAL_DEVELOPMENT_TENANT = "local_development"
-TENANT_OWNED_TABLES = (
-    "policy_document",
-    "policy_version",
-    "policy_control_mapping",
-    "evidence_record",
-    "control_evidence_binding",
-    "audit_event",
-    "control_objective",
-    "internal_control_definition",
-    "control_definition_version",
-    "control_implementation",
-    "control_owner_assignment",
-    "control_requirement_mapping",
-    "control_test_plan",
-    "control_test_execution",
-    "control_test_result",
-    "control_exception",
-    "control_deficiency",
-    "evidence_usage",
+OBLIGATION_MODEL_MIGRATION = "0006_obligation_applicability"
+OBLIGATION_REQUIREMENT_TARGET_MIGRATION = "0007_obligation_requirement_target"
+OBLIGATION_HISTORY_TABLES = (
+    "source_revision",
+    "compliance_obligation",
+    "obligation_requirement",
+    "applicability_decision",
+    "legal_interpretation",
+    "regulatory_change",
+    "change_impact_assessment",
 )
 TENANT_COLUMN_ADDITIONS = (
     (
@@ -97,6 +88,12 @@ def apply_schema_migrations(engine: Engine) -> None:
         if not _migration_applied(connection, INTERNAL_CONTROL_MODEL_MIGRATION):
             _apply_internal_control_model_migration(connection)
             _record_migration(connection, INTERNAL_CONTROL_MODEL_MIGRATION)
+        if not _migration_applied(connection, OBLIGATION_MODEL_MIGRATION):
+            _apply_obligation_model_migration(connection)
+            _record_migration(connection, OBLIGATION_MODEL_MIGRATION)
+        if not _migration_applied(connection, OBLIGATION_REQUIREMENT_TARGET_MIGRATION):
+            _apply_obligation_requirement_target_migration(connection)
+            _record_migration(connection, OBLIGATION_REQUIREMENT_TARGET_MIGRATION)
 
 
 def _migration_applied(connection: Connection, migration_key: str) -> bool:
@@ -293,11 +290,14 @@ def _apply_internal_control_model_migration(connection: Connection) -> None:
     ):
         if inspector.has_table(table_name):
             table = Table(table_name, MetaData(), autoload_with=connection)
-            Index(
+            index = Index(
                 index_name,
                 *(table.c[column_name] for column_name in column_names),
                 unique=True,
-            ).create(connection, checkfirst=True)
+            )
+            connection.execute(
+                CreateIndex(index, if_not_exists=True)
+            )
     Base.metadata.create_all(connection)
     binding_table = Base.metadata.tables["control_evidence_binding"]
     usage_table = Base.metadata.tables["evidence_usage"]
@@ -322,6 +322,77 @@ def _apply_internal_control_model_migration(connection: Connection) -> None:
                 used_at=binding["bound_at"],
             )
         )
+
+
+def _apply_obligation_model_migration(connection: Connection) -> None:
+    """Create obligation and applicability tables without rewriting prior decisions."""
+    from cwl_grc.models import Base
+
+    Base.metadata.create_all(connection)
+
+
+def _apply_obligation_requirement_target_migration(connection: Connection) -> None:
+    """Enforce one obligation target even when optional target columns are null."""
+    if connection.dialect.name == "sqlite":
+        _rebuild_sqlite_obligation_requirement_table(connection)
+    else:
+        connection.execute(
+            text(
+                "ALTER TABLE obligation_requirement "
+                "DROP CONSTRAINT IF EXISTS obligation_requirement_review"
+            )
+        )
+        connection.execute(
+            text(
+                "ALTER TABLE obligation_requirement ADD CONSTRAINT "
+                "obligation_requirement_review CHECK "
+                "(review_status IN ('proposed', 'approved', 'rejected'))"
+            )
+        )
+    connection.execute(
+        text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS obligation_requirement_target_identity "
+            "ON obligation_requirement ("
+            "tenant_id, compliance_obligation_id, "
+            "COALESCE(policy_version_id, ''), "
+            "COALESCE(internal_control_definition_id, ''), "
+            "COALESCE(control_implementation_id, '')"
+            ")"
+        )
+    )
+
+
+def _rebuild_sqlite_obligation_requirement_table(connection: Connection) -> None:
+    """Upgrade the SQLite check constraint without dropping existing requirement rows."""
+    inspector = inspect(connection)
+    checks = inspector.get_check_constraints("obligation_requirement")
+    review_check = next(
+        (check.get("sqltext", "") for check in checks if check.get("name") == "obligation_requirement_review"),
+        "",
+    )
+    if "review_status = 'approved'" not in review_check:
+        return
+    connection.execute(text("DROP TRIGGER IF EXISTS obligation_requirement_block_update"))
+    connection.execute(text("DROP TRIGGER IF EXISTS obligation_requirement_block_delete"))
+    connection.execute(text("ALTER TABLE obligation_requirement RENAME TO obligation_requirement_legacy"))
+    from cwl_grc.models import Base
+
+    Base.metadata.create_all(connection)
+    connection.execute(
+        text(
+            "INSERT INTO obligation_requirement ("
+            "obligation_requirement_id, tenant_id, compliance_obligation_id, policy_version_id, "
+            "internal_control_definition_id, control_implementation_id, control_item_id, "
+            "requirement_code, requirement_title, source_locator, review_status, mapping_rationale, "
+            "reviewed_by_actor, reviewed_at, created_at"
+            ") SELECT obligation_requirement_id, tenant_id, compliance_obligation_id, policy_version_id, "
+            "internal_control_definition_id, control_implementation_id, control_item_id, "
+            "requirement_code, requirement_title, source_locator, review_status, mapping_rationale, "
+            "reviewed_by_actor, reviewed_at, created_at "
+            "FROM obligation_requirement_legacy"
+        )
+    )
+    connection.execute(text("DROP TABLE obligation_requirement_legacy"))
 
 
 def install_integrity_guards(engine: Engine) -> None:
@@ -356,6 +427,14 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
         BEFORE DELETE ON audit_event
         BEGIN
             SELECT RAISE(ABORT, 'audit_event is append-only');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS obligation_requirement_require_proposed
+        BEFORE INSERT ON obligation_requirement
+        WHEN NEW.review_status != 'proposed'
+        BEGIN
+            SELECT RAISE(ABORT, 'new obligation_requirement must start proposed');
         END
         """,
         """
@@ -654,12 +733,47 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
             SELECT RAISE(ABORT, 'evidence_usage is immutable');
         END
         """,
+    ) + tuple(
+        f"""
+        CREATE TRIGGER IF NOT EXISTS {table_name}_block_update
+        BEFORE UPDATE ON {table_name}
+        BEGIN
+            SELECT RAISE(ABORT, '{table_name} is immutable');
+        END
+        """
+        for table_name in OBLIGATION_HISTORY_TABLES
+    ) + tuple(
+        f"""
+        CREATE TRIGGER IF NOT EXISTS {table_name}_block_delete
+        BEFORE DELETE ON {table_name}
+        BEGIN
+            SELECT RAISE(ABORT, '{table_name} is immutable');
+        END
+        """
+        for table_name in OBLIGATION_HISTORY_TABLES
     )
 
 
 def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
     """Return PostgreSQL functions and triggers with the same integrity contract."""
     return (
+        """
+        CREATE OR REPLACE FUNCTION enforce_obligation_requirement_proposal()
+        RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF NEW.review_status <> 'proposed' THEN
+                RAISE EXCEPTION 'new obligation_requirement must start proposed';
+            END IF;
+            RETURN NEW;
+        END;
+        $$
+        """,
+        "DROP TRIGGER IF EXISTS obligation_requirement_propose_only ON obligation_requirement",
+        """
+        CREATE TRIGGER obligation_requirement_propose_only
+        BEFORE INSERT ON obligation_requirement
+        FOR EACH ROW EXECUTE FUNCTION enforce_obligation_requirement_proposal()
+        """,
         """
         CREATE OR REPLACE FUNCTION prevent_audit_event_mutation()
         RETURNS trigger LANGUAGE plpgsql AS $$
@@ -878,4 +992,15 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
         BEFORE UPDATE OR DELETE ON evidence_usage
         FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
         """,
+    ) + tuple(
+        item
+        for table_name in OBLIGATION_HISTORY_TABLES
+        for item in (
+            f"DROP TRIGGER IF EXISTS {table_name}_immutable ON {table_name}",
+            f"""
+            CREATE TRIGGER {table_name}_immutable
+            BEFORE UPDATE OR DELETE ON {table_name}
+            FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
+            """,
+        )
     )

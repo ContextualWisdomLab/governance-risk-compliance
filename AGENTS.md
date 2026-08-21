@@ -13,6 +13,7 @@ Build ContextualWisdomLab GRC as the system of record for policy, control, risk,
 - CSAP / SOC 2 / ISMS-P are product-control catalogs in this repo. Do not invent a second SAST stack or unverified control identifier.
 - Never treat `X-Actor-Id` or `X-Purpose` as authentication. The HTTP surface remains local-only until Keyverse-backed identity and tenant authorization are implemented.
 - Never blanket-mask or destructively alter PII needed by an authorized workflow. Protect exact values with authenticated purpose and tenant authorization, encrypted storage and transport, audit, retention, and purpose-specific field selection that omits unrelated fields.
+- GRC owns the organization OpenTelemetry evidence boundary: govern collector acceptance and aggregate verification evidence here, but never copy raw spans, prompts, post bodies, provider responses, secrets, or unbounded identifiers into GRC records.
 - Never dummy-commit or force-push.
 - Work only in the authorized cloud environment.
 

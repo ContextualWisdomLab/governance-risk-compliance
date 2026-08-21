@@ -21,6 +21,10 @@ machine-readable relationships among control sources; its relationship model
 includes equivalence, subset, superset, intersection, and explicit gaps.
 Official references are recorded in `docs/doctoring/REFERENCES.md`.
 
+Applicability and regulatory-change truth is deliberately handled by ADR 0012;
+this decision starts after an obligation has been linked to an internal control
+and does not make a framework mapping a legal applicability decision.
+
 ## Decision
 
 1. Keep `control_framework` and `control_item` as the shared official external
