@@ -624,9 +624,12 @@ def create_app(
                 "control_total": len(coverage),
                 "control_unresolved": sum(item.status in unresolved for item in coverage),
                 "coverage_status_counts": coverage_status_counts,
-                "obligation_total": len(obligations),
-                "applicability_counts": applicability_counts,
-                "review_queue_counts": review_queue_counts,
+                "obligation_total": len({
+                    item.obligation.compliance_obligation_id for item in obligations
+                }),
+                "obligation_work_item_total": len(obligations),
+                "applicability_work_item_counts": applicability_counts,
+                "review_queue_work_item_counts": review_queue_counts,
                 "policy_gap_total": len(policy_gaps),
             },
             "controls": [

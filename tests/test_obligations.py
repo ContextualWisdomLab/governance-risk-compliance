@@ -790,10 +790,30 @@ def test_compliance_workspace_read_model_is_tenant_scoped() -> None:
     """The workspace combines existing projections without crossing tenant boundaries."""
     client, private_key = _protected_client()
     with client.app.state.session_factory() as session:
+        obligations = {}
         for tenant_id in ("tenant-1", "tenant-2"):
             decision = _decision(tenant_id=tenant_id)
             _source_row, revision = _source(session, decision)
-            _obligation(session, decision, revision, scope_reference=tenant_id)
+            obligations[tenant_id] = _obligation(
+                session,
+                decision,
+                revision,
+                scope_reference=tenant_id,
+            )
+        tenant_one_decision = _decision(tenant_id="tenant-1")
+        for scope_reference in ("tenant-1", "application-1"):
+            decide_applicability(
+                session,
+                tenant_one_decision,
+                obligations["tenant-1"].compliance_obligation_id,
+                ApplicabilityCode.APPLICABLE.value,
+                "organization" if scope_reference == "tenant-1" else "application",
+                scope_reference,
+                "The tenant has documented this exact applicability scope.",
+                f"evidence://applicability-{scope_reference}",
+                FEBRUARY,
+                MARCH,
+            )
         author_policy(
             session,
             AuthorizationDecision("policy-officer", PurposeCode.POLICY_AUTHORING, "tenant-1"),
@@ -834,8 +854,14 @@ def test_compliance_workspace_read_model_is_tenant_scoped() -> None:
     second = tenant_two.json()
     assert first["projection"] == "controls_obligations_policy_gaps"
     assert first["posture"]["obligation_total"] == 1
+    assert first["posture"]["obligation_work_item_total"] == 2
+    assert first["posture"]["applicability_work_item_counts"]["applicable"] == 2
+    assert first["posture"]["review_queue_work_item_counts"]["overdue"] == 2
     assert first["posture"]["policy_gap_total"] == 1
-    assert first["obligations"][0]["scope_reference"] == "tenant-1"
+    assert {item["scope_reference"] for item in first["obligations"]} == {
+        "tenant-1",
+        "application-1",
+    }
     assert first["policy_gaps"][0]["policy_title"] == "Tenant one access policy"
     assert first["next_actions"]
     assert "evidence_requests" in first["not_yet_projected"]

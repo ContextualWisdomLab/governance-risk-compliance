@@ -21,18 +21,22 @@ programs, and exports have their own contracts.
 2. Require the existing `compliance_governance` purpose and, when Keyverse is
    enabled, the existing `grc.compliance.read` action scope.
 3. Return exact row projections, deterministic next actions, and explicit
-   `not_yet_projected` areas. Never derive a synthetic compliance score or
-   treat evidence presence as control effectiveness.
+   `not_yet_projected` areas. Distinguish distinct obligations from
+   applicability/review work items when reporting posture. Never derive a
+   synthetic compliance score or treat evidence presence as control
+   effectiveness.
 4. Keep the buyer-workspace visual system in the Figma/Storybook PR34 design
    authority; this PR supplies the authenticated data contract only.
 
 ## Consequences
 
 The first workspace becomes useful without a new table or migration, and the
-same tenant isolation rules are reused. The endpoint remains bounded to the
-three existing projections. Evidence request state, risks, audit engagement,
-controlled export, data-room access, and production deployment remain follow-up
-work with separate authorization and provenance decisions.
+same tenant isolation rules are reused. Catalog coverage is preloaded in
+tenant-scoped batches so a workspace read does not issue one status query per
+catalog item. The endpoint remains bounded to the three existing projections.
+Evidence request state, risks, audit engagement, controlled export, data-room
+access, and production deployment remain follow-up work with separate
+authorization and provenance decisions.
 
 ## Verification
 

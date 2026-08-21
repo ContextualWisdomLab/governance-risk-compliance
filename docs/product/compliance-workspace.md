@@ -22,8 +22,8 @@ developer preview keeps its existing `local_development` compatibility tenant.
 
 The response contains:
 
-- `posture`: counts by control coverage, obligation applicability, review
-  queue, and policy gaps;
+- `posture`: distinct obligation counts plus work-item counts by control
+  coverage, obligation applicability, review queue, and policy gaps;
 - `controls`: every official catalog control with its conservative coverage
   status and next action;
 - `obligations`: same-tenant source-backed obligations with scope,
@@ -35,7 +35,9 @@ The response contains:
   evidence or risk state.
 
 The route does not expose evidence payloads, source legal text, tenant/actor
-identifiers, or an invented risk score. A customer-facing UI must render the
+identifiers, or an invented risk score. Applicability and review-queue counts
+are explicitly work-item counts because one obligation can have several active
+scope decisions. A customer-facing UI must render the
 exact rows behind every count and provide a keyboard-accessible empty/loading/
 error state; the Figma/Storybook buyer-workspace authority remains PR34.
 

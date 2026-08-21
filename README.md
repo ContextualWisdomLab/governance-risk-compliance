@@ -48,7 +48,7 @@ The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `
 | Register and decide an obligation | `POST /obligations`, `POST /obligations/{id}/applicability-decisions`; decisions require rationale, evidence reference, period, and next review |
 | Propose obligation truth | `POST /obligations/{id}/requirements` to a finalized policy or internal control; the response remains `proposed` until independent review |
 | Review obligations and source changes | `GET /obligations` (`upcoming_days` 0–3660), `POST /obligations/changes`, and `POST /obligations/changes/{id}/impact-assessments` |
-| Read the tenant-scoped compliance workspace | `GET /compliance-workspace` with `compliance_governance`; returns control, obligation, and policy-gap posture only |
+| Read the tenant-scoped compliance workspace | `GET /compliance-workspace` with `compliance_governance`; returns distinct obligations, work-item queues, controls, and policy-gap posture only |
 | Liveness probe | `GET /healthz` (dependency-free) |
 | Readiness probe | `GET /readyz` (returns `503` with stable reason codes when traffic is unsafe) |
 | Startup probe | `GET /startupz` (reports the checks completed before admission) |
