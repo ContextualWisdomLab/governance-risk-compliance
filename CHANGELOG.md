@@ -31,6 +31,7 @@
 - Tenant-scoped internal-control model: immutable definition versions, scoped implementations and owners, reviewed many-to-many catalog mappings, design/operating tests, exceptions, deficiencies, evidence usage, and explicit coverage statuses.
 - Additive migration that classifies preexisting direct evidence bindings as `unassessed` without inventing effectiveness.
 - Tenant-scoped obligation register: source revisions, jurisdictions, applicability decisions, legal references, commitments, proposed policy/control links awaiting independent review, regulatory changes, immutable impact assessments, and overdue/upcoming worklists for Issue #28.
+- Organization OpenTelemetry evidence boundary: GRC governs aggregate collector acceptance for `cwl-grc`, `lineageweave`, `contextual-orchestrator`, and Valkey access without storing raw spans or payloads.
 
 ### Security
 
@@ -71,3 +72,5 @@
 - `docs/adr/0010-slo-and-error-budget-contract.md` — proposed SLO, error-budget, and multi-window alert contract pending collector acceptance.
 - `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — separate external requirements, internal controls, scoped implementations, testing, evidence usage, and explicit effectiveness projection.
 - `docs/adr/0012-obligation-applicability-and-regulatory-change.md` — source-backed obligation, applicability, commitment, and change-impact history separate from control effectiveness.
+- `docs/adr/0012-organization-opentelemetry-evidence-boundary.md` — GRC-owned aggregate OTel acceptance evidence with raw telemetry retained only in the approved observability platform.
+- `docs/doctoring/opentelemetry-evidence-references.md` — APA 7 references for the OpenTelemetry and W3C Trace Context boundary.
