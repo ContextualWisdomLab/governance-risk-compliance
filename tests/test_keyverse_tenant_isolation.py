@@ -181,7 +181,7 @@ def test_policy_list_requires_verified_read_scope() -> None:
         headers=_headers(
             private_key,
             tenant_id="tenant-a",
-            scope="grc.control.read",
+            scope="grc.policy.read",
             purpose="coverage_review",
         ),
     )
@@ -227,7 +227,7 @@ def test_policy_list_never_crosses_verified_tenant_boundary() -> None:
         headers=_headers(
             private_key,
             tenant_id="tenant-b",
-            scope="grc.control.read",
+            scope="grc.policy.read",
             purpose="coverage_review",
         ),
     )
@@ -258,7 +258,7 @@ def test_policy_gap_read_is_authenticated_and_tenant_scoped() -> None:
         headers=_headers(
             private_key,
             tenant_id="tenant-a",
-            scope="grc.control.read",
+            scope="grc.policy.read",
             purpose="coverage_review",
         ),
     )
