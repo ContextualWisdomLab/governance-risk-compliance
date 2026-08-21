@@ -625,7 +625,16 @@ def create_app(
             for risk in risks
         }
         risk_acceptances = {
-            risk.risk_id: latest_risk_acceptance(session, decision, risk.risk_id)
+            risk.risk_id: (
+                latest_risk_acceptance(
+                    session,
+                    decision,
+                    risk.risk_id,
+                    risk_assessment_id=risk_assessments[risk.risk_id].risk_assessment_id,
+                )
+                if risk_assessments[risk.risk_id] is not None
+                else None
+            )
             for risk in risks
         }
         risk_status_counts = {
@@ -820,13 +829,26 @@ def create_app(
         """List the tenant risk register with its latest immutable assessment."""
         decision = decision_for_compliance_read(authorization, x_purpose)
         risks = list_risk_register(session, decision)
+        risk_assessments = {
+            risk.risk_id: latest_risk_assessment(session, decision, risk.risk_id)
+            for risk in risks
+        }
         return {
             "risks": [
                 _serialize_risk(
                     risk,
-                    latest_risk_assessment(session, decision, risk.risk_id),
+                    risk_assessments[risk.risk_id],
                     latest_risk_treatment(session, decision, risk.risk_id),
-                    latest_risk_acceptance(session, decision, risk.risk_id),
+                    (
+                        latest_risk_acceptance(
+                            session,
+                            decision,
+                            risk.risk_id,
+                            risk_assessment_id=risk_assessments[risk.risk_id].risk_assessment_id,
+                        )
+                        if risk_assessments[risk.risk_id] is not None
+                        else None
+                    ),
                 )
                 for risk in risks
             ]
@@ -1628,6 +1650,12 @@ def _serialize_risk_treatment(treatment: Any) -> dict[str, Any]:
 
 def _serialize_risk_acceptance(acceptance: Any) -> dict[str, Any]:
     """Serialize one immutable, time-bounded risk acceptance."""
+    acceptance_status = acceptance.acceptance_status
+    if (
+        acceptance_status == "active"
+        and acceptance.valid_to <= datetime.now(timezone.utc).replace(tzinfo=None)
+    ):
+        acceptance_status = "expired"
     return {
         "risk_acceptance_id": acceptance.risk_acceptance_id,
         "risk_id": acceptance.risk_id,
@@ -1639,7 +1667,7 @@ def _serialize_risk_acceptance(acceptance: Any) -> dict[str, Any]:
         "accepted_at": acceptance.accepted_at.isoformat(),
         "valid_from": acceptance.valid_from.isoformat(),
         "valid_to": acceptance.valid_to.isoformat(),
-        "acceptance_status": acceptance.acceptance_status,
+        "acceptance_status": acceptance_status,
     }
 
 

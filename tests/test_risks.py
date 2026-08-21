@@ -12,7 +12,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import DBAPIError
 
-from cwl_grc.app import create_app
+from cwl_grc.app import _serialize_risk_acceptance, create_app
 from cwl_grc.authorization import AuthorizationDecision, PurposeCode, seed_authorization_purposes
 from cwl_grc.database import create_session_factory
 from cwl_grc.encryption import EvidenceCipher
@@ -334,6 +334,26 @@ def test_risk_http_workspace_and_input_boundaries() -> None:
     assert listed["treatment"]["plan_version"] == 1
     assert listed["acceptance"]["acceptance_status"] == "active"
     assert listed["next_action"].startswith("Monitor")
+    reassessment = client.post(
+        f"/risks/{risk.json()['risk_id']}/assessments",
+        headers=headers,
+        json={
+            "methodology_id": methodology.json()["methodology_id"],
+            "likelihood": 4,
+            "impact": 3,
+            "assessment_rationale": "The previous acceptance does not cover this reassessment.",
+            "next_review_at": FUTURE_REVIEW.isoformat(),
+            "expected_revision_number": 4,
+            "control_links": [],
+        },
+    )
+    assert reassessment.status_code == 201
+    reassessed = next(
+        item for item in client.get("/risks", headers=_headers("reader")).json()["risks"]
+        if item["risk_id"] == risk.json()["risk_id"]
+    )
+    assert reassessed["acceptance"] is None
+    assert reassessed["next_action"].startswith("Advance")
     assert "risk_register" not in workspace["not_yet_projected"]
     assert "risk_treatments" not in workspace["not_yet_projected"]
     assert "risk_acceptances" not in workspace["not_yet_projected"]
@@ -614,9 +634,10 @@ def test_risk_acceptance_boundaries_and_expiry_action(monkeypatch: pytest.Monkey
             "RC-BOUNDARY", "Time-bounded committee acceptance.", now - timedelta(minutes=1),
             now + timedelta(days=1), expected_revision_number=3, escalation_reference="ESC",
         )
-        acceptance.valid_to = datetime(2020, 1, 1)
-        risk.next_review_at = FUTURE_REVIEW.replace(tzinfo=None)
-        assert next_action_for_risk(
+    acceptance.valid_to = datetime(2020, 1, 1)
+    risk.next_review_at = FUTURE_REVIEW.replace(tzinfo=None)
+    assert _serialize_risk_acceptance(acceptance)["acceptance_status"] == "expired"
+    assert next_action_for_risk(
             risk, second_assessment, acceptance=acceptance, current=datetime(2026, 1, 1)
         ).startswith("Create a versioned")
 
