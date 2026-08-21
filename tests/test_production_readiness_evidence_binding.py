@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from copy import deepcopy
 from pathlib import Path
 
 import pytest
 
+import cwl_grc.production_readiness as production_readiness
 from cwl_grc.production_readiness import load_manifest, main
 
 
@@ -83,12 +85,23 @@ def test_release_mode_rejects_opaque_success_words_as_evidence(
 
 def test_release_mode_accepts_hash_bound_repository_file_evidence(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A canonical repository file with its exact SHA-256 digest is verifiable."""
     path = tmp_path / "manifest.json"
     _write_manifest(path, _all_ready_manifest([_bound_repository_evidence()]))
+    opened_flags: list[int] = []
+    real_open = production_readiness.os.open
+
+    def capture_open(file_path: Path, flags: int) -> int:
+        opened_flags.append(flags)
+        return real_open(file_path, flags)
+
+    monkeypatch.setattr(production_readiness.os, "open", capture_open)
 
     assert main(_main_arguments(path, REPOSITORY_ROOT)) == 0
+    assert opened_flags
+    assert all(flags & os.O_NOFOLLOW for flags in opened_flags)
 
 
 def test_release_mode_accepts_current_readiness_index_component_oids(
@@ -275,8 +288,8 @@ def test_release_mode_rejects_unreadable_evidence(
     evidence = _bound_repository_evidence()
     _write_manifest(path, _all_ready_manifest([evidence]))
 
-    def fail_read(_path: Path) -> bytes:
+    def fail_open(_path: Path, _flags: int) -> int:
         raise OSError("simulated read failure")
 
-    monkeypatch.setattr(Path, "read_bytes", fail_read)
+    monkeypatch.setattr(production_readiness.os, "open", fail_open)
     assert main(_main_arguments(path, REPOSITORY_ROOT)) == 2

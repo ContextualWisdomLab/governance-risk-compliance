@@ -45,7 +45,7 @@ Schema version 1 accepts only repository-file evidence:
 The validator requires exactly those three fields.
 
 - `path` is an unambiguous POSIX-style repository-relative path: no absolute path, `.` or `..`, backslashes, `.git` authority, or path escape.
-- The target must exist inside the supplied repository root, resolve to a regular readable file, and may not escape through a symlink.
+- The target must exist inside the supplied repository root, resolve to a regular readable file, and may not escape through a symlink; verification opens it with a no-follow file-descriptor boundary so a replaced final symlink cannot redirect the read.
 - `sha256` must equal the lowercase hexadecimal result of SHA-256 over the exact current file bytes.
 
 The readiness-contract gate cites `docs/production/readiness-evidence-index.json`. That index records the reviewed component paths and their Git blob object IDs as repository coordinates; validation recomputes those coordinates from the supplied tree, while the manifest binds the exact index bytes with SHA-256. Git object IDs are not accepted as the cryptographic evidence field.

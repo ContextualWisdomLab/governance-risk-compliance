@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
+import stat
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -177,16 +179,11 @@ def verify_repository_evidence(
                 raise ReadinessManifestError(
                     f"{path}.path escapes the repository root."
                 ) from exc
-            if not resolved.is_file():
-                raise ReadinessManifestError(
-                    f"{path}.path must identify a regular repository file."
-                )
-            try:
-                contents = resolved.read_bytes()
-            except OSError as exc:
-                raise ReadinessManifestError(
-                    f"{path}.path cannot be read for SHA-256 verification."
-                ) from exc
+            contents = _read_regular_repository_file(
+                resolved,
+                not_regular_message=f"{path}.path must identify a regular repository file.",
+                unreadable_message=f"{path}.path cannot be read for SHA-256 verification.",
+            )
             if _sha256(contents) != evidence["sha256"]:
                 raise ReadinessManifestError(
                     f"{path}.sha256 does not match the repository file."
@@ -211,7 +208,13 @@ def _verify_readiness_evidence_index(
             expected_oid = component["git_blob_oid"]
             resolved = (repository_root / component_path).resolve(strict=True)
             resolved.relative_to(repository_root)
-            actual_oid = _git_blob_oid(resolved.read_bytes())
+            actual_oid = _git_blob_oid(
+                _read_regular_repository_file(
+                    resolved,
+                    not_regular_message=f"{evidence_path} is not a valid readiness evidence index.",
+                    unreadable_message=f"{evidence_path} is not a valid readiness evidence index.",
+                )
+            )
             if actual_oid != expected_oid:
                 raise ReadinessManifestError(
                     f"{evidence_path} records a stale Git blob ID for {component_path}."
@@ -228,6 +231,31 @@ def _git_blob_oid(contents: bytes) -> str:
     """Return Git's SHA-1 content coordinate, not a security digest."""
     header = f"blob {len(contents)}\0".encode("ascii")
     return hashlib.new("sha1", header + contents, usedforsecurity=False).hexdigest()
+
+
+def _read_regular_repository_file(
+    path: Path,
+    *,
+    not_regular_message: str,
+    unreadable_message: str,
+) -> bytes:
+    """Read a regular repository file without following a replaced final symlink."""
+    file_descriptor = -1
+    try:
+        file_descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        file_stat = os.fstat(file_descriptor)
+        if not stat.S_ISREG(file_stat.st_mode):
+            raise ReadinessManifestError(not_regular_message)
+        with os.fdopen(file_descriptor, "rb") as stream:
+            file_descriptor = -1
+            return stream.read()
+    except ReadinessManifestError:
+        raise
+    except OSError as exc:
+        raise ReadinessManifestError(unreadable_message) from exc
+    finally:
+        if file_descriptor >= 0:
+            os.close(file_descriptor)
 
 
 def readiness_summary(gates: Sequence[dict[str, Any]]) -> dict[str, Any]:
