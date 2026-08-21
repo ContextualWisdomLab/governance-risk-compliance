@@ -26,7 +26,7 @@ flowchart LR
 ## Runtime layers
 
 1. **Officer home**: buyer-oriented HTML that authors a policy, lists policy gaps, and attaches the next evidence in a local preview.
-2. **HTTP API**: policy author/revise/list, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, `/healthz`.
+2. **HTTP API**: policy author/revise/list, policy-gap query, catalog list, uncovered query, local-only `/workspace/posture` projection, evidence create, evidence bind, `/healthz`.
 3. **Preview network boundary**: always rejects proxy-forwarded and non-loopback traffic; no runtime override exists before Keyverse authentication.
 4. **CLI tools**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and the local Uvicorn `cwl-grc serve`.
 5. **Kernel package**: `create_app()` for modular composition; `python -m cwl_grc` for standalone local HTTP.
@@ -65,10 +65,10 @@ Production exposure requires Keyverse-backed OIDC signature, issuer, audience, t
 
 ## Buyer-workspace projection boundary
 
-Issue #30 introduces a bounded design authority at `apps/grc-workspace/`, paired with Figma file `ta1jjWSjmADz2BFxka9UPs` and repository Storybook. The fixture is intentionally outside the authoritative domain kernel: it demonstrates how a buyer sees `unknown`, `not assessed`, `stale`, `blocked`, and `access denied`, how a posture claim leads to the next action, and how projected summaries expose exact-value tables.
+Issue #30 introduces a bounded design authority at `apps/grc-workspace/`, paired with Figma file `ta1jjWSjmADz2BFxka9UPs` and repository Storybook. The fixture is intentionally outside the authoritative domain kernel: it demonstrates how a buyer sees `unknown`, `not assessed`, `stale`, `blocked`, and `access denied`, how a posture claim leads to the next action, and how projected summaries expose exact-value tables. The local-only `/workspace/posture` route provides the backend projection with the same fail-closed boundary; it does not claim tenant authorization or control effectiveness.
 
 The workspace must consume authenticated GRC contracts when those dependencies integrate; it must not query persistence tables directly or invent a parallel source of truth. Figma/Storybook states are design evidence only. Authentication, tenant/purpose authorization, evidence requests, exports, and data-room grants remain owned by their corresponding GRC/Keyverse contracts. ADR 0012 records the token, accessibility, i18n, component, and ownership decision.
 
 ## Service extraction
 
-The kernel is already a separately importable package. Extracting the process onto its own host must preserve `/healthz`, `/policy-documents`, `/policy-gaps`, `/controls`, `/controls/uncovered`, and the evidence bind contract while replacing the preview boundary with the authenticated Keyverse and tenant-authorization adapter.
+The kernel is already a separately importable package. Extracting the process onto its own host must preserve `/healthz`, `/policy-documents`, `/policy-gaps`, `/controls`, `/controls/uncovered`, `/workspace/posture`, and the evidence bind contract while replacing the preview boundary with the authenticated Keyverse and tenant-authorization adapter.
