@@ -249,6 +249,16 @@ def test_internal_control_status_projection_covers_failure_exception_stale_and_n
         exception.exception_status = "expired"
         session.flush()
         assert control_coverage_status(session, failed_control.control_item_id, decision.tenant_id) is ControlCoverageStatus.INEFFECTIVE
+        open_exception = record_control_exception(
+            session,
+            decision,
+            failed.implementation.control_implementation_id,
+            "Pending review does not authorize masking the failed result.",
+            _JANUARY_START,
+            exception_status="open",
+        )
+        assert open_exception.approved_by is None
+        assert control_coverage_status(session, failed_control.control_item_id, decision.tenant_id) is ControlCoverageStatus.INEFFECTIVE
 
         stale = _foundation(session, decision, "IC-STALE-1")
         _map(session, decision, stale, "10.2.2")

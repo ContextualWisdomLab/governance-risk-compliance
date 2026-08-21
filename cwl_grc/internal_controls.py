@@ -625,7 +625,7 @@ def control_coverage_status(
         .filter(
             ControlException.tenant_id == tenant_id,
             ControlException.control_implementation_id.in_(implementation_ids),
-            ControlException.exception_status.in_(("open", "approved")),
+            ControlException.exception_status == "approved",
             ControlException.valid_from <= current,
             or_(ControlException.valid_to.is_(None), ControlException.valid_to >= current),
         )
@@ -653,7 +653,10 @@ def control_coverage_status(
             ControlTestPlan.tenant_id == tenant_id,
             ControlTestPlan.control_implementation_id.in_(implementation_ids),
         )
-        .order_by(ControlTestResult.determined_at.desc())
+        .order_by(
+            ControlTestResult.determined_at.desc(),
+            ControlTestResult.test_result_id.desc(),
+        )
         .all()
     )
     latest_results_by_plan: dict[str, tuple[ControlTestPlan, ControlTestResult]] = {}
