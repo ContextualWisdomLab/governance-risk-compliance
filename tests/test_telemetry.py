@@ -104,3 +104,17 @@ def test_route_template_rejects_unmatched_raw_paths() -> None:
         path = "/evidence-records/{evidence_record_id}"
 
     assert route_template({"route": Route()}) == "/evidence-records/{evidence_record_id}"
+def test_request_log_traceparent_matches_response_span(caplog) -> None:
+    """Keep the structured request log correlated with the emitted server span."""
+    import json
+
+    from fastapi.testclient import TestClient
+
+    from cwl_grc.app import create_app
+
+    with TestClient(create_app(database_url="sqlite://", evidence_key=None)) as client:
+        with caplog.at_level("INFO", logger="cwl_grc.request"):
+            response = client.get("/healthz")
+
+    record = next(record for record in reversed(caplog.records) if record.name == "cwl_grc.request")
+    assert json.loads(record.message)["traceparent"] == response.headers["traceparent"]

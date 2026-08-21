@@ -326,6 +326,7 @@ def create_app(
                     elapsed_seconds * 1000,
                     environment,
                     error_class,
+                    traceparent=span_traceparent(span),
                 )
                 reset_verified_principal(principal_token)
                 reset_request_state(request_state_token)

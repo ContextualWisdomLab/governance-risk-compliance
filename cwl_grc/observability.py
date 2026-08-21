@@ -88,6 +88,7 @@ def emit_request_log(
     latency_ms: float,
     environment: str,
     error_class: str | None = None,
+    traceparent: str | None = None,
 ) -> None:
     """Emit one JSON log record without tokens, keys, plaintext, or raw identifiers."""
     payload: dict[str, Any] = {
@@ -97,7 +98,7 @@ def emit_request_log(
         "version": "0.1.0",
         "environment": environment,
         "request_id": context.request_id,
-        "traceparent": context.traceparent,
+        "traceparent": traceparent or context.traceparent,
         "method": method,
         "route": route,
         "status_code": status_code,
