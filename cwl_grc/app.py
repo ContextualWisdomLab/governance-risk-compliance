@@ -105,6 +105,7 @@ from cwl_grc.risks import (
     latest_risk_treatment,
     list_risk_register,
     next_action_for_risk,
+    summarize_risk_portfolio,
 )
 from cwl_grc.telemetry import RequestTelemetry, span_traceparent
 
@@ -643,6 +644,13 @@ def create_app(
             risk.risk_id: latest_risk_closure(session, decision, risk.risk_id)
             for risk in risks
         }
+        risk_portfolio = summarize_risk_portfolio(
+            risks,
+            risk_assessments,
+            risk_treatments,
+            risk_acceptances,
+            risk_closures,
+        )
         risk_status_counts = {
             status: sum(risk.risk_status == status for risk in risks)
             for status in ("identified", "assessed", "treating", "accepted", "closed")
@@ -667,13 +675,14 @@ def create_app(
             if risk.risk_status != "closed"
             and (
                 risk_assessments[risk.risk_id] is None
-            or risk_assessments[risk.risk_id].appetite_status == "above_appetite"
-            or (
-                risk_treatments[risk.risk_id] is not None
-                and risk_treatments[risk.risk_id].plan_status in {"proposed", "approved", "in_progress"}
-            )
-            or risk_acceptances[risk.risk_id] is not None
-            or risk.next_review_at < datetime.now(timezone.utc).replace(tzinfo=None)
+                or risk_assessments[risk.risk_id].appetite_status == "above_appetite"
+                or (
+                    risk_treatments[risk.risk_id] is not None
+                    and risk_treatments[risk.risk_id].plan_status
+                    in {"proposed", "approved", "in_progress"}
+                )
+                or risk_acceptances[risk.risk_id] is not None
+                or risk.next_review_at < datetime.now(timezone.utc).replace(tzinfo=None)
             )
         ]
         control_actions = [
@@ -741,6 +750,7 @@ def create_app(
                     assessment is not None and assessment.appetite_status == "above_appetite"
                     for assessment in risk_assessments.values()
                 ),
+                "risk_portfolio": risk_portfolio,
             },
             "controls": [
                 serialize_control(item.control_item, coverage_status=item.status)

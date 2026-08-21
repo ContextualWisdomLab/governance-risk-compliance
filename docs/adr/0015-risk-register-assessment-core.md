@@ -3,8 +3,9 @@
 ## Status
 
 Accepted for the bounded buyer slice; treatment, time-bounded acceptance, and
-independent closure disposition are included. Portfolio aggregation remains a
-separate follow-up contract.
+independent closure disposition are included. Bounded portfolio indicators
+are defined separately in ADR 0016; composite score aggregation remains out
+of scope.
 
 ## Decision
 
@@ -40,8 +41,9 @@ All writes append an audit event.
   above-appetite follow-up without a certification claim.
 - The workspace can project exact tenant risk rows and deterministic next
   actions without exposing evidence payloads.
-- Treatment completion and risk aggregation across a portfolio are intentionally
-  not represented.
+- Treatment completion and composite score aggregation across methodology
+  versions remain intentionally unrepresented; bounded portfolio indicators
+  are provided by ADR 0016.
 
 ## Verification
 

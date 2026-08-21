@@ -25,7 +25,9 @@ developer preview keeps its existing `local_development` compatibility tenant.
 The response contains:
 
 - `posture`: distinct obligation counts plus work-item counts by control
-  coverage, obligation applicability, review queue, and policy gaps;
+  coverage, obligation applicability, review queue, and policy gaps; the
+  `risk_portfolio` member contains tenant-scoped risk indicators and status/
+  category breakdowns;
 - `controls`: every official catalog control with its conservative coverage
   status and next action;
 - `obligations`: same-tenant source-backed obligations with scope,
@@ -50,6 +52,9 @@ are explicitly work-item counts because one obligation can have several active
 scope decisions. A customer-facing UI must render the
 exact rows behind every count and provide a keyboard-accessible empty/loading/
 error state; the Figma/Storybook buyer-workspace authority remains PR34.
+Risk portfolio indicators are read-only counts, not a cross-methodology risk
+score: active acceptance counts require the latest assessment and valid period,
+and overdue counts and actionable risk items exclude closed risks.
 
 ## UML
 
