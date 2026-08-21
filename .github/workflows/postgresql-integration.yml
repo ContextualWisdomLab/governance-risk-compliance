@@ -56,7 +56,11 @@ jobs:
       - name: Install hash-locked product
         run: uv sync --locked --extra dev
       - name: Exercise real PostgreSQL lifecycle
-        run: uv run pytest -q tests/test_postgresql_integration.py
+        run: >-
+          uv run pytest -q
+          tests/test_postgresql_integration.py
+          tests/test_postgresql_operational_boundaries.py
+          tests/test_postgresql_policy_integrity.py
       - name: Verify clean integration tree
         run: |
           git diff --check
