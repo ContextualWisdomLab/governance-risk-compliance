@@ -21,3 +21,9 @@ Ross, R., & Pillitteri, V. (2020). *Security and privacy controls for informatio
 Policy authoring in this slice follows ISO/IEC 27001:2022 clause 5.2 (information security policy as documented information) and Annex A control A.5.1 (policies for information security); COSO (2013) Principle 12 and AICPA (2022) SOC 2 CC5.3 (deploy control activities through policies and procedures); KISA (2023) ISMS-P 1.1.5; and KISA (2026) CSAP 1.1.1. Open Policy Agent Rego was reviewed and not adopted: it is an authorization PDP language, not a policy-document or evidence-binding store.
 
 The CSAP catalog stores the edition-specific KISA resource notice rather than the generic CSAP introduction page. A content digest is not claimed in this slice because the original attachment bytes were not independently captured and hashed in the repository; adding a digest requires an immutable source-artifact ingestion workflow and reviewable byte-level evidence.
+
+OpenTelemetry Authors. (n.d.). *OpenTelemetry specification*. https://opentelemetry.io/docs/specs/
+
+OpenTelemetry Authors. (n.d.). *OpenTelemetry Python instrumentation*. https://opentelemetry.io/docs/languages/python/instrumentation/
+
+World Wide Web Consortium. (n.d.). *Trace context*. https://www.w3.org/TR/trace-context/
