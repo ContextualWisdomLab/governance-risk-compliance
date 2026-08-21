@@ -182,7 +182,6 @@ def _apply_tenant_isolation_migration(connection: Connection) -> None:
         columns = {column["name"] for column in inspector.get_columns(table_name)}
         if "tenant_id" in columns:
             continue
-        table = Table(table_name, MetaData(), autoload_with=connection)
         connection.execute(
             DDL(
                 "ALTER TABLE %(table)s ADD COLUMN tenant_id VARCHAR(128) "
