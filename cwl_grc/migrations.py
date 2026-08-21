@@ -17,6 +17,7 @@ EVIDENCE_RETENTION_MIGRATION = "0004_evidence_retention"
 INTERNAL_CONTROL_MODEL_MIGRATION = "0005_internal_control_model"
 OBLIGATION_MODEL_MIGRATION = "0006_obligation_applicability"
 OBLIGATION_REQUIREMENT_TARGET_MIGRATION = "0007_obligation_requirement_target"
+EVIDENCE_REQUEST_WORKFLOW_MIGRATION = "0008_evidence_request_workflow"
 OBLIGATION_HISTORY_TABLES = (
     "source_revision",
     "compliance_obligation",
@@ -94,6 +95,9 @@ def apply_schema_migrations(engine: Engine) -> None:
         if not _migration_applied(connection, OBLIGATION_REQUIREMENT_TARGET_MIGRATION):
             _apply_obligation_requirement_target_migration(connection)
             _record_migration(connection, OBLIGATION_REQUIREMENT_TARGET_MIGRATION)
+        if not _migration_applied(connection, EVIDENCE_REQUEST_WORKFLOW_MIGRATION):
+            _apply_evidence_request_workflow_migration(connection)
+            _record_migration(connection, EVIDENCE_REQUEST_WORKFLOW_MIGRATION)
 
 
 def _migration_applied(connection: Connection, migration_key: str) -> bool:
@@ -326,6 +330,13 @@ def _apply_internal_control_model_migration(connection: Connection) -> None:
 
 def _apply_obligation_model_migration(connection: Connection) -> None:
     """Create obligation and applicability tables without rewriting prior decisions."""
+    from cwl_grc.models import Base
+
+    Base.metadata.create_all(connection)
+
+
+def _apply_evidence_request_workflow_migration(connection: Connection) -> None:
+    """Create the evidence-request state table without rewriting evidence payloads."""
     from cwl_grc.models import Base
 
     Base.metadata.create_all(connection)
@@ -609,6 +620,17 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
             SELECT RAISE(ABORT, 'evidence_usage is immutable');
         END
         """,
+        """
+        CREATE TRIGGER IF NOT EXISTS evidence_request_state_transition
+        BEFORE UPDATE OF request_state ON evidence_request
+        WHEN NOT (
+            (OLD.request_state = 'requested' AND NEW.request_state = 'submitted')
+            OR (OLD.request_state = 'submitted' AND NEW.request_state IN ('accepted', 'rejected'))
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'evidence_request state transition is invalid');
+        END
+        """,
     ) + tuple(
         f"""
         CREATE TRIGGER IF NOT EXISTS {table_name}_block_update
@@ -787,6 +809,26 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
         CREATE TRIGGER evidence_usage_immutable
         BEFORE UPDATE OR DELETE ON evidence_usage
         FOR EACH ROW EXECUTE FUNCTION prevent_control_history_mutation()
+        """,
+        """
+        CREATE OR REPLACE FUNCTION enforce_evidence_request_state_transition()
+        RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF NOT (
+                (OLD.request_state = 'requested' AND NEW.request_state = 'submitted')
+                OR (OLD.request_state = 'submitted' AND NEW.request_state IN ('accepted', 'rejected'))
+            ) THEN
+                RAISE EXCEPTION 'evidence_request state transition is invalid';
+            END IF;
+            RETURN NEW;
+        END;
+        $$
+        """,
+        "DROP TRIGGER IF EXISTS evidence_request_state_transition ON evidence_request",
+        """
+        CREATE TRIGGER evidence_request_state_transition
+        BEFORE UPDATE OF request_state ON evidence_request
+        FOR EACH ROW EXECUTE FUNCTION enforce_evidence_request_state_transition()
         """,
     ) + tuple(
         item

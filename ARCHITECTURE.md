@@ -24,6 +24,7 @@ flowchart LR
     kernel --> policy[(tenant-owned policy records)]
     kernel --> catalog[(shared control catalog)]
     kernel --> evidence[(tenant-owned evidence records)]
+    kernel --> requests[(tenant-owned evidence requests)]
     kernel --> binding[(legacy evidence bindings)]
     kernel --> controls[(internal control definitions, tests, and status projection)]
     kernel --> obligations[(sources, obligations, applicability, and change impact)]
@@ -33,8 +34,8 @@ flowchart LR
 
 ## Runtime layers
 
-1. **Local officer home**: buyer-oriented HTML that authors a policy, lists explicit control statuses and policy gaps, and stores evidence for a future control test under the fixed `local_development` tenant.
-2. **HTTP API**: policy author/revise/list, obligation source/revision/register/decision/link/change/impact workflows, tenant-scoped `/compliance-workspace` posture, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, and dependency-separated `/healthz`, `/readyz`, and `/startupz` probes.
+1. **Local officer home**: buyer-oriented HTML that authors a policy, lists explicit control statuses and policy gaps, and stores evidence for a future control test under the fixed `local_development` tenant. Evidence-request workflow state is exposed through the JSON surface and remains outside this static form until the PR34 buyer UI authority adopts it.
+2. **HTTP API**: policy author/revise/list, obligation source/revision/register/decision/link/change/impact workflows, tenant-scoped `/compliance-workspace` posture, evidence-request collection/review, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, and dependency-separated `/healthz`, `/readyz`, and `/startupz` probes.
 3. **Keyverse security adapter**: optional closed-profile JWT verification plus bounded OIDC Discovery/JWKS loading. When configured, protected policy and evidence routes derive actor and tenant from the signed principal and enforce action-specific scopes.
 4. **Preview network boundary**: always rejects proxy-forwarded and non-loopback traffic. Keyverse authentication inside the process does not enable customer or Internet exposure by itself.
 5. **CLI tools**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and the local Uvicorn `cwl-grc serve`.
@@ -53,6 +54,7 @@ flowchart LR
 | `control_item` | Shared official identifier and statement; not customer-owned |
 | `authorization_purpose` | Shared declared-purpose vocabulary; not actor authentication |
 | `evidence_record` | Tenant-owned encrypted-at-rest artifact; exact values remain usable in an authorized workflow |
+| `evidence_request` | Tenant-owned scope/period/submission/review workflow metadata linked to one same-tenant evidence artifact |
 | `control_evidence_binding` | Tenant-owned legacy compatibility bind of an evidence artifact to a shared official control; never an effectiveness conclusion |
 | `control_objective` | Tenant-owned objective grouping reusable internal controls |
 | `internal_control_definition` | Tenant-owned reusable control definition |
@@ -94,6 +96,7 @@ Application filtering is not the sole control. New schemas pair tenant and paren
 - `policy_version(tenant_id, policy_document_id)` → `policy_document(tenant_id, policy_document_id)`;
 - `policy_control_mapping(tenant_id, policy_version_id)` → `policy_version(tenant_id, policy_version_id)`;
 - `control_evidence_binding(tenant_id, evidence_record_id)` → `evidence_record(tenant_id, evidence_record_id)`.
+- `evidence_request(tenant_id, evidence_record_id)` → `evidence_record(tenant_id, evidence_record_id)` when a request has a submission.
 - `source_revision(tenant_id, regulatory_source_id)` → `regulatory_source(tenant_id, regulatory_source_id)`;
 - `compliance_obligation(tenant_id, source_revision_id)` → `source_revision(tenant_id, source_revision_id)`;
 - applicability, owner, requirement, change, and impact rows pair tenant keys with their parent identifiers.

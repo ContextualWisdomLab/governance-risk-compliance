@@ -318,7 +318,7 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
     assert finalized in {True, 1}
     assert policy_tenant == "local_development"
     assert version_tenant == "local_development"
-    assert receipt_count == 7
+    assert receipt_count == 8
     with engine.connect() as connection:
         requirement = connection.execute(
             text(
