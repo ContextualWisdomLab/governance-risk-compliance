@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import Counter
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
@@ -32,6 +34,7 @@ _RISK_STATUSES = {"identified", "assessed", "treating", "accepted", "closed"}
 _AGGREGATION_RULE = "minimum_operating_effective_factor_no_double_count"
 _ROUNDING_POLICY = "nearest_integer_half_up"
 _CONTROL_EFFECTIVENESS_METHOD = "completed_operating_test_with_supporting_evidence"
+_RISK_STATUS_ORDER = ("identified", "assessed", "treating", "accepted", "closed")
 
 
 def next_action_for_risk(
@@ -310,6 +313,61 @@ def list_risk_register(session: Session, decision: AuthorizationDecision) -> lis
         .order_by(RiskRegister.next_review_at, RiskRegister.risk_id)
         .all()
     )
+
+
+def summarize_risk_portfolio(
+    risks: Sequence[RiskRegister],
+    assessments: Mapping[str, RiskAssessment | None],
+    treatments: Mapping[str, RiskTreatmentPlan | None],
+    acceptances: Mapping[str, RiskAcceptance | None],
+    closures: Mapping[str, RiskClosure | None],
+    *,
+    current: datetime | None = None,
+) -> dict[str, object]:
+    """Build tenant-scoped portfolio indicators without cross-methodology score arithmetic."""
+    now = _normalize_utc(current or datetime.now(timezone.utc))
+    return {
+        "risk_total": len(risks),
+        "assessed_total": sum(assessments.get(risk.risk_id) is not None for risk in risks),
+        "unassessed_total": sum(assessments.get(risk.risk_id) is None for risk in risks),
+        "above_appetite_total": sum(
+            assessment is not None and assessment.appetite_status == "above_appetite"
+            for assessment in (assessments.get(risk.risk_id) for risk in risks)
+        ),
+        "within_appetite_total": sum(
+            assessment is not None and assessment.appetite_status == "within_appetite"
+            for assessment in (assessments.get(risk.risk_id) for risk in risks)
+        ),
+        "overdue_total": sum(
+            risk.risk_status != "closed" and risk.next_review_at < now for risk in risks
+        ),
+        "treatment_plan_total": sum(
+            treatments.get(risk.risk_id) is not None for risk in risks
+        ),
+        "active_treatment_total": sum(
+            treatment is not None
+            and treatment.plan_status in {"proposed", "approved", "in_progress"}
+            for treatment in (treatments.get(risk.risk_id) for risk in risks)
+        ),
+        "active_acceptance_total": sum(
+            assessment is not None
+            and acceptance is not None
+            and acceptance.risk_assessment_id == assessment.risk_assessment_id
+            and acceptance.acceptance_status == "active"
+            and acceptance.valid_from <= now < acceptance.valid_to
+            for risk in risks
+            for assessment, acceptance in [
+                (assessments.get(risk.risk_id), acceptances.get(risk.risk_id))
+            ]
+        ),
+        "closure_total": sum(closures.get(risk.risk_id) is not None for risk in risks),
+        "closed_total": sum(risk.risk_status == "closed" for risk in risks),
+        "risk_status_counts": {
+            status: sum(risk.risk_status == status for risk in risks)
+            for status in _RISK_STATUS_ORDER
+        },
+        "risk_category_counts": dict(sorted(Counter(risk.risk_category for risk in risks).items())),
+    }
 
 
 def latest_risk_assessment(

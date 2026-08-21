@@ -45,6 +45,7 @@ from cwl_grc.risks import (
     latest_risk_treatment,
     list_risk_register,
     next_action_for_risk,
+    summarize_risk_portfolio,
 )
 
 
@@ -305,6 +306,8 @@ def test_risk_http_workspace_and_input_boundaries() -> None:
     assert workspace["projection"].endswith("_risks")
     assert workspace["posture"]["risk_total"] == 1
     assert workspace["risks"][0]["assessment"]["appetite_status"] == "above_appetite"
+    assert workspace["posture"]["risk_portfolio"]["risk_total"] == 1
+    assert workspace["posture"]["risk_portfolio"]["above_appetite_total"] == 1
     treatment = client.post(
         f"/risks/{risk.json()['risk_id']}/treatments",
         headers=headers,
@@ -385,6 +388,10 @@ def test_risk_http_workspace_and_input_boundaries() -> None:
     )
     assert closed["risk_status"] == "closed"
     assert closed["closure"]["risk_closure_id"] == closure.json()["risk_closure_id"]
+    closed_portfolio = client.get("/compliance-workspace", headers=_headers("reader")).json()["posture"]["risk_portfolio"]
+    assert closed_portfolio["risk_total"] == 2
+    assert closed_portfolio["active_acceptance_total"] == 1
+    assert closed_portfolio["closed_total"] == 1
     reassessment = client.post(
         f"/risks/{risk.json()['risk_id']}/assessments",
         headers=headers,
@@ -889,6 +896,74 @@ def test_risk_normal_and_closed_next_actions() -> None:
         assert next_action_for_risk(risk, assessment).startswith("Monitor")
         risk.risk_status = "closed"
         assert next_action_for_risk(risk, assessment).startswith("Retain")
+
+
+def test_risk_portfolio_indicators_aggregate_current_dispositions() -> None:
+    """Aggregate tenant risk counts without comparing scores across methodologies."""
+    factory = _factory()
+    officer = _decision()
+    approver = AuthorizationDecision("portfolio-approver", PurposeCode.COMPLIANCE_GOVERNANCE, officer.tenant_id)
+    with factory() as session:
+        methodology = _methodology(
+            session, officer, code="CWL-PORTFOLIO", appetite=5, factor=100, tolerance=10
+        )
+        above = _risk(session, officer, "RISK-PORTFOLIO-ABOVE")
+        above_assessment = assess_risk(
+            session, officer, above.risk_id, methodology.methodology_id,
+            3, 3, "Residual exposure requires portfolio disposition.", FUTURE_REVIEW, [], expected_revision_number=1,
+        )
+        treatment = create_risk_treatment(
+            session, officer, above.risk_id, "reduce", "Reduce privileged access delay",
+            "Reconcile role changes within one business day.", "access-owner",
+            datetime.now(timezone.utc) + timedelta(days=30), expected_revision_number=2,
+        )
+        now = datetime.now(timezone.utc)
+        acceptance = create_risk_acceptance(
+            session, approver, above.risk_id, above_assessment.risk_assessment_id,
+            "RC-PORTFOLIO-001", "The committee accepts the residual exposure temporarily.",
+            now - timedelta(minutes=1), now + timedelta(days=1), expected_revision_number=3,
+        )
+        within = _risk(session, officer, "RISK-PORTFOLIO-WITHIN")
+        within_assessment = assess_risk(
+            session, officer, within.risk_id, methodology.methodology_id,
+            2, 2, "Residual exposure is within appetite.", FUTURE_REVIEW, [], expected_revision_number=1,
+        )
+        closure = create_risk_closure(
+            session, approver, within.risk_id, within_assessment.risk_assessment_id,
+            "RC-PORTFOLIO-CLOSE", "The residual exposure is retained with closure evidence.",
+            "evidence://portfolio-close", expected_revision_number=2,
+        )
+        overdue = _risk(session, officer, "RISK-PORTFOLIO-OVERDUE")
+        overdue.next_review_at = datetime(2020, 1, 1)
+        summary = summarize_risk_portfolio(
+            [above, within, overdue],
+            {above.risk_id: above_assessment, within.risk_id: within_assessment, overdue.risk_id: None},
+            {above.risk_id: treatment, within.risk_id: None, overdue.risk_id: None},
+            {above.risk_id: acceptance, within.risk_id: None, overdue.risk_id: None},
+            {above.risk_id: None, within.risk_id: closure, overdue.risk_id: None},
+            current=now,
+        )
+        assert summary["risk_total"] == 3
+        assert summary["assessed_total"] == 2
+        assert summary["unassessed_total"] == 1
+        assert summary["above_appetite_total"] == 1
+        assert summary["within_appetite_total"] == 1
+        assert summary["overdue_total"] == 1
+        assert summary["treatment_plan_total"] == 1
+        assert summary["active_treatment_total"] == 1
+        assert summary["active_acceptance_total"] == 1
+        assert summary["closure_total"] == 1
+        assert summary["closed_total"] == 1
+        assert summary["risk_status_counts"] == {
+            "identified": 1,
+            "assessed": 0,
+            "treating": 0,
+            "accepted": 1,
+            "closed": 1,
+        }
+        assert summary["risk_category_counts"] == {"access": 3}
+        assert "residual_score_total" not in summary
+        assert summarize_risk_portfolio([], {}, {}, {}, {}, current=now)["risk_category_counts"] == {}
 
 
 def test_risk_control_link_defensive_relationship_guards() -> None:

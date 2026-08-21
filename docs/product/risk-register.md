@@ -31,6 +31,14 @@ within-appetite reassessment, requires an actor other than the assessor, and
 requires a closure evidence reference. An active acceptance must expire before
 closure; all earlier assessments and disposition records remain available.
 
+The compliance workspace also publishes tenant-scoped portfolio indicators.
+They count total, assessed, unassessed, above-appetite, within-appetite,
+overdue, treatment, active-acceptance, closure, and closed-risk states, with
+status and category breakdowns. Overdue counts exclude closed risks, and an
+active acceptance is counted only when it belongs to the latest assessment and
+is inside its validity window. The read model deliberately does not add or
+average residual scores across methodology versions.
+
 ## API
 
 - `POST /risk-methodologies` creates one immutable methodology version.
@@ -45,7 +53,8 @@ closure; all earlier assessments and disposition records remain available.
 - `POST /risks/{risk_id}/closures` records an independent closure approval
   for the latest within-appetite reassessment after active acceptance expires.
 - `GET /compliance-workspace` includes `risks`, risk posture counts, and risk
-  treatment/acceptance/closure projections, and deterministic next actions.
+  treatment/acceptance/closure projections, portfolio indicators, and
+  deterministic next actions.
 
 Writes require the compliance-governance purpose and the existing verified
 tenant boundary. Local preview headers remain compatibility inputs only; they
@@ -54,7 +63,7 @@ projection.
 
 ## Deliberate ceiling
 
-This slice does not claim treatment completion, portfolio aggregation,
+This slice does not claim treatment completion, portfolio score aggregation,
 audit-program completion, or certification. A proposed
 treatment still requires officer follow-through and evidence; an active
 acceptance produces an expiry review action and never becomes a compliance

@@ -93,6 +93,12 @@ flowchart LR
 
 Every tenant-owned row has a non-null `tenant_id`. In Keyverse mode it comes from the verified `org` claim. The `local_development` value is reserved for the loopback-only compatibility profile and migration of pre-tenant preview data.
 
+The compliance workspace's `risk_portfolio` is a read-model projection over
+tenant-filtered risk identities and their latest immutable disposition records;
+it adds no persistence object and performs no arithmetic across incompatible
+risk methodology scales. Consumers receive bounded counts and exact category/
+status breakdowns, while the individual risk rows remain the source of detail.
+
 A policy gap is a latest finalized-edition mapping whose external control projects to a status other than `operating_effective` or authorized `not_applicable`. Direct `control_evidence_binding` rows remain compatibility data and project to `unassessed`; `evidence_usage` records a purpose-approved use without replacing the legacy binding model. Cross-service reads use published HTTP contracts after a production-authenticated service boundary exists; peer products never query these tables directly.
 
 ## Tenant relationship integrity

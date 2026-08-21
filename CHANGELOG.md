@@ -34,6 +34,7 @@
 - Tenant-scoped `/compliance-workspace` read model that composes existing control, obligation, policy-gap, evidence-request, and risk-disposition projections without a duplicate persistence model, distinguishes obligations from scoped work items, and preloads catalog coverage in tenant batches; audit programs and exports remain explicit gaps.
 - Tenant-scoped evidence-request workflow for bounded scope/period collection, same-tenant artifact submission, independent acceptance or rejection, reuse policy, append-only audit history, and workspace projection without copying evidence payloads.
 - Tenant-scoped versioned risk methodology, register, disposition, and closure workflow with immutable inherent/residual assessments, versioned treatment plans, independent time-bounded acceptances, independent within-appetite closure approvals, appetite/tolerance escalation, optimistic revision checks, and mitigation links limited to implemented internal controls, completed test results, and purpose-bound evidence usage.
+- Tenant-scoped read-only risk portfolio indicators in `/compliance-workspace`, with status/category breakdowns, bounded overdue and active-disposition counts, and no cross-methodology score arithmetic.
 
 ### Security
 
@@ -79,3 +80,4 @@
 - `docs/adr/0013-compliance-workspace-read-model.md` — tenant-scoped posture composition and explicit projection ceiling.
 - `docs/adr/0014-evidence-request-workflow.md` — bounded evidence request, independent review, payload non-disclosure, and terminal rejection contract.
 - `docs/adr/0015-risk-register-assessment-core.md` — versioned methodology, immutable assessment snapshots, tested-control mitigation links, and explicit treatment/acceptance ceiling.
+- `docs/adr/0016-risk-portfolio-indicators.md` — tenant-scoped count indicators without cross-methodology score aggregation.
