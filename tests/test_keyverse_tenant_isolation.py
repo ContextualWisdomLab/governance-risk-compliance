@@ -246,6 +246,73 @@ def test_policy_gap_read_is_authenticated_and_tenant_scoped() -> None:
     assert len(own_tenant.json()["gaps"]) == 1
 
 
+def test_coverage_and_officer_console_reads_use_verified_tenant() -> None:
+    """Coverage bindings and the officer console never cross tenant boundaries."""
+    private_key, public_jwk = _material()
+    client = _client(public_jwk)
+    evidence_record_id = _create_evidence(client, private_key, "tenant-a")
+    bound = client.post(
+        "/control-evidence-bindings",
+        headers=_headers(
+            private_key,
+            tenant_id="tenant-a",
+            scope="grc.evidence.write",
+            purpose="evidence_binding",
+        ),
+        json={
+            "framework": SOC2_FRAMEWORK,
+            "catalog_identifier": "CC1.1",
+            "evidence_record_id": evidence_record_id,
+        },
+    )
+    assert bound.status_code == 201
+
+    missing_coverage_auth = client.get(
+        "/controls/uncovered",
+        params={"framework": SOC2_FRAMEWORK},
+    )
+    tenant_a_coverage = client.get(
+        "/controls/uncovered",
+        params={"framework": SOC2_FRAMEWORK},
+        headers=_headers(
+            private_key,
+            tenant_id="tenant-a",
+            scope="grc.policy.read",
+            purpose="coverage_review",
+        ),
+    )
+    tenant_b_coverage = client.get(
+        "/controls/uncovered",
+        params={"framework": SOC2_FRAMEWORK},
+        headers=_headers(
+            private_key,
+            tenant_id="tenant-b",
+            scope="grc.policy.read",
+            purpose="coverage_review",
+        ),
+    )
+    missing_home_auth = client.get("/")
+    tenant_b_home = client.get(
+        "/",
+        headers=_headers(
+            private_key,
+            tenant_id="tenant-b",
+            scope="grc.policy.read",
+            purpose="coverage_review",
+        ),
+    )
+
+    tenant_a_ids = {item["catalog_identifier"] for item in tenant_a_coverage.json()["controls"]}
+    tenant_b_ids = {item["catalog_identifier"] for item in tenant_b_coverage.json()["controls"]}
+    assert missing_coverage_auth.status_code == 401
+    assert tenant_a_coverage.status_code == 200
+    assert tenant_b_coverage.status_code == 200
+    assert "CC1.1" not in tenant_a_ids
+    assert "CC1.1" in tenant_b_ids
+    assert missing_home_auth.status_code == 401
+    assert tenant_b_home.status_code == 200
+
+
 def test_policy_revision_hides_cross_tenant_object_reference() -> None:
     """A tenant B writer cannot revise a tenant A policy by guessing its identifier."""
     private_key, public_jwk = _material()

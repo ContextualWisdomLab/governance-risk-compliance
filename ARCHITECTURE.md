@@ -78,7 +78,7 @@ Policy creation writes an unfinalized `policy_version`, writes its same-tenant o
 The application has two loopback-only execution profiles:
 
 - **Local development** uses the fixed `local_development` tenant and explicit actor/purpose declarations for the local officer UI and CLI. Those declarations are not authentication.
-- **Keyverse-enabled composition** requires verified bearer identity and action scope for protected policy and evidence routes. Caller-supplied `X-Actor-Id` never overrides the signed principal. Policy and policy-gap reads require `grc.policy.read`; mutations require their corresponding policy or evidence write scope.
+- **Keyverse-enabled composition** requires verified bearer identity and action scope for protected policy, evidence, coverage, and officer-console routes. Caller-supplied `X-Actor-Id` never overrides the signed principal. Policy, policy-gap, coverage-gap, and officer-console reads require `grc.policy.read`; mutations require their corresponding policy or evidence write scope.
 
 Both profiles remain behind the same loopback-only boundary, which rejects non-loopback and proxy-forwarded traffic. Remote exposure still requires production issuer configuration, complete purpose/resource authorization, deployment identity, encrypted transport, operational controls, and acceptance evidence.
 

@@ -207,9 +207,16 @@ def create_app(
     def uncovered_controls(
         session: Session = Depends(get_session),
         framework: str | None = None,
+        authorization: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        """List official controls that still need evidence."""
-        items = list_uncovered_controls(session, parse_framework(framework))
+        """List official controls still needing evidence for the verified tenant."""
+        tenant_id = tenant_for_policy_read(authorization, x_purpose)
+        items = list_uncovered_controls(
+            session,
+            parse_framework(framework),
+            tenant_id=tenant_id,
+        )
         return {
             "next_action": "Attach the next evidence on an uncovered control.",
             "controls": [serialize_control(item, covered=False) for item in items],
@@ -364,11 +371,16 @@ def create_app(
         }
 
     @app.get("/", response_class=HTMLResponse)
-    def officer_home(session: Session = Depends(get_session)) -> str:
-        """Show local policy authoring, policy gaps, and the next evidence action."""
+    def officer_home(
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> str:
+        """Show tenant policy authoring, policy gaps, and the next evidence action."""
+        tenant_id = tenant_for_policy_read(authorization, x_purpose)
         return render_officer_home(
-            list_uncovered_controls(session, None),
-            policy_gaps=list_policy_gaps(session, None),
+            list_uncovered_controls(session, None, tenant_id=tenant_id),
+            policy_gaps=list_policy_gaps(session, None, tenant_id=tenant_id),
             catalog_items=list_control_items(session, None),
         )
 
