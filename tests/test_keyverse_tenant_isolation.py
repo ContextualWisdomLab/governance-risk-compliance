@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -189,6 +190,30 @@ def test_policy_list_requires_verified_read_scope() -> None:
     assert wrong_scope.status_code == 403
     assert allowed.status_code == 200
     assert len(allowed.json()["policies"]) == 1
+
+
+def test_authenticated_request_log_contains_hashed_verified_principal(caplog) -> None:  # noqa: ANN001
+    """Real authenticated requests retain only a one-way principal reference in logs."""
+    caplog.set_level(logging.INFO, logger="cwl_grc.request")
+    private_key, public_jwk = _material()
+    client = _client(public_jwk)
+
+    response = client.get(
+        "/policy-documents",
+        headers=_headers(
+            private_key,
+            tenant_id="tenant-a",
+            scope="grc.policy.read",
+            purpose="coverage_review",
+        ),
+    )
+
+    assert response.status_code == 200
+    record = json.loads(caplog.records[-1].message)
+    assert isinstance(record["principal_reference"], str)
+    assert len(record["principal_reference"]) == 16
+    assert "tenant-a" not in caplog.text
+    assert "officer-tenant-a" not in caplog.text
 
 
 def test_policy_list_never_crosses_verified_tenant_boundary() -> None:

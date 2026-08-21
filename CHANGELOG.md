@@ -22,6 +22,8 @@
 - Non-null tenant ownership on policy, evidence, binding, and audit records, including a migration backfill for pre-tenant local-preview data.
 - Versioned evidence encryption metadata, bounded old/new key overlap, and audited idempotent rewrap support.
 - Evidence retention metadata and purpose-authorized legal-hold placement/release without altering stored payloads.
+- Truthful `/readyz` and `/startupz` contracts, bounded PostgreSQL connection setup, drain rejection, W3C correlation, and redaction-safe JSON request logs.
+- OpenTelemetry request traces, request rate/duration metrics, authorization-denial metrics, and route-template cardinality protection with standard OTLP export configuration.
 
 ### Security
 
@@ -42,6 +44,7 @@
 - Pair tenant and parent identifiers with named composite foreign-key constraints for new schemas and idempotent tenant-parent guards for existing SQLite and PostgreSQL stores.
 - Require explicit evidence key IDs and authenticated tenant-record encryption context; reject unknown, revoked, mismatched, or tampered encryption metadata without falling back to another key.
 - Require retention metadata and a verified `grc.evidence.retention` purpose for legal-hold changes; leave destructive disposition and remote access disabled until their operating contracts exist.
+- Keep `/healthz` dependency-free; require database, schema receipts, seed rows, integrity guards, key round-trip, and environment checks before startup admits traffic.
 
 ### ADR
 
@@ -52,3 +55,5 @@
 - `docs/adr/0005-verified-tenant-record-isolation.md` — verified tenant ownership, protected reads, cross-tenant non-disclosure, and database-enforced tenant-parent relationships.
 - `docs/adr/0006-evidence-keyring-and-rotation.md` — provider-neutral evidence key inventory, context-bound envelopes, and bounded rewrap behavior.
 - `docs/adr/0007-evidence-retention-and-legal-hold.md` — retention metadata and tenant-scoped legal holds without destructive evidence mutation.
+- `docs/adr/0008-operational-readiness-and-correlation.md` — liveness/readiness/startup separation, drain state, correlation, and safe structured logging.
+- `docs/adr/0009-opentelemetry-request-telemetry.md` — isolated OpenTelemetry request spans/metrics, standard OTLP export, and bounded route attributes.

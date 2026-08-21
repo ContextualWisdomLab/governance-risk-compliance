@@ -28,6 +28,14 @@ Ross, R., & Pillitteri, V. (2020). *Security and privacy controls for informatio
 
 Barker, E. (2020). *Recommendation for key management: Part 1—General* (NIST Special Publication 800-57 Part 1 Revision 5). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-57pt1r5
 
+Kubernetes Authors. (n.d.). *Liveness, readiness, and startup probes*. Kubernetes Documentation. https://kubernetes.io/docs/concepts/workloads/pods/probes/
+
+OpenTelemetry Authors. (n.d.). *Specifications*. OpenTelemetry. https://opentelemetry.io/docs/specs/
+
+OpenTelemetry Authors. (n.d.). *Instrumentation*. OpenTelemetry. https://opentelemetry.io/docs/languages/python/instrumentation/
+
+World Wide Web Consortium. (n.d.). *Trace context*. https://www.w3.org/TR/trace-context/
+
 Policy authoring in this slice follows ISO/IEC 27001:2022 clause 5.2 (information security policy as documented information) and Annex A control A.5.1 (policies for information security); COSO (2013) Principle 12 and AICPA (2022) SOC 2 CC5.3 (deploy control activities through policies and procedures); KISA (2023) ISMS-P 1.1.5; and KISA (2026) CSAP 1.1.1. Open Policy Agent Rego was reviewed and not adopted: it is an authorization PDP language, not a policy-document or evidence-binding store.
 
 The CSAP catalog stores the edition-specific KISA resource notice rather than the generic CSAP introduction page. A content digest is not claimed in this slice because the original attachment bytes were not independently captured and hashed in the repository; adding a digest requires an immutable source-artifact ingestion workflow and reviewable byte-level evidence.
@@ -35,3 +43,5 @@ The CSAP catalog stores the edition-specific KISA resource notice rather than th
 The first Keyverse authentication prerequisite follows RFC 9068 for explicit JWT access-token typing, signed RS256 validation, issuer/audience checks, and required access-token claims; RFC 9700 for resource/action restriction and client-versus-resource-owner separation; and the OpenID Connect Core/Discovery errata-set-2 issuer and signing-key metadata semantics. Discovery and live JWK retrieval are intentionally deferred until URL pinning, redirect refusal, response bounds, cache/rotation, and issuer-outage behavior have executable tests.
 
 The first evidence key-lifecycle slice follows NIST SP 800-57 Part 1 Revision 5 key-inventory, key-lifecycle, metadata-protection, and recovery principles. KMS/HSM integration, legal hold, retention disposition, backup, and restore rehearsal remain explicit follow-up work rather than unverified production claims.
+
+The operational readiness slice follows Kubernetes liveness/readiness/startup separation, OpenTelemetry Python instrumentation, and W3C Trace Context propagation. The current implementation provides dependency-separated probes, bounded PostgreSQL connection setup, drain state, correlation IDs, redaction-safe structured logs, and low-cardinality request traces/metrics with standard OTLP export configuration; database instrumentation, SLO dashboards, burn-rate alerts, and paging remain explicit platform-integration work.
