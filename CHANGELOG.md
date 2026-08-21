@@ -17,6 +17,7 @@
 - Hash-locked `uv.lock` dependency graph for runtime and development dependencies.
 - Versioned schema-upgrade receipts for existing first-slice stores.
 - Strict `/v1` policy/control API with bounded cursor pages, durable idempotency keys, strong ETags, If-Match revision preconditions, and RFC 9457 problem details; legacy policy routes are marked deprecated in OpenAPI.
+- Hardened version-one retries against concurrent key races and cross-policy key reuse; batched paged reads and bounded non-reflective validation errors.
 
 ### Security
 

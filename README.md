@@ -60,6 +60,7 @@ Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `n
 - `policy_document.current_version_number` serializes revision allocation; a stale writer receives `409 Conflict` and must reload.
 - Versioned schema upgrades leave `schema_migration` receipts and upgrade existing first-slice stores before integrity triggers are installed.
 - Version-one mutation retries are recorded in `idempotency_record`; stale revisions fail their `If-Match` precondition before any new edition is written.
+- Version-revision idempotency is target-scoped, concurrent key reservation is retry-safe, and paged policy reads batch related rows.
 - A persistent database cannot start without explicit `CWL_GRC_EVIDENCE_KEY` material. Ephemeral keys are limited to explicitly selected in-memory tests.
 
 ## Personal-data handling

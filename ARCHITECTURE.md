@@ -62,10 +62,13 @@ Policy creation writes an unfinalized `policy_version`, writes its official-cont
 The version-one HTTP contract adds a strong representation ETag and requires
 `If-Match` for revisions, so a caller cannot publish from an unobserved
 edition. Mutations require a durable `Idempotency-Key`; an exact retry returns
-the stored response and a changed request body returns `409 Conflict`. List
-routes use opaque keyset cursors and a maximum page size of 100. Version-one
-errors use `application/problem+json`; the error handler excludes reflected
-request values and adds a request reference.
+the stored response, a changed request body returns `409 Conflict`, and the
+version-revision key is scoped to its target policy. A concurrent unique-key
+race returns a safe retry or replay response. List routes use opaque keyset
+cursors, a maximum page size of 100, and batched policy/version/control reads.
+Version-one errors use `application/problem+json`; the error handler caps and
+sanitizes validation detail, excludes reflected request values, and adds a
+request reference.
 
 ## Security posture
 

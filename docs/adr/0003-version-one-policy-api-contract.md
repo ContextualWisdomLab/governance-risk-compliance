@@ -25,8 +25,9 @@ therefore an explicit deployment gate, not an implied property of this API.
    OpenAPI-visible request/response contract.
 2. Require `Idempotency-Key` on version-one mutations. Persist the validated
    request digest and response in `idempotency_record`, scoped to the local
-   purpose actor and operation. A reused key with a different body is a
-   conflict; an exact retry replays the original response.
+   purpose actor, operation, and target policy for revisions. A reused key
+   with a different body is a conflict; an exact retry replays the original
+   response, including after a concurrent unique-key reservation race.
 3. Return a strong `ETag` for a policy representation. Version publication
    requires `If-Match` with the current ETag (or `*`) and returns `428` when the
    precondition is missing or `412` when it is stale.
@@ -38,11 +39,12 @@ therefore an explicit deployment gate, not an implied property of this API.
 ## Consequences
 
 The buyer can integrate a bounded policy/control truth surface and safely retry
-authoring or revision requests. Existing CLI, officer-console, and preview
-HTTP callers continue to work. Cursor semantics and idempotency records are
-now durable, but production exposure remains blocked until Keyverse identity,
-tenant authorization, migration rehearsal, and authenticated contract tests
-are complete.
+authoring or revision requests. Paged policy reads batch related rows, and
+validation problems avoid reflecting arbitrary field names or query values.
+Existing CLI, officer-console, and preview HTTP callers continue to work.
+Cursor semantics and idempotency records are now durable, but production
+exposure remains blocked until Keyverse identity, tenant authorization,
+migration rehearsal, and authenticated contract tests are complete.
 
 ## References
 

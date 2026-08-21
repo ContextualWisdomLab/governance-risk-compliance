@@ -12,9 +12,11 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Query, Request, Response
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from cwl_grc.authorization import (
@@ -42,6 +44,7 @@ from cwl_grc.policy import (
     revise_policy,
     serialize_gap,
     serialize_policy,
+    serialize_policy_page,
 )
 from cwl_grc.remote_access import request_is_local
 
@@ -95,7 +98,7 @@ def _problem_response(
         "title": HTTPStatus(status_code).phrase,
         "status": status_code,
         "detail": detail,
-        "instance": str(request.url),
+        "instance": request.url.path,
         "request_reference": request_reference,
     }
     response_headers = {"X-Request-ID": request_reference}
@@ -124,6 +127,23 @@ def _request_digest(body: BaseModel) -> str:
     """Hash the validated request body used by an idempotency record."""
     material = json.dumps(body.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(material.encode()).hexdigest()
+
+
+def _policy_version_operation(policy_document_id: str) -> str:
+    """Scope version idempotency to the target policy without leaking path length."""
+    target_digest = hashlib.sha256(policy_document_id.encode()).hexdigest()[:32]
+    return f"v1_policy_version_create:{target_digest}"
+
+
+def _replay_idempotent_record(record: IdempotencyRecord) -> JSONResponse:
+    """Return the durable response recorded for an idempotent mutation."""
+    payload = json.loads(record.response_payload)
+    headers = {"Idempotency-Replayed": "true", "ETag": _policy_etag(payload)}
+    return JSONResponse(
+        status_code=record.response_status,
+        content=payload,
+        headers=headers,
+    )
 
 
 def _begin_idempotent_request(
@@ -156,13 +176,7 @@ def _begin_idempotent_request(
                 status_code=409,
                 detail="Reuse the idempotency key only with the original request.",
             )
-        payload = json.loads(existing.response_payload)
-        headers = {"Idempotency-Replayed": "true", "ETag": _policy_etag(payload)}
-        return None, JSONResponse(
-            status_code=existing.response_status,
-            content=payload,
-            headers=headers,
-        )
+        return None, _replay_idempotent_record(existing)
     record = IdempotencyRecord(
         idempotency_record_id=uuid4().hex,
         actor_identifier=decision.actor_identifier,
@@ -174,7 +188,35 @@ def _begin_idempotent_request(
         created_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     session.add(record)
-    session.flush()
+    try:
+        session.flush()
+    except IntegrityError as exc:
+        session.rollback()
+        existing = (
+            session.query(IdempotencyRecord)
+            .filter_by(
+                actor_identifier=decision.actor_identifier,
+                operation_name=operation_name,
+                idempotency_key=key,
+            )
+            .one_or_none()
+        )
+        if existing is None:
+            raise HTTPException(
+                status_code=409,
+                detail="That idempotency key is already in progress; retry the request.",
+            ) from exc
+        if existing.request_digest != digest:
+            raise HTTPException(
+                status_code=409,
+                detail="Reuse the idempotency key only with the original request.",
+            ) from exc
+        if existing.response_status == 0:
+            raise HTTPException(
+                status_code=409,
+                detail="That idempotency key is already in progress; retry the request.",
+            ) from exc
+        return None, _replay_idempotent_record(existing)
     return record, None
 
 
@@ -289,10 +331,14 @@ def create_app(
     ) -> JSONResponse:
         """Render safe version-one validation details without echoing input values."""
         if not _is_v1_request(request):
-            return JSONResponse(status_code=422, content={"detail": exc.errors()})
+            return JSONResponse(
+                status_code=422,
+                content={"detail": jsonable_encoder(exc.errors())},
+            )
+        errors = exc.errors()[:5]
         details = "; ".join(
-            f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
-            for error in exc.errors()
+            f"{'body' if error.get('type') == 'extra_forbidden' else '.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+            for error in errors
         )
         return _problem_response(request, 422, details or "The request is invalid.")
 
@@ -449,7 +495,7 @@ def create_app(
         """List version-one policies with bounded deterministic pagination."""
         documents, next_cursor = list_policy_documents_page(session, limit, cursor)
         return {
-            "items": [serialize_policy(session, document) for document in documents],
+            "items": serialize_policy_page(session, documents),
             "next_cursor": next_cursor,
             "limit": limit,
             "next_action": "Review policy gaps and attach the next evidence.",
@@ -486,7 +532,7 @@ def create_app(
         record, replay = _begin_idempotent_request(
             session,
             decision,
-            "v1_policy_version_create",
+            _policy_version_operation(policy_document_id),
             idempotency_key,
             body,
         )

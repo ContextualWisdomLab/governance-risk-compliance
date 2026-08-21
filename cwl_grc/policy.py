@@ -10,7 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import and_, or_, update
+from sqlalchemy import and_, or_, tuple_, update
 from sqlalchemy.orm import Session
 
 from cwl_grc.audit import record_audit_event
@@ -258,6 +258,8 @@ def list_policy_gaps_page(
         .filter(ControlEvidenceBinding.binding_id.is_(None))
     )
     if policy_document_id:
+        if session.get(PolicyDocument, policy_document_id) is None:
+            raise HTTPException(status_code=404, detail="That policy document is not on file.")
         query = query.filter(PolicyDocument.policy_document_id == policy_document_id)
     if cursor:
         created_at_text, document_id, framework, catalog_identifier = decode_page_cursor(
@@ -365,9 +367,86 @@ def serialize_policy(session: Session, document: PolicyDocument) -> dict[str, An
         .order_by(PolicyControlMapping.control_item_id)
         .all()
     )
+    items = {
+        item.control_item_id: item
+        for item in session.query(ControlItem)
+        .filter(
+            ControlItem.control_item_id.in_({mapping.control_item_id for mapping in mappings})
+        )
+        .all()
+    }
+    return _serialize_policy_values(document, version, mappings, items)
+
+
+def serialize_policy_page(
+    session: Session,
+    documents: list[PolicyDocument],
+) -> list[dict[str, Any]]:
+    """Serialize one policy page with one batched query per related table."""
+    if not documents:
+        return []
+    version_keys = [
+        (document.policy_document_id, document.current_version_number)
+        for document in documents
+    ]
+    versions = (
+        session.query(PolicyVersion)
+        .filter(
+            tuple_(PolicyVersion.policy_document_id, PolicyVersion.version_number).in_(version_keys),
+            PolicyVersion.is_finalized.is_(True),
+        )
+        .all()
+    )
+    versions_by_key = {
+        (version.policy_document_id, version.version_number): version
+        for version in versions
+    }
+    current_versions = [
+        versions_by_key[(document.policy_document_id, document.current_version_number)]
+        for document in documents
+    ]
+    version_ids = [version.policy_version_id for version in current_versions]
+    mappings = (
+        session.query(PolicyControlMapping)
+        .filter(PolicyControlMapping.policy_version_id.in_(version_ids))
+        .order_by(
+            PolicyControlMapping.policy_version_id,
+            PolicyControlMapping.control_item_id,
+        )
+        .all()
+    )
+    items = {
+        item.control_item_id: item
+        for item in session.query(ControlItem)
+        .filter(
+            ControlItem.control_item_id.in_({mapping.control_item_id for mapping in mappings})
+        )
+        .all()
+    }
+    mappings_by_version: dict[str, list[PolicyControlMapping]] = {}
+    for mapping in mappings:
+        mappings_by_version.setdefault(mapping.policy_version_id, []).append(mapping)
+    return [
+        _serialize_policy_values(
+            document,
+            version,
+            mappings_by_version.get(version.policy_version_id, []),
+            items,
+        )
+        for document, version in zip(documents, current_versions, strict=True)
+    ]
+
+
+def _serialize_policy_values(
+    document: PolicyDocument,
+    version: PolicyVersion,
+    mappings: list[PolicyControlMapping],
+    items: dict[str, ControlItem],
+) -> dict[str, Any]:
+    """Build the shared persisted policy representation from loaded rows."""
     mapped: list[dict[str, str]] = []
     for mapping in mappings:
-        item = session.get(ControlItem, mapping.control_item_id)
+        item = items.get(mapping.control_item_id)
         if item is None:  # pragma: no cover
             continue
         mapped.append(
