@@ -9,11 +9,11 @@ This repository is the ContextualWisdomLab home for policy, control, risk, evide
 1. Install with `python -m pip install -e ".[dev]"`.
 2. Generate and store a Fernet key as `CWL_GRC_EVIDENCE_KEY` before using any persistent database.
 3. Run `python -m cwl_grc` or `cwl-grc serve`; both start Uvicorn on loopback only.
-4. Open `/` from the same machine, author the next policy, and map it only to official catalog identifiers.
+4. Open `/` from the same machine with `X-Actor-Id` and `X-Purpose: policy_authoring`, author the next policy, and map it only to official catalog identifiers.
 5. Read the policy-gap list and attach the next evidence on an uncovered mapped control.
 6. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
 
-The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. The command-line server binds to `127.0.0.1`, and the app always rejects proxy-forwarded or non-loopback traffic. No runtime bypass exists. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
+The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. Purpose-scoped policy, catalog, coverage, and evidence routes require `X-Actor-Id` plus the matching `X-Purpose`; these headers declare audit context and purpose but do not authenticate an actor. The command-line server binds to `127.0.0.1`, and the app always rejects proxy-forwarded or non-loopback traffic. No runtime bypass exists. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
 
 ## Operator CLI
 
@@ -34,10 +34,10 @@ The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `
 | Action | Where |
 | --- | --- |
 | Author or revise a policy | `POST /policy-documents`, `POST /policy-documents/{id}/versions`, `cwl-grc policy author`, or `cwl-grc policy revise` |
-| List policies | `GET /policy-documents` or `cwl-grc policy list` |
-| See policy/control gaps | `GET /policy-gaps?policy_document_id=`, `cwl-grc gaps`, or `/` |
-| List official controls | `GET /controls?framework=csap_2026` |
-| See catalog coverage gaps | `GET /controls/uncovered?framework=soc2_tsc_2017` |
+| List policies | `GET /policy-documents` with `X-Purpose: policy_authoring`, or `cwl-grc policy list` |
+| See policy/control gaps | `GET /policy-gaps?policy_document_id=` with `X-Purpose: policy_authoring`, `cwl-grc gaps`, or `/` with the same purpose |
+| List official controls | `GET /controls?framework=csap_2026` with `X-Purpose: catalog_governance` |
+| See catalog coverage gaps | `GET /controls/uncovered?framework=soc2_tsc_2017` with `X-Purpose: catalog_governance` |
 | Store evidence | `POST /evidence-records` with `X-Actor-Id` and `X-Purpose: evidence_binding` |
 | Bind evidence | `POST /control-evidence-bindings` or `cwl-grc bind` |
 | Register and compare catalog provenance | `POST /catalog/source-artifacts`, `/versions`, `/import-runs`, or `/releases`, bounded `GET /catalog/releases?limit=50&offset=0`, detail `GET /catalog/releases/{id}`, or `GET /catalog/releases/{id}/compare/{id}` with `X-Purpose: catalog_governance` |

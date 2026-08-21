@@ -23,6 +23,7 @@
 
 ### Security
 
+- Require purpose-scoped headers on policy, catalog, coverage, and officer-home reads so local preview GET routes do not expose GRC records without an explicit audit context.
 - Always deny proxy-forwarded and non-loopback HTTP traffic while the runtime lacks Keyverse-backed identity and tenant authorization; remove the unauthenticated remote-preview bypass entirely.
 - Bind both standalone server entry points to `127.0.0.1`.
 - Require durable Fernet key material for every persistent evidence store; limit ephemeral keys to explicitly selected in-memory tests.

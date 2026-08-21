@@ -148,8 +148,11 @@ def create_app(
     def list_controls(
         session: Session = Depends(get_session),
         framework: str | None = None,
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """List official controls, optionally limited to one catalog."""
+        require_purpose(x_actor_id, x_purpose, PurposeCode.CATALOG_GOVERNANCE)
         items = list_control_items(session, parse_framework(framework))
         return {"controls": [serialize_control(item) for item in items]}
 
@@ -157,8 +160,11 @@ def create_app(
     def uncovered_controls(
         session: Session = Depends(get_session),
         framework: str | None = None,
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """List official controls that still need evidence."""
+        require_purpose(x_actor_id, x_purpose, PurposeCode.CATALOG_GOVERNANCE)
         items = list_uncovered_controls(session, parse_framework(framework))
         return {
             "next_action": "Attach the next evidence on an uncovered control.",
@@ -364,8 +370,13 @@ def create_app(
         return serialize_policy(session, document)
 
     @app.get("/policy-documents")
-    def get_policy_documents(session: Session = Depends(get_session)) -> dict[str, Any]:
+    def get_policy_documents(
+        session: Session = Depends(get_session),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
         """List authored policies and their latest official mappings."""
+        require_purpose(x_actor_id, x_purpose, PurposeCode.POLICY_AUTHORING)
         return {
             "next_action": "Review policy gaps and attach the next evidence.",
             "policies": [
@@ -378,8 +389,11 @@ def create_app(
     def get_policy_gaps(
         session: Session = Depends(get_session),
         policy_document_id: str | None = None,
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """List latest-version policy mappings that still lack evidence."""
+        require_purpose(x_actor_id, x_purpose, PurposeCode.POLICY_AUTHORING)
         return {
             "next_action": "Attach the next evidence on an uncovered policy control.",
             "gaps": [
@@ -435,8 +449,13 @@ def create_app(
         }
 
     @app.get("/", response_class=HTMLResponse)
-    def officer_home(session: Session = Depends(get_session)) -> str:
+    def officer_home(
+        session: Session = Depends(get_session),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> str:
         """Show policy authoring, policy gaps, and the next evidence action."""
+        require_purpose(x_actor_id, x_purpose, PurposeCode.POLICY_AUTHORING)
         return render_officer_home(
             list_uncovered_controls(session, None),
             policy_gaps=list_policy_gaps(session, None),
