@@ -16,8 +16,8 @@ August 21, 2026, from https://opentelemetry.io/docs/specs/semconv/general/
 OpenTelemetry Authors. (n.d.). *Semantic conventions*. Retrieved August 21,
 2026, from https://opentelemetry.io/docs/specs/otel/semantic-conventions/
 
-World Wide Web Consortium. (2021, November 23). *Trace Context* (W3C
-Recommendation). https://www.w3.org/TR/trace-context/
+World Wide Web Consortium. (n.d.). *Trace Context* (W3C Recommendation).
+https://www.w3.org/TR/trace-context/
 
 ## Applied boundary
 
