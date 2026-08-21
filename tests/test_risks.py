@@ -620,6 +620,12 @@ def test_risk_acceptance_boundaries_and_expiry_action(monkeypatch: pytest.Monkey
                 "RC-WITHIN", "Not permitted.", datetime.now(timezone.utc),
                 datetime.now(timezone.utc) + timedelta(days=1), expected_revision_number=2,
             )
+        with pytest.raises(HTTPException, match="above-appetite"):
+            create_risk_treatment(
+                session, officer, within_risk.risk_id, "reduce", "Not permitted.",
+                "A within-appetite risk does not need a treatment plan.", "access-owner",
+                datetime.now(timezone.utc) + timedelta(days=1), expected_revision_number=2,
+            )
         methodology = _methodology(
             session,
             officer,
