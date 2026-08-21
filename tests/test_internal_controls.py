@@ -41,6 +41,7 @@ from cwl_grc.models import (
     ControlDefinitionVersion,
     ControlTestExecution,
     EvidenceRecord,
+    EvidenceUsage,
 )
 from cwl_grc.policy import ControlRef, author_policy, list_policy_gaps
 
@@ -806,6 +807,19 @@ def test_migration_backfills_preexisting_direct_binding_as_unassessed() -> None:
                 bound_by_actor="legacy-officer",
                 purpose_code=PurposeCode.EVIDENCE_BINDING.value,
                 bound_at=_JANUARY_START,
+            )
+        )
+        session.add(
+            EvidenceUsage(
+                evidence_usage_id="legacy-existing",
+                tenant_id="local_development",
+                evidence_record_id=evidence.evidence_record_id,
+                legacy_binding_id="migration-binding",
+                purpose_code=PurposeCode.EVIDENCE_BINDING.value,
+                usage_status="unassessed",
+                usage_note="Already backfilled.",
+                used_by_actor="legacy-officer",
+                used_at=_JANUARY_START,
             )
         )
         session.add(
