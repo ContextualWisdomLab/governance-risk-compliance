@@ -79,11 +79,12 @@ def test_invalid_correlation_is_replaced() -> None:
     )
     assert context.request_id != "bad request"
     assert context.traceparent != "00-" + "0" * 32 + "-" + "0" * 16 + "-01"
+    assert context.traceparent.endswith("-00")
     assert build_request_context(None, None).request_id
     assert build_request_context(
         None,
         "ff-0123456789abcdef0123456789abcdef-0123456789abcdef-01",
-    ).traceparent.startswith("00-")
+    ).traceparent.endswith("-00")
     build_request_context(
         None,
         "00-0123456789abcdef0123456789abcdef-" + "0" * 16 + "-01",
