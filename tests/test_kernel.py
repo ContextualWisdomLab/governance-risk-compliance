@@ -97,7 +97,7 @@ def test_purpose_labels_and_empty_officer_home() -> None:
         "Author or revise a policy"
     )
     html = render_officer_home([])
-    assert "Every seeded control in this catalog has evidence" in html
+    assert "Every seeded control in this catalog is operating-effective" in html
     try:
         parse_control_ref("soc2_tsc_2017")
     except ValueError:

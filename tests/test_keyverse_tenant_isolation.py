@@ -316,6 +316,30 @@ def test_coverage_and_officer_console_reads_use_verified_tenant() -> None:
             purpose="coverage_review",
         ),
     )
+    missing_catalog_auth = client.get(
+        "/controls",
+        params={"framework": SOC2_FRAMEWORK},
+    )
+    tenant_a_catalog = client.get(
+        "/controls",
+        params={"framework": SOC2_FRAMEWORK},
+        headers=_headers(
+            private_key,
+            tenant_id="tenant-a",
+            scope="grc.policy.read",
+            purpose="coverage_review",
+        ),
+    )
+    tenant_b_catalog = client.get(
+        "/controls",
+        params={"framework": SOC2_FRAMEWORK},
+        headers=_headers(
+            private_key,
+            tenant_id="tenant-b",
+            scope="grc.policy.read",
+            purpose="coverage_review",
+        ),
+    )
     missing_home_auth = client.get("/")
     tenant_b_home = client.get(
         "/",
@@ -329,11 +353,22 @@ def test_coverage_and_officer_console_reads_use_verified_tenant() -> None:
 
     tenant_a_ids = {item["catalog_identifier"] for item in tenant_a_coverage.json()["controls"]}
     tenant_b_ids = {item["catalog_identifier"] for item in tenant_b_coverage.json()["controls"]}
+    tenant_a_cc11 = next(
+        item for item in tenant_a_catalog.json()["controls"] if item["catalog_identifier"] == "CC1.1"
+    )
+    tenant_b_cc11 = next(
+        item for item in tenant_b_catalog.json()["controls"] if item["catalog_identifier"] == "CC1.1"
+    )
     assert missing_coverage_auth.status_code == 401
     assert tenant_a_coverage.status_code == 200
     assert tenant_b_coverage.status_code == 200
-    assert "CC1.1" not in tenant_a_ids
+    assert missing_catalog_auth.status_code == 401
+    assert tenant_a_catalog.status_code == 200
+    assert tenant_b_catalog.status_code == 200
+    assert "CC1.1" in tenant_a_ids
     assert "CC1.1" in tenant_b_ids
+    assert tenant_a_cc11["coverage_status"] == "unassessed"
+    assert tenant_b_cc11["coverage_status"] == "unknown"
     assert missing_home_auth.status_code == 401
     assert tenant_b_home.status_code == 200
 

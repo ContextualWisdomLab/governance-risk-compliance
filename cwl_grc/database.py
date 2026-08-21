@@ -6,7 +6,7 @@ import time
 from collections.abc import Iterator
 from typing import Any
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -31,18 +31,31 @@ def build_engine(
         or connect_timeout_seconds <= 0
     ):
         raise ValueError("Database connect timeout must be a positive integer.")
-    if database_url in {"sqlite://", "sqlite:///:memory:"}:
-        return create_engine(
-            "sqlite://",
-            connect_args={"check_same_thread": False},
-            poolclass=StaticPool,
-        )
+    if database_url.startswith("sqlite"):
+        engine_kwargs: dict[str, Any] = {}
+        if database_url in {"sqlite://", "sqlite:///:memory:"}:
+            engine_kwargs = {
+                "connect_args": {"check_same_thread": False},
+                "poolclass": StaticPool,
+            }
+        engine = create_engine(database_url, **engine_kwargs)
+        event.listen(engine, "connect", _enable_sqlite_foreign_keys)
+        return engine
     if database_url.startswith("postgresql"):
         return create_engine(
             database_url,
             connect_args={"connect_timeout": connect_timeout_seconds},
         )
     return create_engine(database_url)
+
+
+def _enable_sqlite_foreign_keys(dbapi_connection: Any, _connection_record: Any) -> None:
+    """Enable SQLite foreign-key enforcement for every product connection."""
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("PRAGMA foreign_keys=ON")
+    finally:
+        cursor.close()
 
 
 def create_session_factory(

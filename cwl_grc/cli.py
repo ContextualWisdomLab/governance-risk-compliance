@@ -57,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
                     "error": exc.detail,
                     "status_code": exc.status_code,
                     "next_action": (
-                        "Use an official catalog identifier, then attach the next evidence."
+                        "Use an official catalog identifier, then establish the next control test."
                     ),
                 }
             )
@@ -161,7 +161,7 @@ def _policy_command(namespace: argparse.Namespace) -> int:
                     serialize_policy(session, document)
                     for document in list_policy_documents(session)
                 ],
-                "next_action": "Review policy gaps and attach the next evidence.",
+                "next_action": "Review explicit control statuses and establish the next control test.",
             }
             print(json.dumps(payload))
             return 0
@@ -179,7 +179,7 @@ def _gaps_command(policy_document_id: str | None) -> int:
             json.dumps(
                 {
                     "next_action": (
-                        "Attach the next evidence on an uncovered policy control."
+                        "Review explicit control statuses and establish the next control test."
                     ),
                     "gaps": [serialize_gap(gap) for gap in gaps],
                 }
@@ -239,8 +239,8 @@ def _bind_command(namespace: argparse.Namespace) -> int:
                     ),
                     "control": serialize_control(binding.control_item),
                     "next_action": (
-                        "Review remaining uncovered policy controls and attach the next "
-                        "evidence."
+                        "Direct evidence binding remains unassessed; establish the next "
+                        "control test."
                     ),
                 }
             )

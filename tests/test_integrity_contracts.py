@@ -285,7 +285,7 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
     assert finalized in {True, 1}
     assert policy_tenant == "local_development"
     assert version_tenant == "local_development"
-    assert receipt_count == 4
+    assert receipt_count == 5
 
 
 def test_integrity_guard_ddl_covers_supported_and_unknown_dialects() -> None:

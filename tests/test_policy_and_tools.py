@@ -106,7 +106,7 @@ def test_policy_version_replaces_mappings_on_the_new_edition() -> None:
     assert mapped == {"12.3.1", "2.7.1"}
 
 
-def test_policy_gaps_use_the_same_control_evidence_bindings() -> None:
+def test_policy_gaps_do_not_treat_legacy_bindings_as_effective() -> None:
     client = _client()
     created = client.post(
         "/policy-documents",
@@ -122,7 +122,7 @@ def test_policy_gaps_use_the_same_control_evidence_bindings() -> None:
     ).json()
     gaps = client.get("/policy-gaps", params={"policy_document_id": created["policy_document_id"]})
     assert gaps.status_code == 200
-    assert gaps.json()["next_action"] == "Attach the next evidence on an uncovered policy control."
+    assert gaps.json()["next_action"] == "Review explicit control statuses and establish the next control test."
     uncovered = {item["catalog_identifier"] for item in gaps.json()["gaps"]}
     assert uncovered == {"10.2.1", "CC6.2"}
     evidence = client.post(
@@ -144,8 +144,9 @@ def test_policy_gaps_use_the_same_control_evidence_bindings() -> None:
     )
     assert bind.status_code == 201
     after = client.get("/policy-gaps", params={"policy_document_id": created["policy_document_id"]})
-    remaining = {item["catalog_identifier"] for item in after.json()["gaps"]}
-    assert remaining == {"CC6.2"}
+    remaining = {item["catalog_identifier"]: item for item in after.json()["gaps"]}
+    assert set(remaining) == {"10.2.1", "CC6.2"}
+    assert remaining["10.2.1"]["coverage_status"] == "unassessed"
 
 
 def test_policy_authoring_requires_purpose() -> None:
@@ -182,7 +183,7 @@ def test_officer_home_lets_buyer_write_policy_and_see_policy_gaps() -> None:
     assert posted.status_code == 200
     assert "Account Management Policy" in posted.text
     assert "10.2.1" in posted.text
-    assert "Attach the next evidence" in posted.text
+    assert "establish the next control test" in posted.text
 
 
 def test_cli_authors_policy_lists_gaps_and_binds_evidence(tmp_path: Path, capsys) -> None:
@@ -215,11 +216,11 @@ def test_cli_authors_policy_lists_gaps_and_binds_evidence(tmp_path: Path, capsys
             == 0
         )
         authored = json.loads(capsys.readouterr().out)
-        assert authored["next_action"] == "Review policy gaps and attach the next evidence."
+        assert authored["next_action"] == "Review explicit control statuses and establish the next control test."
         assert cli_main(["gaps", "--policy-id", authored["policy_document_id"]]) == 0
         gaps = json.loads(capsys.readouterr().out)
         assert {item["catalog_identifier"] for item in gaps["gaps"]} == {"10.2.1", "CC6.1"}
-        assert gaps["next_action"] == "Attach the next evidence on an uncovered policy control."
+        assert gaps["next_action"] == "Review explicit control statuses and establish the next control test."
         assert (
             cli_main(
                 [
@@ -243,7 +244,9 @@ def test_cli_authors_policy_lists_gaps_and_binds_evidence(tmp_path: Path, capsys
         assert "park@example.co.kr" in json.dumps(bound)
         assert cli_main(["gaps", "--policy-id", authored["policy_document_id"]]) == 0
         remaining = json.loads(capsys.readouterr().out)
-        assert {item["catalog_identifier"] for item in remaining["gaps"]} == {"CC6.1"}
+        remaining_gaps = {item["catalog_identifier"]: item for item in remaining["gaps"]}
+        assert set(remaining_gaps) == {"10.2.1", "CC6.1"}
+        assert remaining_gaps["10.2.1"]["coverage_status"] == "unassessed"
         assert cli_main(["policy", "list"]) == 0
         listed = json.loads(capsys.readouterr().out)
         assert listed["policies"][0]["policy_title"] == "Logical Access Policy"

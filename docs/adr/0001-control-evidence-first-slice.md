@@ -1,5 +1,9 @@
 # ADR 0001: Control catalog and evidence binding as the first GRC slice
 
+> The direct binding coverage semantics in this historical slice are superseded
+> by ADR 0011. Existing bindings remain usable as `unassessed` compatibility
+> data.
+
 ## Status
 
 Accepted for the first buyer-facing product slice.
