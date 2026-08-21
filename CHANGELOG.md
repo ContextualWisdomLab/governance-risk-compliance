@@ -33,7 +33,7 @@
 - Tenant-scoped obligation register: source revisions, jurisdictions, applicability decisions, legal references, commitments, proposed policy/control links awaiting independent review, regulatory changes, immutable impact assessments, and overdue/upcoming worklists for Issue #28.
 - Tenant-scoped `/compliance-workspace` read model that composes existing control, obligation, policy-gap, evidence-request, and risk-disposition projections without a duplicate persistence model, distinguishes obligations from scoped work items, and preloads catalog coverage in tenant batches; audit programs and exports remain explicit gaps.
 - Tenant-scoped evidence-request workflow for bounded scope/period collection, same-tenant artifact submission, independent acceptance or rejection, reuse policy, append-only audit history, and workspace projection without copying evidence payloads.
-- Tenant-scoped versioned risk methodology, register, and disposition workflow with immutable inherent/residual assessments, versioned treatment plans, independent time-bounded acceptances, appetite/tolerance escalation, optimistic revision checks, and mitigation links limited to implemented internal controls, completed test results, and purpose-bound evidence usage.
+- Tenant-scoped versioned risk methodology, register, disposition, and closure workflow with immutable inherent/residual assessments, versioned treatment plans, independent time-bounded acceptances, independent within-appetite closure approvals, appetite/tolerance escalation, optimistic revision checks, and mitigation links limited to implemented internal controls, completed test results, and purpose-bound evidence usage.
 
 ### Security
 

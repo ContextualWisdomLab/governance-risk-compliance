@@ -613,6 +613,50 @@ class RiskAcceptance(Base):
     )
 
 
+class RiskClosure(Base):
+    """Immutable independent closure approval tied to the latest assessment."""
+
+    __tablename__ = "risk_closure"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "risk_closure_id",
+            name="risk_closure_tenant_identity",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "risk_id",
+            "risk_assessment_id",
+            name="risk_closure_assessment_identity",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "risk_id"],
+            ["risk_register.tenant_id", "risk_register.risk_id"],
+            name="risk_closure_tenant_risk",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "risk_assessment_id"],
+            ["risk_assessment.tenant_id", "risk_assessment.risk_assessment_id"],
+            name="risk_closure_tenant_assessment",
+        ),
+    )
+
+    risk_closure_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default=LOCAL_DEVELOPMENT_TENANT,
+        server_default=LOCAL_DEVELOPMENT_TENANT,
+    )
+    risk_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    risk_assessment_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    closure_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    closure_rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    closure_evidence_reference: Mapped[str] = mapped_column(String(255), nullable=False)
+    closed_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    closed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
 class ControlEvidenceBinding(Base):
     """Binds tenant-owned evidence to one official control identifier."""
 

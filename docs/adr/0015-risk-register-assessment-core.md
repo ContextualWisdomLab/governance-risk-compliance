@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted for the bounded buyer slice; treatment and time-bounded acceptance
-disposition are included. Closure and portfolio aggregation remain separate
-follow-up contracts.
+Accepted for the bounded buyer slice; treatment, time-bounded acceptance, and
+independent closure disposition are included. Portfolio aggregation remains a
+separate follow-up contract.
 
 ## Decision
 
@@ -30,7 +30,9 @@ methodology, assessment, assessment-link, treatment-plan, and acceptance
 history. Treatment plans are versioned per risk. Acceptance is allowed only for
 the latest above-appetite assessment, requires an actor other than the
 assessor, has a current future-ending period, and requires escalation above
-tolerance. All writes append an audit event.
+tolerance. Closure requires a fresh within-appetite assessment, an independent
+approver, and a closure evidence reference; an active acceptance blocks closure.
+All writes append an audit event.
 
 ## Consequences
 
@@ -38,14 +40,14 @@ tolerance. All writes append an audit event.
   above-appetite follow-up without a certification claim.
 - The workspace can project exact tenant risk rows and deterministic next
   actions without exposing evidence payloads.
-- Treatment completion, risk aggregation across a portfolio, and closure
-  approval are intentionally not represented.
+- Treatment completion and risk aggregation across a portfolio are intentionally
+  not represented.
 
 ## Verification
 
 `tests/test_risks.py` exercises local API boundaries, methodology and register
 validation, optimistic concurrency, real internal-control test results,
 purpose-bound evidence usage, tenant isolation, score calculation, treatment
-versioning, independent acceptance, expiry actions, and database immutability
-guards. The implementation does not copy external standard text; the current
+versioning, independent acceptance, expiry actions, independent closure, and
+database immutability guards. The implementation does not copy external standard text; the current
 standards references are maintained in `docs/doctoring/REFERENCES.md`.

@@ -21,6 +21,7 @@ from cwl_grc.models import (
     RiskAssessment,
     RiskAssessmentControlLink,
     RiskAcceptance,
+    RiskClosure,
     RiskMethodology,
     RiskRegister,
     RiskTreatmentPlan,
@@ -43,6 +44,8 @@ def next_action_for_risk(
 ) -> str:
     """Return the next officer action without implying that risk is certified away."""
     now = _normalize_utc(current or datetime.now(timezone.utc))
+    if assessment is not None and risk.risk_status == "closed":
+        return "Retain the immutable assessment and closure decision for audit review."
     if risk.next_review_at < now:
         return "Review this overdue risk and create a fresh assessment or approved follow-up."
     if assessment is None:
@@ -57,8 +60,6 @@ def next_action_for_risk(
         return "Advance the versioned treatment plan and retain completion evidence."
     if assessment.appetite_status == "above_appetite":
         return "Create a versioned treatment plan or a time-bounded approved acceptance."
-    if risk.risk_status == "closed":
-        return "Retain the immutable assessment and closure decision for audit review."
     return "Monitor the next review date and preserve the assessment evidence references."
 
 
@@ -502,6 +503,97 @@ def latest_risk_acceptance(
         session.query(RiskAcceptance)
         .filter_by(tenant_id=decision.tenant_id, risk_id=risk_id, acceptance_status="active")
         .order_by(RiskAcceptance.valid_to.desc(), RiskAcceptance.accepted_at.desc())
+        .first()
+    )
+
+
+def create_risk_closure(
+    session: Session,
+    decision: AuthorizationDecision,
+    risk_id: str,
+    risk_assessment_id: str,
+    closure_reference: str,
+    closure_rationale: str,
+    closure_evidence_reference: str,
+    *,
+    expected_revision_number: int,
+) -> RiskClosure:
+    """Approve immutable closure only after a current within-appetite reassessment."""
+    _require_governance_purpose(decision)
+    risk = _locked_risk(session, decision, risk_id, expected_revision_number)
+    assessment = (
+        session.query(RiskAssessment)
+        .filter_by(
+            tenant_id=decision.tenant_id,
+            risk_assessment_id=risk_assessment_id,
+            risk_id=risk.risk_id,
+        )
+        .one_or_none()
+    )
+    if assessment is None:
+        raise HTTPException(status_code=404, detail="That risk assessment is not on file.")
+    latest = latest_risk_assessment(session, decision, risk.risk_id)
+    if latest is None or latest.risk_assessment_id != assessment.risk_assessment_id:
+        raise HTTPException(status_code=409, detail="Closure must reference the latest risk assessment.")
+    if assessment.appetite_status != "within_appetite":
+        raise HTTPException(status_code=409, detail="Only a within-appetite assessment can be closed.")
+    acceptance = latest_risk_acceptance(session, decision, risk.risk_id)
+    now = _utc_now()
+    if acceptance is not None and acceptance.valid_from <= now < acceptance.valid_to:
+        raise HTTPException(status_code=409, detail="An active risk acceptance must expire before closure.")
+    if assessment.assessed_by_actor == decision.actor_identifier:
+        raise HTTPException(status_code=403, detail="Closure requires an independent approving actor.")
+    reference = _required_text(closure_reference, "closure reference")
+    rationale = _required_text(closure_rationale, "closure rationale")
+    evidence_reference = _required_text(closure_evidence_reference, "closure evidence reference")
+    if (
+        session.query(RiskClosure)
+        .filter_by(
+            tenant_id=decision.tenant_id,
+            risk_id=risk.risk_id,
+            risk_assessment_id=assessment.risk_assessment_id,
+        )
+        .one_or_none()
+        is not None
+    ):
+        raise HTTPException(status_code=409, detail="That risk assessment already has a closure.")
+    closure = RiskClosure(
+        risk_closure_id=uuid4().hex,
+        tenant_id=decision.tenant_id,
+        risk_id=risk.risk_id,
+        risk_assessment_id=assessment.risk_assessment_id,
+        closure_reference=reference,
+        closure_rationale=rationale,
+        closure_evidence_reference=evidence_reference,
+        closed_by_actor=decision.actor_identifier,
+        closed_at=now,
+    )
+    session.add(closure)
+    risk.revision_number += 1
+    risk.risk_status = "closed"
+    risk.next_review_at = now
+    session.flush()
+    record_audit_event(
+        session,
+        decision,
+        action_name="close_risk",
+        resource_kind="risk_closure",
+        resource_identifier=closure.risk_closure_id,
+    )
+    return closure
+
+
+def latest_risk_closure(
+    session: Session,
+    decision: AuthorizationDecision,
+    risk_id: str,
+) -> RiskClosure | None:
+    """Return the latest immutable closure approval for one risk."""
+    _require_governance_purpose(decision)
+    return (
+        session.query(RiskClosure)
+        .filter_by(tenant_id=decision.tenant_id, risk_id=risk_id)
+        .order_by(RiskClosure.closed_at.desc())
         .first()
     )
 

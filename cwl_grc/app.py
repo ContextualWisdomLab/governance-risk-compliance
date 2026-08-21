@@ -94,12 +94,14 @@ from cwl_grc.policy import (
 from cwl_grc.remote_access import request_is_local
 from cwl_grc.risks import (
     assess_risk,
-    create_risk_methodology,
     create_risk_acceptance,
+    create_risk_closure,
+    create_risk_methodology,
     create_risk_register,
     create_risk_treatment,
     latest_risk_acceptance,
     latest_risk_assessment,
+    latest_risk_closure,
     latest_risk_treatment,
     list_risk_register,
     next_action_for_risk,
@@ -628,6 +630,10 @@ def create_app(
             risk.risk_id: latest_risk_acceptance(session, decision, risk.risk_id)
             for risk in risks
         }
+        risk_closures = {
+            risk.risk_id: latest_risk_closure(session, decision, risk.risk_id)
+            for risk in risks
+        }
         risk_status_counts = {
             status: sum(risk.risk_status == status for risk in risks)
             for status in ("identified", "assessed", "treating", "accepted", "closed")
@@ -740,6 +746,7 @@ def create_app(
                     risk_assessments[risk.risk_id],
                     risk_treatments[risk.risk_id],
                     risk_acceptances[risk.risk_id],
+                    risk_closures[risk.risk_id],
                 )
                 for risk in risks
             ],
@@ -809,7 +816,7 @@ def create_app(
             body.get("owner_reference"),
             body.get("review_cadence_days"),
         )
-        return _serialize_risk(risk, None, None, None)
+        return _serialize_risk(risk, None, None, None, None)
 
     @app.get("/risks")
     def get_risks(
@@ -827,6 +834,7 @@ def create_app(
                     latest_risk_assessment(session, decision, risk.risk_id),
                     latest_risk_treatment(session, decision, risk.risk_id),
                     latest_risk_acceptance(session, decision, risk.risk_id),
+                    latest_risk_closure(session, decision, risk.risk_id),
                 )
                 for risk in risks
             ]
@@ -924,6 +932,35 @@ def create_app(
             escalation_reference=body.get("escalation_reference"),
         )
         return _serialize_risk_acceptance(acceptance)
+
+    @app.post("/risks/{risk_id}/closures", status_code=201)
+    def post_risk_closure(
+        risk_id: str,
+        body: dict[str, Any],
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Approve immutable risk closure after an independent within-appetite review."""
+        decision = require_request_actor(
+            authorization,
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COMPLIANCE_GOVERNANCE,
+            "grc.compliance.write",
+        )
+        closure = create_risk_closure(
+            session,
+            decision,
+            risk_id,
+            body.get("risk_assessment_id"),
+            body.get("closure_reference"),
+            body.get("closure_rationale"),
+            body.get("closure_evidence_reference"),
+            expected_revision_number=body.get("expected_revision_number"),
+        )
+        return _serialize_risk_closure(closure)
 
     @app.post("/obligations/{compliance_obligation_id}/applicability-decisions", status_code=201)
     def post_applicability_decision(
@@ -1643,11 +1680,26 @@ def _serialize_risk_acceptance(acceptance: Any) -> dict[str, Any]:
     }
 
 
+def _serialize_risk_closure(closure: Any) -> dict[str, Any]:
+    """Serialize one immutable independent risk-closure approval."""
+    return {
+        "risk_closure_id": closure.risk_closure_id,
+        "risk_id": closure.risk_id,
+        "risk_assessment_id": closure.risk_assessment_id,
+        "closure_reference": closure.closure_reference,
+        "closure_rationale": closure.closure_rationale,
+        "closure_evidence_reference": closure.closure_evidence_reference,
+        "closed_by_actor": closure.closed_by_actor,
+        "closed_at": closure.closed_at.isoformat(),
+    }
+
+
 def _serialize_risk(
     risk: RiskRegister,
     assessment: Any,
     treatment: Any,
     acceptance: Any,
+    closure: Any,
 ) -> dict[str, Any]:
     """Serialize tenant risk identity and latest immutable assessment."""
     return {
@@ -1667,6 +1719,7 @@ def _serialize_risk(
         "assessment": _serialize_risk_assessment(assessment) if assessment is not None else None,
         "treatment": _serialize_risk_treatment(treatment) if treatment is not None else None,
         "acceptance": _serialize_risk_acceptance(acceptance) if acceptance is not None else None,
+        "closure": _serialize_risk_closure(closure) if closure is not None else None,
         "next_action": next_action_for_risk(
             risk,
             assessment,

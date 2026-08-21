@@ -27,6 +27,7 @@ from cwl_grc.models import (
     EvidenceRecord,
     RiskAcceptance,
     RiskAssessment,
+    RiskClosure,
     RiskMethodology,
     RiskTreatmentPlan,
 )
@@ -34,11 +35,13 @@ from cwl_grc.risks import (
     _validated_control_links,
     assess_risk,
     create_risk_acceptance,
+    create_risk_closure,
     create_risk_methodology,
     create_risk_register,
     create_risk_treatment,
     latest_risk_acceptance,
     latest_risk_assessment,
+    latest_risk_closure,
     latest_risk_treatment,
     list_risk_register,
     next_action_for_risk,
@@ -334,6 +337,54 @@ def test_risk_http_workspace_and_input_boundaries() -> None:
     assert listed["treatment"]["plan_version"] == 1
     assert listed["acceptance"]["acceptance_status"] == "active"
     assert listed["next_action"].startswith("Monitor")
+    second_risk = client.post(
+        "/risks",
+        headers=headers,
+        json={
+            "risk_code": "RISK-CLOSURE-HTTP-001",
+            "risk_title": "Closure candidate",
+            "risk_scenario": "A reviewed residual exposure remains within appetite.",
+            "risk_category": "access",
+            "source_reference": "interview-2026-02",
+            "affected_scope_type": "application",
+            "affected_scope_reference": "identity-service",
+            "owner_reference": "access-owner",
+            "review_cadence_days": 30,
+        },
+    )
+    assert second_risk.status_code == 201
+    second_assessment = client.post(
+        f"/risks/{second_risk.json()['risk_id']}/assessments",
+        headers=headers,
+        json={
+            "methodology_id": methodology.json()["methodology_id"],
+            "likelihood": 2,
+            "impact": 2,
+            "assessment_rationale": "Residual exposure is within appetite.",
+            "next_review_at": FUTURE_REVIEW.isoformat(),
+            "expected_revision_number": 1,
+            "control_links": [],
+        },
+    )
+    assert second_assessment.status_code == 201
+    closure = client.post(
+        f"/risks/{second_risk.json()['risk_id']}/closures",
+        headers=approver_headers,
+        json={
+            "risk_assessment_id": second_assessment.json()["risk_assessment_id"],
+            "closure_reference": "RC-HTTP-001",
+            "closure_rationale": "The reassessment is within appetite and evidence is retained.",
+            "closure_evidence_reference": "evidence://closure-http-001",
+            "expected_revision_number": 2,
+        },
+    )
+    assert closure.status_code == 201
+    closed = next(
+        item for item in client.get("/risks", headers=_headers("reader")).json()["risks"]
+        if item["risk_id"] == second_risk.json()["risk_id"]
+    )
+    assert closed["risk_status"] == "closed"
+    assert closed["closure"]["risk_closure_id"] == closure.json()["risk_closure_id"]
     assert "risk_register" not in workspace["not_yet_projected"]
     assert "risk_treatments" not in workspace["not_yet_projected"]
     assert "risk_acceptances" not in workspace["not_yet_projected"]
@@ -619,6 +670,107 @@ def test_risk_acceptance_boundaries_and_expiry_action(monkeypatch: pytest.Monkey
         assert next_action_for_risk(
             risk, second_assessment, acceptance=acceptance, current=datetime(2026, 1, 1)
         ).startswith("Create a versioned")
+
+
+def test_risk_closure_requires_latest_independent_within_appetite_review() -> None:
+    """Close only after a fresh acceptable assessment and preserve the closure approval."""
+    factory = _factory()
+    officer = _decision()
+    approver = AuthorizationDecision("risk-closer", PurposeCode.COMPLIANCE_GOVERNANCE, officer.tenant_id)
+    with factory() as session:
+        methodology = _methodology(session, officer, code="CWL-CLOSE-5X5", appetite=20, factor=100)
+        risk = _risk(session, officer, "RISK-CLOSURE-001")
+        first = assess_risk(
+            session, officer, risk.risk_id, methodology.methodology_id,
+            3, 3, "The first review is within appetite.", FUTURE_REVIEW, [], expected_revision_number=1,
+        )
+        latest = assess_risk(
+            session, officer, risk.risk_id, methodology.methodology_id,
+            2, 2, "The current review confirms acceptable residual exposure.", FUTURE_REVIEW,
+            [], expected_revision_number=2,
+        )
+        assert latest_risk_closure(session, approver, risk.risk_id) is None
+        with pytest.raises(HTTPException, match="not on file"):
+            create_risk_closure(
+                session, approver, "missing-risk", latest.risk_assessment_id,
+                "RC-CLOSE", "Closure rationale.", "evidence://closure-001", expected_revision_number=1,
+            )
+        with pytest.raises(HTTPException, match="not on file"):
+            create_risk_closure(
+                session, approver, risk.risk_id, "missing-assessment",
+                "RC-CLOSE", "Closure rationale.", "evidence://closure-001", expected_revision_number=3,
+            )
+        with pytest.raises(HTTPException, match="latest"):
+            create_risk_closure(
+                session, approver, risk.risk_id, first.risk_assessment_id,
+                "RC-STALE", "Stale closure.", "evidence://closure-stale", expected_revision_number=3,
+            )
+        with pytest.raises(HTTPException, match="independent"):
+            create_risk_closure(
+                session, officer, risk.risk_id, latest.risk_assessment_id,
+                "RC-SELF", "Self closure is not allowed.", "evidence://closure-self", expected_revision_number=3,
+            )
+        with pytest.raises(HTTPException, match="closure reference"):
+            create_risk_closure(
+                session, approver, risk.risk_id, latest.risk_assessment_id,
+                "", "Closure rationale.", "evidence://closure-001", expected_revision_number=3,
+            )
+        closure = create_risk_closure(
+            session, approver, risk.risk_id, latest.risk_assessment_id,
+            "RC-CLOSE-001", "The reassessment is within appetite and evidence is retained.",
+            "evidence://closure-001", expected_revision_number=3,
+        )
+        assert risk.risk_status == "closed"
+        assert risk.revision_number == 4
+        assert latest_risk_closure(session, approver, risk.risk_id) is closure
+        assert next_action_for_risk(risk, latest).startswith("Retain")
+        with pytest.raises(HTTPException, match="already has"):
+            create_risk_closure(
+                session, approver, risk.risk_id, latest.risk_assessment_id,
+                "RC-CLOSE-DUPLICATE", "Duplicate closure.", "evidence://closure-duplicate", expected_revision_number=4,
+            )
+        session.commit()
+        with pytest.raises(DBAPIError):
+            session.query(RiskClosure).filter_by(risk_closure_id=closure.risk_closure_id).update(
+                {RiskClosure.closure_rationale: "tampered"}, synchronize_session=False
+            )
+        session.rollback()
+        with pytest.raises(DBAPIError):
+            session.query(RiskClosure).filter_by(risk_closure_id=closure.risk_closure_id).delete(
+                synchronize_session=False
+            )
+
+        accepting_methodology = _methodology(
+            session, officer, code="CWL-CLOSE-ACCEPTED", appetite=5, tolerance=10, factor=100
+        )
+        accepted_risk = _risk(session, officer, "RISK-CLOSURE-ACTIVE-ACCEPTANCE")
+        accepted_assessment = assess_risk(
+            session, officer, accepted_risk.risk_id, accepting_methodology.methodology_id,
+            3, 3, "Residual exposure needs temporary acceptance.", FUTURE_REVIEW, [], expected_revision_number=1,
+        )
+        with pytest.raises(HTTPException, match="within-appetite"):
+            create_risk_closure(
+                session, approver, accepted_risk.risk_id, accepted_assessment.risk_assessment_id,
+                "RC-ABOVE-APPETITE", "The exposure requires disposition first.", "evidence://above",
+                expected_revision_number=2,
+            )
+        create_risk_acceptance(
+            session, approver, accepted_risk.risk_id, accepted_assessment.risk_assessment_id,
+            "RC-ACTIVE-001", "Temporary acceptance remains active.",
+            datetime.now(timezone.utc) - timedelta(minutes=1),
+            datetime.now(timezone.utc) + timedelta(days=7), expected_revision_number=2,
+        )
+        acceptable_reassessment = assess_risk(
+            session, officer, accepted_risk.risk_id, accepting_methodology.methodology_id,
+            2, 2, "The reassessment is now within appetite but acceptance is still active.",
+            FUTURE_REVIEW, [], expected_revision_number=3,
+        )
+        with pytest.raises(HTTPException, match="active risk acceptance"):
+            create_risk_closure(
+                session, approver, accepted_risk.risk_id, acceptable_reassessment.risk_assessment_id,
+                "RC-BLOCKED", "The active exception must expire first.", "evidence://blocked",
+                expected_revision_number=4,
+            )
 
 
 def test_risk_validation_and_tenant_boundaries() -> None:

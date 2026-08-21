@@ -36,7 +36,7 @@ The response contains:
   history without evidence payloads;
 - `risks`: stable tenant risk identities with immutable inherent/residual
   assessment snapshots, versioned treatment plans, independent time-bounded
-  acceptances, and explicit appetite status;
+  acceptances, independent closure approvals, and explicit appetite status;
 - `next_actions`: deterministic references into the projected work items;
 - `not_yet_projected`: explicit follow-up areas, never presented as empty
   audit state.
@@ -44,7 +44,7 @@ The response contains:
 The route does not expose evidence payloads, source legal text, tenant/actor
 identifiers, or an invented risk score. Risk scores are only calculated from a
 versioned methodology and explicit same-tenant internal-control test/evidence
-links; treatment and acceptance records are returned only as their bounded
+links; treatment, acceptance, and closure records are returned only as their bounded
 metadata projections. Applicability and review-queue counts
 are explicitly work-item counts because one obligation can have several active
 scope decisions. A customer-facing UI must render the
