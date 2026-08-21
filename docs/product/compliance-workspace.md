@@ -11,9 +11,9 @@ The contract preserves `unknown`, `unassessed`, `stale`, `exception`, and
 
 This slice is read-only and reuses the existing control, obligation, and policy
 gap projections, evidence requests, and the bounded risk-register assessment
-projection. Risk treatments, time-bounded risk acceptances, audit programs,
-controlled exports, and auditor data rooms remain explicitly out of the
-projection until their authorization and provenance contracts are implemented.
+and disposition projection. Audit programs, controlled exports, and auditor
+data rooms remain explicitly out of the projection until their authorization
+and provenance contracts are implemented.
 
 ## TRD contract
 
@@ -35,15 +35,17 @@ The response contains:
 - `evidence_requests`: metadata-only request state, scope, period, and audit
   history without evidence payloads;
 - `risks`: stable tenant risk identities with immutable inherent/residual
-  assessment snapshots and explicit appetite status;
+  assessment snapshots, versioned treatment plans, independent time-bounded
+  acceptances, and explicit appetite status;
 - `next_actions`: deterministic references into the projected work items;
 - `not_yet_projected`: explicit follow-up areas, never presented as empty
-  treatment, acceptance, evidence, or audit state.
+  audit state.
 
 The route does not expose evidence payloads, source legal text, tenant/actor
 identifiers, or an invented risk score. Risk scores are only calculated from a
 versioned methodology and explicit same-tenant internal-control test/evidence
-links; no treatment or acceptance is implied. Applicability and review-queue counts
+links; treatment and acceptance records are returned only as their bounded
+metadata projections. Applicability and review-queue counts
 are explicitly work-item counts because one obligation can have several active
 scope decisions. A customer-facing UI must render the
 exact rows behind every count and provide a keyboard-accessible empty/loading/
@@ -70,6 +72,6 @@ sequenceDiagram
 Two verified tenant tokens receive only their own obligations and policy gaps;
 the wrong scope is denied. The route is a local-preview contract, not a
 production deployment or compliance conclusion. Adding evidence freshness,
-risk treatments, risk acceptances, audit, exports, or data-room projections requires a separate
+audit, exports, or data-room projections requires a separate
 reviewed contract with purpose-specific field selection, audit, retention, and
 reproducibility evidence.

@@ -2,8 +2,9 @@
 
 ## Status
 
-Accepted for the bounded buyer slice. Risk treatment, acceptance, and closure
-workflows remain separate follow-up contracts.
+Accepted for the bounded buyer slice; treatment and time-bounded acceptance
+disposition are included. Closure and portfolio aggregation remain separate
+follow-up contracts.
 
 ## Decision
 
@@ -25,8 +26,11 @@ are not multiplied, preventing double counting.
 The application requires an expected risk revision for assessment writes and
 increments the revision only after the immutable snapshot and links are
 validated. SQLite and PostgreSQL guards reject updates and deletes of
-methodology, assessment, and assessment-link history. All writes append an
-audit event.
+methodology, assessment, assessment-link, treatment-plan, and acceptance
+history. Treatment plans are versioned per risk. Acceptance is allowed only for
+the latest above-appetite assessment, requires an actor other than the
+assessor, has a current future-ending period, and requires escalation above
+tolerance. All writes append an audit event.
 
 ## Consequences
 
@@ -34,14 +38,14 @@ audit event.
   above-appetite follow-up without a certification claim.
 - The workspace can project exact tenant risk rows and deterministic next
   actions without exposing evidence payloads.
-- Treatment plans, time-bounded above-appetite acceptance, risk aggregation
-  across a portfolio, and closure approval are intentionally not represented.
+- Treatment completion, risk aggregation across a portfolio, and closure
+  approval are intentionally not represented.
 
 ## Verification
 
 `tests/test_risks.py` exercises local API boundaries, methodology and register
 validation, optimistic concurrency, real internal-control test results,
-purpose-bound evidence usage, tenant isolation, score calculation, and
-database immutability guards. The implementation does not copy external
-standard text; the current standards references are maintained in
-`docs/doctoring/REFERENCES.md`.
+purpose-bound evidence usage, tenant isolation, score calculation, treatment
+versioning, independent acceptance, expiry actions, and database immutability
+guards. The implementation does not copy external standard text; the current
+standards references are maintained in `docs/doctoring/REFERENCES.md`.

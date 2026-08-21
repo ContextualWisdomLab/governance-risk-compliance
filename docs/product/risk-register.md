@@ -19,6 +19,13 @@ are not direct risk bindings. A repeated implementation is rejected so the
 same mitigation cannot be counted twice; effective operating links use the
 methodology factor and the minimum factor across distinct implementations.
 
+An above-appetite assessment can receive an immutable, versioned treatment plan
+with a named owner, strategy, description, and due date. A risk acceptance must
+reference the latest assessment, be created by an actor other than the assessor,
+remain time-bounded, and include an escalation reference when residual exposure
+exceeds tolerance. Both disposition records are tenant-scoped, audit-recorded,
+and protected from update or deletion at the database boundary.
+
 ## API
 
 - `POST /risk-methodologies` creates one immutable methodology version.
@@ -26,8 +33,12 @@ methodology factor and the minimum factor across distinct implementations.
 - `GET /risks` lists the verified tenant's risk identities and latest snapshot.
 - `POST /risks/{risk_id}/assessments` appends an assessment using an expected
   revision number.
+- `POST /risks/{risk_id}/treatments` appends the next proposed treatment-plan
+  version using an expected revision number.
+- `POST /risks/{risk_id}/acceptances` records an independent, current,
+  future-ending acceptance for the latest above-appetite assessment.
 - `GET /compliance-workspace` includes `risks`, risk posture counts, and risk
-  next actions.
+  treatment/acceptance projections, and deterministic next actions.
 
 Writes require the compliance-governance purpose and the existing verified
 tenant boundary. Local preview headers remain compatibility inputs only; they
@@ -36,7 +47,8 @@ projection.
 
 ## Deliberate ceiling
 
-This slice does not claim treatment completion, risk acceptance, portfolio
-aggregation, audit-program completion, or certification. Above-appetite rows
-point to the next treatment or time-bounded acceptance workflow, which must be
-implemented and reviewed before a product can report that disposition.
+This slice does not claim treatment completion, portfolio aggregation,
+audit-program completion, closure approval, or certification. A proposed
+treatment still requires officer follow-through and evidence; an active
+acceptance produces an expiry review action and never becomes a compliance
+conclusion.

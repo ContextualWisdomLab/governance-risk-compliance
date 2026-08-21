@@ -20,8 +20,10 @@ from cwl_grc.models import (
     EvidenceUsage,
     RiskAssessment,
     RiskAssessmentControlLink,
+    RiskAcceptance,
     RiskMethodology,
     RiskRegister,
+    RiskTreatmentPlan,
 )
 
 
@@ -35,6 +37,8 @@ def next_action_for_risk(
     risk: RiskRegister,
     assessment: RiskAssessment | None,
     *,
+    treatment: RiskTreatmentPlan | None = None,
+    acceptance: RiskAcceptance | None = None,
     current: datetime | None = None,
 ) -> str:
     """Return the next officer action without implying that risk is certified away."""
@@ -43,6 +47,14 @@ def next_action_for_risk(
         return "Review this overdue risk and create a fresh assessment or approved follow-up."
     if assessment is None:
         return "Record an inherent and residual assessment using a versioned methodology."
+    if (
+        acceptance is not None
+        and acceptance.acceptance_status == "active"
+        and acceptance.valid_from <= now < acceptance.valid_to
+    ):
+        return "Monitor the approved acceptance and complete the next review before it expires."
+    if treatment is not None and treatment.plan_status in {"proposed", "approved", "in_progress"}:
+        return "Advance the versioned treatment plan and retain completion evidence."
     if assessment.appetite_status == "above_appetite":
         return "Create a versioned treatment plan or a time-bounded approved acceptance."
     if risk.risk_status == "closed":
@@ -311,6 +323,208 @@ def latest_risk_assessment(
         .order_by(RiskAssessment.assessment_number.desc())
         .first()
     )
+
+
+def create_risk_treatment(
+    session: Session,
+    decision: AuthorizationDecision,
+    risk_id: str,
+    treatment_strategy: str,
+    plan_title: str,
+    plan_description: str,
+    owner_reference: str,
+    due_at: datetime,
+    *,
+    expected_revision_number: int,
+) -> RiskTreatmentPlan:
+    """Create the next immutable treatment-plan version for an assessed risk."""
+    _require_governance_purpose(decision)
+    risk = _locked_risk(session, decision, risk_id, expected_revision_number)
+    if latest_risk_assessment(session, decision, risk_id) is None:
+        raise HTTPException(status_code=409, detail="Assess the risk before creating treatment.")
+    strategy = _required_text(treatment_strategy, "treatment strategy")
+    if strategy not in {"avoid", "reduce", "transfer", "accept"}:
+        raise HTTPException(status_code=400, detail="Use a supported treatment strategy.")
+    title = _required_text(plan_title, "treatment plan title")
+    description = _required_text(plan_description, "treatment plan description")
+    owner = _required_text(owner_reference, "treatment owner reference")
+    due = _normalize_utc(due_at)
+    if due <= _utc_now():
+        raise HTTPException(status_code=400, detail="The treatment due date must be in the future.")
+    version = (
+        session.query(func.max(RiskTreatmentPlan.plan_version))
+        .filter_by(tenant_id=decision.tenant_id, risk_id=risk.risk_id)
+        .scalar()
+        or 0
+    ) + 1
+    plan = RiskTreatmentPlan(
+        risk_treatment_plan_id=uuid4().hex,
+        tenant_id=decision.tenant_id,
+        risk_id=risk.risk_id,
+        plan_version=version,
+        treatment_strategy=strategy,
+        plan_title=title,
+        plan_description=description,
+        owner_reference=owner,
+        due_at=due,
+        plan_status="proposed",
+        created_by_actor=decision.actor_identifier,
+        created_at=_utc_now(),
+    )
+    session.add(plan)
+    risk.revision_number += 1
+    risk.risk_status = "treating"
+    risk.next_review_at = due
+    session.flush()
+    record_audit_event(
+        session,
+        decision,
+        action_name="create_risk_treatment",
+        resource_kind="risk_treatment_plan",
+        resource_identifier=plan.risk_treatment_plan_id,
+    )
+    return plan
+
+
+def latest_risk_treatment(
+    session: Session,
+    decision: AuthorizationDecision,
+    risk_id: str,
+) -> RiskTreatmentPlan | None:
+    """Return the latest immutable treatment-plan version for one risk."""
+    _require_governance_purpose(decision)
+    return (
+        session.query(RiskTreatmentPlan)
+        .filter_by(tenant_id=decision.tenant_id, risk_id=risk_id)
+        .order_by(RiskTreatmentPlan.plan_version.desc())
+        .first()
+    )
+
+
+def create_risk_acceptance(
+    session: Session,
+    decision: AuthorizationDecision,
+    risk_id: str,
+    risk_assessment_id: str,
+    acceptance_reference: str,
+    acceptance_rationale: str,
+    valid_from: datetime,
+    valid_to: datetime,
+    *,
+    expected_revision_number: int,
+    escalation_reference: str | None = None,
+) -> RiskAcceptance:
+    """Create an independent, time-bounded acceptance for the latest above-appetite assessment."""
+    _require_governance_purpose(decision)
+    risk = _locked_risk(session, decision, risk_id, expected_revision_number)
+    assessment = (
+        session.query(RiskAssessment)
+        .filter_by(
+            tenant_id=decision.tenant_id,
+            risk_assessment_id=risk_assessment_id,
+            risk_id=risk.risk_id,
+        )
+        .one_or_none()
+    )
+    if assessment is None:
+        raise HTTPException(status_code=404, detail="That risk assessment is not on file.")
+    if latest_risk_assessment(session, decision, risk.risk_id).risk_assessment_id != assessment.risk_assessment_id:
+        raise HTTPException(status_code=409, detail="Acceptance must reference the latest risk assessment.")
+    if assessment.appetite_status != "above_appetite":
+        raise HTTPException(status_code=409, detail="Only an above-appetite assessment can be accepted.")
+    if assessment.assessed_by_actor == decision.actor_identifier:
+        raise HTTPException(status_code=403, detail="Acceptance requires an independent approving actor.")
+    methodology = (
+        session.query(RiskMethodology)
+        .filter_by(tenant_id=decision.tenant_id, methodology_id=assessment.methodology_id)
+        .one_or_none()
+    )
+    if methodology is None:
+        raise HTTPException(status_code=409, detail="The assessment methodology is not on file.")
+    reference = _required_text(acceptance_reference, "acceptance reference")
+    rationale = _required_text(acceptance_rationale, "acceptance rationale")
+    start = _normalize_utc(valid_from)
+    end = _normalize_utc(valid_to)
+    now = _utc_now()
+    if end <= start or end <= now or start > now:
+        raise HTTPException(status_code=400, detail="Acceptance must have a current, future-ending period.")
+    escalation = _optional_text(escalation_reference, "escalation reference")
+    if assessment.residual_score > methodology.tolerance_threshold and escalation is None:
+        raise HTTPException(status_code=400, detail="An above-tolerance risk requires escalation reference.")
+    if (
+        session.query(RiskAcceptance)
+        .filter_by(
+            tenant_id=decision.tenant_id,
+            risk_id=risk.risk_id,
+            risk_assessment_id=assessment.risk_assessment_id,
+        )
+        .one_or_none()
+        is not None
+    ):
+        raise HTTPException(status_code=409, detail="That risk assessment already has an acceptance.")
+    acceptance = RiskAcceptance(
+        risk_acceptance_id=uuid4().hex,
+        tenant_id=decision.tenant_id,
+        risk_id=risk.risk_id,
+        risk_assessment_id=assessment.risk_assessment_id,
+        acceptance_reference=reference,
+        acceptance_rationale=rationale,
+        escalation_reference=escalation,
+        accepted_by_actor=decision.actor_identifier,
+        accepted_at=now,
+        valid_from=start,
+        valid_to=end,
+        acceptance_status="active",
+    )
+    session.add(acceptance)
+    risk.revision_number += 1
+    risk.risk_status = "accepted"
+    risk.next_review_at = end
+    session.flush()
+    record_audit_event(
+        session,
+        decision,
+        action_name="create_risk_acceptance",
+        resource_kind="risk_acceptance",
+        resource_identifier=acceptance.risk_acceptance_id,
+    )
+    return acceptance
+
+
+def latest_risk_acceptance(
+    session: Session,
+    decision: AuthorizationDecision,
+    risk_id: str,
+) -> RiskAcceptance | None:
+    """Return the latest active acceptance for one exact-tenant risk."""
+    _require_governance_purpose(decision)
+    return (
+        session.query(RiskAcceptance)
+        .filter_by(tenant_id=decision.tenant_id, risk_id=risk_id, acceptance_status="active")
+        .order_by(RiskAcceptance.valid_to.desc(), RiskAcceptance.accepted_at.desc())
+        .first()
+    )
+
+
+def _locked_risk(
+    session: Session,
+    decision: AuthorizationDecision,
+    risk_id: str,
+    expected_revision_number: int,
+) -> RiskRegister:
+    """Load and optimistically lock one tenant risk before a disposition write."""
+    risk = (
+        session.query(RiskRegister)
+        .filter_by(tenant_id=decision.tenant_id, risk_id=risk_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if risk is None:
+        raise HTTPException(status_code=404, detail="That risk is not on file.")
+    expected = _positive_int(expected_revision_number, "expected risk revision")
+    if risk.revision_number != expected:
+        raise HTTPException(status_code=409, detail="The risk changed; reload before recording disposition.")
+    return risk
 
 
 def _validated_control_links(
