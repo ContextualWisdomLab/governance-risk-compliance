@@ -14,6 +14,7 @@
 - Uncovered-control query and officer home that states the next action.
 - `/healthz` probe, standalone `python -m cwl_grc` entry, and `create_app()` module factory.
 - Product CI for lint, docstring coverage, and 100% statement/branch test coverage.
+- Local HTTP preview mutations use a fixed audit actor instead of trusting `X-Actor-Id` or officer-form actor input.
 - Hash-locked `uv.lock` dependency graph for runtime and development dependencies.
 - Versioned schema-upgrade receipts for existing first-slice stores.
 - Provider-neutral Keyverse JWT access-token verification kernel and typed authenticated-principal contract.
@@ -30,6 +31,8 @@
 - Proposed availability, mutation-success, audit-write, and recovery SLO/error-budget policy with bounded-label burn-rate alert thresholds.
 - Tenant-scoped internal-control model: immutable definition versions, scoped implementations and owners, reviewed many-to-many catalog mappings, design/operating tests, exceptions, deficiencies, evidence usage, and explicit coverage statuses.
 - Additive migration that classifies preexisting direct evidence bindings as `unassessed` without inventing effectiveness.
+- Database-enforced control-graph consistency for test plans, executions, and deficiencies; retired definitions and inactive plans no longer project positive coverage.
+- Keyverse-enabled catalog and coverage reads now require the signed tenant and `grc.control.read` scope.
 - Tenant-scoped obligation register: source revisions, jurisdictions, applicability decisions, legal references, commitments, proposed policy/control links awaiting independent review, regulatory changes, immutable impact assessments, and overdue/upcoming worklists for Issue #28.
 - Organization OpenTelemetry evidence boundary: GRC governs aggregate collector acceptance for `cwl-grc`, `lineageweave`, `contextual-orchestrator`, and Valkey access without storing raw spans or payloads.
 
@@ -54,6 +57,7 @@
 - Require retention metadata and a verified `grc.evidence.retention` purpose for legal-hold changes; leave destructive disposition and remote access disabled until their operating contracts exist.
 - Keep `/healthz` dependency-free; require database, schema receipts, seed rows, integrity guards, key round-trip, and environment checks before startup admits traffic.
 - Enable SQLite foreign-key enforcement and require PostgreSQL-compatible boolean constraints for the internal-control schema.
+- Stage PostgreSQL schema creation around the compatibility indexes needed before creating `evidence_usage`, allowing existing pre-tenant stores to upgrade safely.
 - Add SQLite/PostgreSQL composite tenant guards and immutable-history triggers for obligation and regulatory-change records; require the dedicated `compliance_governance` purpose on the new JSON workflow.
 - Enforce null-safe obligation-target uniqueness, savepoint-backed concurrent-create conflicts, and proposed-only obligation-link insertion so creation cannot self-assert approval.
 - Construct migration tenant DDL and compatibility indexes through SQLAlchemy's quoted schema APIs instead of interpolated SQL identifiers.

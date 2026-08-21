@@ -540,6 +540,130 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
         END
         """,
         """
+        CREATE TRIGGER IF NOT EXISTS control_test_plan_require_matching_foundation
+        BEFORE INSERT ON control_test_plan
+        WHEN (
+            SELECT internal_control_definition_id
+            FROM control_definition_version
+            WHERE control_definition_version_id = NEW.control_definition_version_id
+              AND tenant_id = NEW.tenant_id
+        ) != (
+            SELECT internal_control_definition_id
+            FROM control_implementation
+            WHERE control_implementation_id = NEW.control_implementation_id
+              AND tenant_id = NEW.tenant_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'control test plan foundation mismatch');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_test_plan_require_matching_foundation_update
+        BEFORE UPDATE OF tenant_id, control_definition_version_id, control_implementation_id
+        ON control_test_plan
+        WHEN (
+            SELECT internal_control_definition_id
+            FROM control_definition_version
+            WHERE control_definition_version_id = NEW.control_definition_version_id
+              AND tenant_id = NEW.tenant_id
+        ) != (
+            SELECT internal_control_definition_id
+            FROM control_implementation
+            WHERE control_implementation_id = NEW.control_implementation_id
+              AND tenant_id = NEW.tenant_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'control test plan foundation mismatch');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_owner_assignment_require_matching_foundation
+        BEFORE INSERT ON control_owner_assignment
+        WHEN NEW.control_implementation_id IS NOT NULL
+         AND NOT EXISTS (
+            SELECT 1
+            FROM control_implementation
+            WHERE control_implementation_id = NEW.control_implementation_id
+              AND tenant_id = NEW.tenant_id
+              AND internal_control_definition_id = NEW.internal_control_definition_id
+         )
+        BEGIN
+            SELECT RAISE(ABORT, 'control owner assignment foundation mismatch');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_owner_assignment_require_matching_foundation_update
+        BEFORE UPDATE OF tenant_id, internal_control_definition_id, control_implementation_id
+        ON control_owner_assignment
+        WHEN NEW.control_implementation_id IS NOT NULL
+         AND NOT EXISTS (
+            SELECT 1
+            FROM control_implementation
+            WHERE control_implementation_id = NEW.control_implementation_id
+              AND tenant_id = NEW.tenant_id
+              AND internal_control_definition_id = NEW.internal_control_definition_id
+         )
+        BEGIN
+            SELECT RAISE(ABORT, 'control owner assignment foundation mismatch');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_test_execution_require_plan_implementation
+        BEFORE INSERT ON control_test_execution
+        WHEN (
+            SELECT control_implementation_id
+            FROM control_test_plan
+            WHERE test_plan_id = NEW.test_plan_id
+              AND tenant_id = NEW.tenant_id
+        ) != NEW.control_implementation_id
+        BEGIN
+            SELECT RAISE(ABORT, 'control test execution implementation mismatch');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_test_execution_require_plan_implementation_update
+        BEFORE UPDATE OF tenant_id, test_plan_id, control_implementation_id
+        ON control_test_execution
+        WHEN (
+            SELECT control_implementation_id
+            FROM control_test_plan
+            WHERE test_plan_id = NEW.test_plan_id
+              AND tenant_id = NEW.tenant_id
+        ) != NEW.control_implementation_id
+        BEGIN
+            SELECT RAISE(ABORT, 'control test execution implementation mismatch');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_deficiency_require_execution_implementation
+        BEFORE INSERT ON control_deficiency
+        WHEN NEW.test_execution_id IS NOT NULL
+         AND (
+            SELECT control_implementation_id
+            FROM control_test_execution
+            WHERE test_execution_id = NEW.test_execution_id
+              AND tenant_id = NEW.tenant_id
+         ) != NEW.control_implementation_id
+        BEGIN
+            SELECT RAISE(ABORT, 'control deficiency implementation mismatch');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS control_deficiency_require_execution_implementation_update
+        BEFORE UPDATE OF tenant_id, test_execution_id, control_implementation_id
+        ON control_deficiency
+        WHEN NEW.test_execution_id IS NOT NULL
+         AND (
+            SELECT control_implementation_id
+            FROM control_test_execution
+            WHERE test_execution_id = NEW.test_execution_id
+              AND tenant_id = NEW.tenant_id
+         ) != NEW.control_implementation_id
+        BEGIN
+            SELECT RAISE(ABORT, 'control deficiency implementation mismatch');
+        END
+        """,
+        """
         CREATE TRIGGER IF NOT EXISTS control_definition_version_block_update
         BEFORE UPDATE ON control_definition_version
         BEGIN
@@ -749,6 +873,86 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
         BEFORE INSERT OR UPDATE OF tenant_id, evidence_record_id
         ON control_evidence_binding
         FOR EACH ROW EXECUTE FUNCTION enforce_control_binding_tenant_parent()
+        """,
+        """
+        CREATE OR REPLACE FUNCTION enforce_control_graph_consistency()
+        RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF TG_TABLE_NAME = 'control_test_plan' THEN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM control_definition_version AS version
+                    JOIN control_implementation AS implementation
+                      ON implementation.tenant_id = version.tenant_id
+                     AND implementation.internal_control_definition_id = version.internal_control_definition_id
+                    WHERE version.tenant_id = NEW.tenant_id
+                      AND version.control_definition_version_id = NEW.control_definition_version_id
+                      AND implementation.control_implementation_id = NEW.control_implementation_id
+                ) THEN
+                    RAISE EXCEPTION 'control test plan foundation mismatch';
+                END IF;
+            ELSIF TG_TABLE_NAME = 'control_test_execution' THEN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM control_test_plan
+                    WHERE tenant_id = NEW.tenant_id
+                      AND test_plan_id = NEW.test_plan_id
+                      AND control_implementation_id = NEW.control_implementation_id
+                ) THEN
+                    RAISE EXCEPTION 'control test execution implementation mismatch';
+                END IF;
+            ELSIF TG_TABLE_NAME = 'control_deficiency' THEN
+                IF NEW.test_execution_id IS NOT NULL AND NOT EXISTS (
+                    SELECT 1
+                    FROM control_test_execution
+                    WHERE tenant_id = NEW.tenant_id
+                      AND test_execution_id = NEW.test_execution_id
+                      AND control_implementation_id = NEW.control_implementation_id
+                ) THEN
+                    RAISE EXCEPTION 'control deficiency implementation mismatch';
+                END IF;
+            ELSIF TG_TABLE_NAME = 'control_owner_assignment' THEN
+                IF NEW.control_implementation_id IS NOT NULL AND NOT EXISTS (
+                    SELECT 1
+                    FROM control_implementation
+                    WHERE tenant_id = NEW.tenant_id
+                      AND control_implementation_id = NEW.control_implementation_id
+                      AND internal_control_definition_id = NEW.internal_control_definition_id
+                ) THEN
+                    RAISE EXCEPTION 'control owner assignment foundation mismatch';
+                END IF;
+            END IF;
+            RETURN NEW;
+        END;
+        $$
+        """,
+        "DROP TRIGGER IF EXISTS control_test_plan_graph_consistency ON control_test_plan",
+        """
+        CREATE TRIGGER control_test_plan_graph_consistency
+        BEFORE INSERT OR UPDATE OF tenant_id, control_definition_version_id, control_implementation_id
+        ON control_test_plan
+        FOR EACH ROW EXECUTE FUNCTION enforce_control_graph_consistency()
+        """,
+        "DROP TRIGGER IF EXISTS control_test_execution_graph_consistency ON control_test_execution",
+        """
+        CREATE TRIGGER control_test_execution_graph_consistency
+        BEFORE INSERT OR UPDATE OF tenant_id, test_plan_id, control_implementation_id
+        ON control_test_execution
+        FOR EACH ROW EXECUTE FUNCTION enforce_control_graph_consistency()
+        """,
+        "DROP TRIGGER IF EXISTS control_owner_assignment_graph_consistency ON control_owner_assignment",
+        """
+        CREATE TRIGGER control_owner_assignment_graph_consistency
+        BEFORE INSERT OR UPDATE OF tenant_id, internal_control_definition_id, control_implementation_id
+        ON control_owner_assignment
+        FOR EACH ROW EXECUTE FUNCTION enforce_control_graph_consistency()
+        """,
+        "DROP TRIGGER IF EXISTS control_deficiency_graph_consistency ON control_deficiency",
+        """
+        CREATE TRIGGER control_deficiency_graph_consistency
+        BEFORE INSERT OR UPDATE OF tenant_id, test_execution_id, control_implementation_id
+        ON control_deficiency
+        FOR EACH ROW EXECUTE FUNCTION enforce_control_graph_consistency()
         """,
         """
         CREATE OR REPLACE FUNCTION prevent_control_history_mutation()
