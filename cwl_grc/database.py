@@ -45,12 +45,17 @@ def build_engine(
     return create_engine(database_url)
 
 
-def create_session_factory(database_url: str) -> sessionmaker[Session]:
-    """Create or upgrade tables and return a guarded product session factory."""
+def create_session_factory(
+    database_url: str,
+    telemetry: Any | None = None,
+) -> sessionmaker[Session]:
+    """Create guarded tables and bind optional telemetry to the product engine."""
     engine = build_engine(database_url)
     Base.metadata.create_all(engine)
     apply_schema_migrations(engine)
     install_integrity_guards(engine)
+    if telemetry is not None:
+        telemetry.bind_database_engine(engine)
     return sessionmaker(bind=engine, expire_on_commit=False)
 
 

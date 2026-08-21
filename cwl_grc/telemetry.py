@@ -9,7 +9,7 @@ from typing import Any, Iterator, Mapping
 from opentelemetry import propagate
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.metrics import Counter, Histogram
+from opentelemetry.metrics import Counter, Histogram, Observation
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import (
     InMemoryMetricReader,
@@ -83,11 +83,60 @@ class RequestTelemetry:
             unit="{write}",
             description="Audit events committed or rejected by the database transaction.",
         )
+        self._database_engine = None
+        self._pool_gauges = tuple(
+            meter.create_observable_gauge(
+                f"cwl_grc.database.pool.{name}",
+                callbacks=[lambda _options, method=method: self._observe_pool_metric(method)],
+                unit="{connection}",
+                description=description,
+            )
+            for name, method, description in (
+                (
+                    "size",
+                    "size",
+                    "Configured database connection-pool size.",
+                ),
+                (
+                    "checked_out",
+                    "checkedout",
+                    "Database connections currently checked out of the pool.",
+                ),
+                (
+                    "checked_in",
+                    "checkedin",
+                    "Database connections currently checked in to the pool.",
+                ),
+                (
+                    "overflow",
+                    "overflow",
+                    "Database connection-pool overflow count.",
+                ),
+            )
+        )
 
     @property
     def metric_reader(self) -> InMemoryMetricReader:
         """Expose the bounded local reader for integration evidence and tests."""
         return self._metric_reader
+
+    def bind_database_engine(self, engine: Any) -> None:
+        """Bind one SQLAlchemy engine for low-cardinality pool observations."""
+        self._database_engine = engine
+
+    def _observe_pool_metric(self, method_name: str) -> tuple[Observation, ...]:
+        """Read one supported SQLAlchemy pool value when the pool exposes it."""
+        if self._database_engine is None:
+            return ()
+        reader = getattr(self._database_engine.pool, method_name, None)
+        if not callable(reader):
+            return ()
+        return (
+            Observation(
+                reader(),
+                {"db.system.name": self._database_engine.dialect.name},
+            ),
+        )
 
     @contextmanager
     def server_span(

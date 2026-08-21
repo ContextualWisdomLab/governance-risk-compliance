@@ -25,6 +25,7 @@
 - Truthful `/readyz` and `/startupz` contracts, bounded PostgreSQL connection setup, drain rejection, W3C correlation, and redaction-safe JSON request logs.
 - OpenTelemetry request traces, request rate/duration metrics, authorization-denial metrics, and route-template cardinality protection with standard OTLP export configuration.
 - Database session transaction outcome/duration metrics with rollback-safe request dependency instrumentation.
+- Bounded SQLAlchemy database-pool size, checked-in, checked-out, and overflow gauges labeled only by database system.
 - Proposed availability, mutation-success, audit-write, and recovery SLO/error-budget policy with bounded-label burn-rate alert thresholds.
 
 ### Security
