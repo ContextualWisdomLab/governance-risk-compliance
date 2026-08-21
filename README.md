@@ -13,6 +13,7 @@ This repository is the ContextualWisdomLab home for policy, control, risk, evide
 5. Read the policy-gap list and attach the next evidence on an uncovered mapped control.
 6. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
 7. Confirm `/readyz` returns `200` with database, schema, seed, guard, key, identity, and lifecycle checks; use `/startupz` to inspect the checks that admitted the process.
+8. Set the standard `OTEL_EXPORTER_OTLP_ENDPOINT` only when an approved collector is available; request traces and low-cardinality request metrics are then exported asynchronously.
 
 The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. The command-line server binds to `127.0.0.1`, and the app always rejects proxy-forwarded or non-loopback traffic. No runtime bypass exists. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
 
@@ -44,6 +45,7 @@ The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `
 | Liveness probe | `GET /healthz` (dependency-free) |
 | Readiness probe | `GET /readyz` (returns `503` with stable reason codes when traffic is unsafe) |
 | Startup probe | `GET /startupz` (reports the checks completed before admission) |
+| OpenTelemetry telemetry | Standard OTLP endpoint from `OTEL_EXPORTER_OTLP_ENDPOINT`; no endpoint means bounded local collection for tests/developer diagnostics |
 
 Policy authoring requires the declared purpose `policy_authoring`. Evidence create and bind require `evidence_binding`. Policies map only to seeded official identifiers: CSAP, SOC 2 TSC, ISMS-P, ISO/IEC 27001:2022, NIST SP 800-53 Rev. 5, COSO 2013, and COSO 2017.
 
@@ -86,7 +88,7 @@ app = create_app()
 
 Set `CWL_GRC_EVIDENCE_KEY` for every durable store; startup fails when a persistent database has no key. Ephemeral key generation is limited to explicitly selected in-memory SQLite tests. Set `CWL_GRC_DATABASE_URL` when you are not using the local SQLite file.
 
-The default `CWL_GRC_ENVIRONMENT=local_preview` is the only environment admitted by this loopback-only slice. A production value fails startup until the Keyverse remote boundary is implemented. Requests receive `X-Request-ID` and W3C `traceparent` headers; structured logs hash verified principal references and never include bearer tokens, keys, plaintext evidence, or request bodies.
+The default `CWL_GRC_ENVIRONMENT=local_preview` is the only environment admitted by this loopback-only slice. A production value fails startup until the Keyverse remote boundary is implemented. Requests receive `X-Request-ID` and W3C `traceparent` headers; structured logs and OpenTelemetry attributes use route templates and never include bearer tokens, keys, plaintext evidence, raw tenant/actor identifiers, or request bodies. The next action for production telemetry is to configure and verify the organization collector, dashboards, SLOs, and paging policy.
 
 ## Citations
 

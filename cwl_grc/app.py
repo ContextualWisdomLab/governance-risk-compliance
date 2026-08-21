@@ -48,6 +48,7 @@ from cwl_grc.observability import (
     emit_request_log,
     reset_verified_principal,
     reset_request_state,
+    route_template,
     set_verified_principal,
     set_request_state,
 )
@@ -63,6 +64,7 @@ from cwl_grc.policy import (
     serialize_policy,
 )
 from cwl_grc.remote_access import request_is_local
+from cwl_grc.telemetry import RequestTelemetry, span_traceparent
 
 
 MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
@@ -210,7 +212,9 @@ def create_app(
     app.state.lifecycle = LifecycleState()
     app.state.lifecycle.mark_ready()
     app.state.startup_report = startup_report
+    app.state.telemetry = RequestTelemetry(environment)
     app.router.add_event_handler("shutdown", app.state.lifecycle.begin_drain)
+    app.router.add_event_handler("shutdown", app.state.telemetry.shutdown)
 
     @app.exception_handler(HTTPException)
     async def handle_http_exception(request: Request, exc: HTTPException) -> JSONResponse:
@@ -262,53 +266,70 @@ def create_app(
         started_at = time.perf_counter()
         status_code = 500
         error_class: str | None = None
-        try:
-            client_host = getattr(request.client, "host", None)
-            local_request = request_is_local(
-                client_host,
-                request.headers.get("x-forwarded-for"),
-                request.headers.get("forwarded"),
-            )
-            if not local_request:
-                response = JSONResponse(
-                    status_code=503,
-                    content={
-                        "detail": (
-                            "Remote preview is disabled. Configure Keyverse-backed identity and "
-                            "tenant authorization before exposing CWL GRC."
-                        ),
-                        "request_reference": context.request_id,
-                    },
+        route = route_template(request.scope)
+        with app.state.telemetry.server_span(
+            request.method,
+            route,
+            request.headers,
+        ) as span:
+            try:
+                client_host = getattr(request.client, "host", None)
+                local_request = request_is_local(
+                    client_host,
+                    request.headers.get("x-forwarded-for"),
+                    request.headers.get("forwarded"),
                 )
-            elif request.method in MUTATING_METHODS and app.state.lifecycle.is_draining:
-                response = JSONResponse(
-                    status_code=503,
-                    content={
-                        "detail": "The instance is draining; retry this mutation on a ready instance.",
-                        "request_reference": context.request_id,
-                    },
+                if not local_request:
+                    response = JSONResponse(
+                        status_code=503,
+                        content={
+                            "detail": (
+                                "Remote preview is disabled. Configure Keyverse-backed identity and "
+                                "tenant authorization before exposing CWL GRC."
+                            ),
+                            "request_reference": context.request_id,
+                        },
+                    )
+                elif request.method in MUTATING_METHODS and app.state.lifecycle.is_draining:
+                    response = JSONResponse(
+                        status_code=503,
+                        content={
+                            "detail": "The instance is draining; retry this mutation on a ready instance.",
+                            "request_reference": context.request_id,
+                        },
+                    )
+                else:
+                    response = await call_next(request)
+                status_code = response.status_code
+                response.headers["X-Request-ID"] = context.request_id
+                response.headers["traceparent"] = span_traceparent(span)
+                return response
+            except Exception as exc:
+                error_class = type(exc).__name__
+                raise
+            finally:
+                route = route_template(request.scope)
+                elapsed_seconds = time.perf_counter() - started_at
+                span.set_attribute("http.route", route)
+                span.set_attribute("http.response.status_code", status_code)
+                app.state.telemetry.record_request(
+                    request.method,
+                    route,
+                    status_code,
+                    elapsed_seconds,
                 )
-            else:
-                response = await call_next(request)
-            status_code = response.status_code
-            response.headers["X-Request-ID"] = context.request_id
-            response.headers["traceparent"] = context.traceparent
-            return response
-        except Exception as exc:
-            error_class = type(exc).__name__
-            raise
-        finally:
-            emit_request_log(
-                context,
-                request.method,
-                getattr(request.scope.get("route"), "path", request.url.path),
-                status_code,
-                (time.perf_counter() - started_at) * 1000,
-                environment,
-                error_class,
-            )
-            reset_verified_principal(principal_token)
-            reset_request_state(request_state_token)
+                emit_request_log(
+                    context,
+                    request.method,
+                    route,
+                    status_code,
+                    elapsed_seconds * 1000,
+                    environment,
+                    error_class,
+                    traceparent=span_traceparent(span),
+                )
+                reset_verified_principal(principal_token)
+                reset_request_state(request_state_token)
 
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:
