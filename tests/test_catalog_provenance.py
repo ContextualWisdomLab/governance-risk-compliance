@@ -903,9 +903,16 @@ def test_catalog_routes_execute_the_local_governance_workflow() -> None:
     )
     assert release_response.status_code == 201
     assert release_response.json()["release_status"] == "published"
-    releases_response = client.get("/catalog/releases", headers=_HEADERS)
+    releases_response = client.get(
+        "/catalog/releases",
+        headers=_HEADERS,
+        params={"limit": 1},
+    )
     assert releases_response.status_code == 200
     assert releases_response.json()["releases"][0]["catalog_release_id"] == release_response.json()["catalog_release_id"]
+    assert releases_response.json()["limit"] == 1
+    assert releases_response.json()["offset"] == 0
+    assert releases_response.json()["has_more"] is False
     assert releases_response.json()["next_action"].startswith("Review the release")
     second_digest = hashlib.sha256(b"next lawful catalog fixture").hexdigest()
     second_version_response = client.post(
@@ -944,6 +951,32 @@ def test_catalog_routes_execute_the_local_governance_workflow() -> None:
     assert second_release_response.status_code == 201
     first_release_id = release_response.json()["catalog_release_id"]
     second_release_id = second_release_response.json()["catalog_release_id"]
+    first_page = client.get(
+        "/catalog/releases",
+        headers=_HEADERS,
+        params={"limit": 1},
+    )
+    assert first_page.status_code == 200
+    assert len(first_page.json()["releases"]) == 1
+    assert first_page.json()["has_more"] is True
+    second_page = client.get(
+        "/catalog/releases",
+        headers=_HEADERS,
+        params={"limit": 1, "offset": 1},
+    )
+    assert second_page.status_code == 200
+    assert len(second_page.json()["releases"]) == 1
+    assert second_page.json()["has_more"] is False
+    assert client.get(
+        "/catalog/releases",
+        headers=_HEADERS,
+        params={"limit": 0},
+    ).status_code == 422
+    assert client.get(
+        "/catalog/releases",
+        headers=_HEADERS,
+        params={"offset": 100_001},
+    ).status_code == 422
     comparison_response = client.get(
         f"/catalog/releases/{first_release_id}/compare/{second_release_id}",
         headers=_HEADERS,

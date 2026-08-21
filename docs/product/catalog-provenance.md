@@ -10,9 +10,13 @@ The loopback-only API accepts `X-Purpose: catalog_governance` and records:
 - an edition, publication/effective/withdrawal dates, lowercase SHA-256 digest, media type, and bounded byte length;
 - an idempotent parser run and deterministic receipt digest with requirement/change/warning counts;
 - a release only when a successful import receipt exists.
-- a governed release list and metadata-only comparison of two published releases, including changed and unchanged provenance/receipt fields and a clear requirement-diff limitation.
+- a bounded governed release list and metadata-only comparison of two published releases, including changed and unchanged provenance/receipt fields and a clear requirement-diff limitation.
 
-Historical provenance rows are append-only through database triggers. The service does not retain raw source bytes, follow remote redirects, or treat actor/purpose headers as authentication.
+`GET /catalog/releases?limit=50&offset=0` returns deterministic pages with
+`has_more` state and never returns more than 100 rows per request. Historical
+provenance rows are append-only through database triggers. The service does not
+retain raw source bytes, follow remote redirects, or treat actor/purpose headers
+as authentication.
 
 ## Deliberate boundary
 

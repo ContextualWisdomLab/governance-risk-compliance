@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable, Iterator
 from datetime import date
 from typing import Any
 
-from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, Form, Header, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -264,20 +264,29 @@ def create_app(
 
     @app.get("/catalog/releases")
     def get_catalog_releases(
+        limit: int = Query(default=50, ge=1, le=100),
+        offset: int = Query(default=0, ge=0, le=100_000),
         session: Session = Depends(get_session),
         x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        """List published catalog release identities for governed review."""
+        """List a bounded page of published catalog release identities for review."""
         require_purpose(x_actor_id, x_purpose, PurposeCode.CATALOG_GOVERNANCE)
         releases = (
             session.query(CatalogRelease)
-            .order_by(CatalogRelease.published_at.desc())
+            .filter_by(release_status="published")
+            .order_by(CatalogRelease.created_at.desc(), CatalogRelease.catalog_release_id.desc())
+            .offset(offset)
+            .limit(limit + 1)
             .all()
         )
+        has_more = len(releases) > limit
         return {
             "next_action": "Review the release change set before using it in compliance decisions.",
-            "releases": [_serialize_catalog_release(release) for release in releases],
+            "limit": limit,
+            "offset": offset,
+            "has_more": has_more,
+            "releases": [_serialize_catalog_release(release) for release in releases[:limit]],
         }
 
     @app.get("/catalog/releases/{catalog_release_id}/compare/{other_catalog_release_id}")
