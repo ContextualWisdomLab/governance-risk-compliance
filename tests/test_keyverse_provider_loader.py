@@ -264,8 +264,17 @@ def test_provider_loader_validates_metadata_jwks_hashes_and_rotation() -> None:
         allowed_client_ids=frozenset({"cwl-grc-web"}),
         allowed_roles=frozenset({"compliance_officer"}),
     )
-    verifier = snapshot.build_verifier(access_settings, now=lambda: NOW)
+    def replay_guard(_token_id: str) -> bool:
+        """Keep this wiring test's token reusable."""
+        return False
+
+    verifier = snapshot.build_verifier(
+        access_settings,
+        now=lambda: NOW,
+        token_replay_guard=replay_guard,
+    )
     assert verifier is not None
+    assert verifier._token_replay_guard is replay_guard
 
 
 def test_provider_loader_rejects_metadata_drift_and_malformed_documents() -> None:

@@ -118,13 +118,19 @@ class KeyverseProviderSnapshot:
         settings: KeyverseAccessTokenSettings,
         *,
         now: Callable[[], datetime] | None = None,
+        token_replay_guard: Callable[[str], bool] | None = None,
     ) -> KeyverseAccessTokenVerifier:
         """Build a token verifier only when resource and discovery issuers agree."""
         if settings.issuer != self.metadata.issuer:
             raise KeyverseProviderLoadError(
                 "Keyverse verifier settings do not match the loaded issuer."
             )
-        return KeyverseAccessTokenVerifier(settings, self.key_set, now=now)
+        return KeyverseAccessTokenVerifier(
+            settings,
+            self.key_set,
+            now=now,
+            token_replay_guard=token_replay_guard,
+        )
 
 
 class KeyverseDocumentFetcher(Protocol):
