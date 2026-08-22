@@ -4,6 +4,7 @@ import pageMarkup from './index.html?raw';
 
 const meta = {
   title: 'GRC/Buyer workspace',
+  tags: ['!autodocs'],
   parameters: {
     a11y: { test: 'error' },
     layout: 'fullscreen',
