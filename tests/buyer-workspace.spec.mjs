@@ -52,3 +52,20 @@ test('locale switching translates labels without changing state identifiers', as
   await expect(page.getByRole('heading', { name: 'Compliance workspace' })).toBeVisible();
   await expect(page.locator('[data-state="access_denied"]')).toHaveText('Access denied');
 });
+
+test('Storybook locale story initializes and switches the real workspace selector', async ({ page }) => {
+  await page.goto('/storybook-static/iframe.html?id=grc-buyer-workspace--korean-locale&viewMode=story');
+
+  const localeSelect = page.locator('#locale-select');
+  await expect(localeSelect).toHaveValue('ko');
+  await expect(page.getByRole('heading', { name: '컴플라이언스 워크스페이스' })).toBeVisible();
+
+  await localeSelect.selectOption('en');
+  await expect(localeSelect).toHaveValue('en');
+  await expect(page.locator('[data-locale="en"]')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Compliance workspace' })).toBeVisible();
+
+  await localeSelect.selectOption('ko');
+  await expect(page.locator('[data-locale="ko"]')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '컴플라이언스 워크스페이스' })).toBeVisible();
+});
