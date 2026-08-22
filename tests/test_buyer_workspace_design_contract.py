@@ -59,6 +59,8 @@ def test_storybook_inventory_covers_reusable_states_with_a11y_enabled() -> None:
     package = read("package.json")
     assert "@storybook/web-components-vite" in main
     assert "@storybook/addon-a11y" in main
+    assert "docs: { autodocs: true }" not in main
+    assert "tags: ['!autodocs']" in stories
     assert "./index.html?raw" in stories
     assert "accessDenied = true" in stories
     assert "stale = true" in stories
