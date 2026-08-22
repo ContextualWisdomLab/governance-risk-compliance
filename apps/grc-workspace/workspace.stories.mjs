@@ -30,7 +30,10 @@ function renderFixture({ mobile = false, accessDenied = true, stale = true, loca
 }
 
 export const ComplianceOfficerDesktop = { render: () => renderFixture() };
-export const ComplianceOfficerMobile = { render: () => renderFixture({ mobile: true }), parameters: { viewport: { defaultViewport: 'mobile1' } } };
+export const ComplianceOfficerMobile = {
+  render: () => renderFixture({ mobile: true }),
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
+};
 export const AccessDenied = { render: () => renderFixture({ accessDenied: true, stale: false }) };
 export const StaleEvidence = { render: () => renderFixture({ accessDenied: false, stale: true }) };
 export const KoreanLocale = { render: () => renderFixture({ locale: 'ko' }) };
