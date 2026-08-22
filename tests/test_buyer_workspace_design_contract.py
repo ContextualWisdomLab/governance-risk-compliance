@@ -66,7 +66,13 @@ def test_storybook_inventory_covers_reusable_states_with_a11y_enabled() -> None:
     assert "renderFixture({ accessDenied: false, stale: true })" in stories
     assert "globals: { viewport: { value: 'mobile1', isRotated: false } }" in stories
     assert "parameters: { viewport: { defaultViewport: 'mobile1' } }" not in stories
-    for story in ("ComplianceOfficerDesktop", "ComplianceOfficerMobile", "AccessDenied", "StaleEvidence"):
+    for story in (
+        "ComplianceOfficerDesktop",
+        "ComplianceOfficerMobile",
+        "AccessDenied",
+        "StaleEvidence",
+        "KoreanLocale",
+    ):
         assert story in stories
     assert '"storybook": "10.5.10"' in package
     assert '"@storybook/web-components-vite": "10.5.10"' in package
@@ -106,10 +112,11 @@ def test_design_authority_is_traceable_to_figma_and_decision_records() -> None:
 
 
 def test_i18n_contract_keeps_english_and_korean_semantics_aligned() -> None:
-    """Require one dependency-free locale catalog for the real page and stories."""
+    """Require one locale controller for the real page and Storybook fixture."""
 
     html = read("apps/grc-workspace/index.html")
     i18n = read("apps/grc-workspace/i18n.mjs")
+    controller = read("apps/grc-workspace/locale-controller.mjs")
     bootstrap = read("apps/grc-workspace/i18n-bootstrap.mjs")
     stories = read("apps/grc-workspace/workspace.stories.mjs")
     assert 'lang="en"' in html
@@ -127,5 +134,9 @@ def test_i18n_contract_keeps_english_and_korean_semantics_aligned() -> None:
         assert f"'{key}'" in i18n
     assert "local developer preview" in i18n
     assert "로컬 개발자 미리보기" in i18n
-    assert "applyLocale(document, locale)" in bootstrap
+    assert "export function initializeLocale" in controller
+    assert "applyLocale(root, requestedLocale)" in controller
+    assert "select.addEventListener('change'" in controller
+    assert "initializeLocale(document, document.documentElement.lang)" in bootstrap
+    assert "initializeLocale(host, locale)" in stories
     assert "KoreanLocale" in stories
