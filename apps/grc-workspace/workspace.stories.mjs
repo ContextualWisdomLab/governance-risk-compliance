@@ -1,5 +1,5 @@
 import './styles.css';
-import { applyLocale } from './i18n.mjs';
+import { initializeLocale } from './locale-controller.mjs';
 import pageMarkup from './index.html?raw';
 
 const meta = {
@@ -25,7 +25,7 @@ function renderFixture({ mobile = false, accessDenied = true, stale = true, loca
   if (freshnessNotice) freshnessNotice.hidden = !stale;
   const accessDeniedRow = workspace.querySelector('[data-state="access_denied"]')?.closest('li');
   if (accessDeniedRow) accessDeniedRow.hidden = !accessDenied;
-  applyLocale(host, locale);
+  initializeLocale(host, locale);
   return host;
 }
 
