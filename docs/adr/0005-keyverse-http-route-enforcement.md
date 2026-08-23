@@ -27,14 +27,17 @@ the identity issuer; GRC is a resource server.
    exception text.
 4. Policy list, gap queries, and the officer home (`GET /`, `POST /officer/policy`,
    `POST /officer/evidence`) return or mutate only documents authored by the
-   verified subject. Official catalog reads remain unauthenticated because they
-   are published control identifiers, not tenant records.
+   verified subject. Gap coverage counts only evidence bindings whose
+   `evidence_record.tenant_identifier` matches the verified Keyverse `org`.
+   Official catalog reads remain unauthenticated because they are published
+   control identifiers, not tenant records.
 5. `/healthz` remains unauthenticated. Remote traffic stays denied until
    deployment hardening.
 6. Officer home HTML forms cannot attach an `Authorization` header on native
-   submit. The page stores the Keyverse access token in `sessionStorage` and
-   sends it as Bearer on `fetch` so the next policy or evidence action works in
-   a browser.
+   submit. When a Keyverse token is present, the page stores it in
+   `sessionStorage` and sends Bearer on `fetch`. Local preview without a
+   verifier sends `X-Actor-Id` from the officer identifier instead of requiring
+   a token. Evidence form posts authenticate before validating `control_ref`.
 
 ## Consequences
 

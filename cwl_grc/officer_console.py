@@ -35,24 +35,36 @@ _OFFICER_HOME_SCRIPT = """
     }
     form.addEventListener("submit", function (event) {
       event.preventDefault();
-      if (!tokenInput || !tokenInput.value) {
+      var token = tokenInput ? tokenInput.value.trim() : "";
+      var actorField = form.querySelector('[name="actor_identifier"]');
+      var actor = actorField ? actorField.value.trim() : "";
+      if (token) {
+        sessionStorage.setItem(tokenKey, token);
+      } else if (!actor) {
         if (tokenInput) {
+          tokenInput.setCustomValidity(
+            "Present a Keyverse access token, or the officer identifier for local preview."
+          );
           tokenInput.reportValidity();
+          tokenInput.setCustomValidity("");
         }
         return;
       }
-      var token = tokenInput.value;
-      sessionStorage.setItem(tokenKey, token);
+      var headers = { "X-Purpose": purpose };
+      if (token) {
+        headers.Authorization = "Bearer " + token;
+      } else {
+        headers["X-Actor-Id"] = actor;
+      }
       fetch(form.action, {
         method: "POST",
-        headers: {
-          Authorization: "Bearer " + token,
-          "X-Purpose": purpose
-        },
+        headers: headers,
         body: new FormData(form)
       }).then(function (response) {
         if (response.ok || response.redirected) {
-          sessionStorage.setItem(tokenKey, token);
+          if (token) {
+            sessionStorage.setItem(tokenKey, token);
+          }
           window.location.assign("/");
           return;
         }
@@ -128,8 +140,9 @@ def render_officer_home(
   <h1>Author the next policy, then attach evidence on uncovered controls</h1>
   <p>Map each policy to official CSAP / SOC 2 / ISMS-P / ISO 27001 identifiers. Officer contact details stay usable; they are not masked.</p>
   <label>Keyverse access token
-    <input id="keyverse-access-token" type="password" required autocomplete="off">
+    <input id="keyverse-access-token" type="password" autocomplete="off">
   </label>
+  <p>Present a Keyverse access token when Keyverse is configured. Local preview uses the officer identifier instead.</p>
   <h2>Author the next policy</h2>
   <form id="officer-policy-form" method="post" action="/officer/policy">
     <label>Policy title

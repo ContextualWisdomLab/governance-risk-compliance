@@ -302,6 +302,92 @@ def test_keyverse_tenant_owned_policies_are_isolated_by_org_claim() -> None:
     assert bound.status_code == 404
 
 
+def test_keyverse_gap_coverage_does_not_use_another_tenant_binding() -> None:
+    """Another org's CSAP 10.2.1 evidence must not close this tenant's policy gap."""
+    private_key, jwk = _signing_material("key-1")
+    client = _client(_verifier(jwk))
+    acme_token = _token(private_key, org="tenant-acme", jti="token-acme-gap")
+    other_token = _token(
+        private_key,
+        org="tenant-other",
+        sub="officer-kim",
+        jti="token-other-gap",
+    )
+    policy_body = {
+        "policy_title": "Logical Access Policy",
+        "policy_body": "Least privilege for CSAP 10.2.1.",
+        "control_refs": [
+            {
+                "framework": FrameworkCode.CSAP_2026.value,
+                "catalog_identifier": "10.2.1",
+            }
+        ],
+    }
+    acme_policy = client.post(
+        "/policy-documents",
+        headers={
+            "Authorization": f"Bearer {acme_token}",
+            "X-Purpose": "policy_authoring",
+        },
+        json=policy_body,
+    )
+    assert acme_policy.status_code == 201
+    other_policy = client.post(
+        "/policy-documents",
+        headers={
+            "Authorization": f"Bearer {other_token}",
+            "X-Purpose": "policy_authoring",
+        },
+        json={**policy_body, "policy_title": "Other Logical Access Policy"},
+    )
+    assert other_policy.status_code == 201
+
+    evidence = client.post(
+        "/evidence-records",
+        headers={
+            "Authorization": f"Bearer {acme_token}",
+            "X-Purpose": "evidence_binding",
+        },
+        json={
+            "evidence_title": "Acme CSAP 10.2.1 register",
+            "payload_text": "Officer Park approved unique user IDs for tenant-acme.",
+        },
+    )
+    assert evidence.status_code == 201
+    bound = client.post(
+        "/control-evidence-bindings",
+        headers={
+            "Authorization": f"Bearer {acme_token}",
+            "X-Purpose": "evidence_binding",
+        },
+        json={
+            "framework": FrameworkCode.CSAP_2026.value,
+            "catalog_identifier": "10.2.1",
+            "evidence_record_id": evidence.json()["evidence_record_id"],
+        },
+    )
+    assert bound.status_code == 201
+
+    acme_gaps = client.get(
+        "/policy-gaps",
+        headers={"Authorization": f"Bearer {acme_token}"},
+    )
+    assert acme_gaps.status_code == 200
+    assert acme_gaps.json()["gaps"] == []
+    assert acme_gaps.json()["next_action"].startswith("Attach the next evidence")
+
+    other_gaps = client.get(
+        "/policy-gaps",
+        headers={"Authorization": f"Bearer {other_token}"},
+    )
+    assert other_gaps.status_code == 200
+    other_catalogs = [gap["catalog_identifier"] for gap in other_gaps.json()["gaps"]]
+    assert "10.2.1" in other_catalogs
+    other_home = client.get("/", headers={"Authorization": f"Bearer {other_token}"})
+    assert other_home.status_code == 200
+    assert "10.2.1" in other_home.text
+
+
 def test_officer_home_hides_other_officers_policy_title_under_keyverse() -> None:
     """officer-kim must not see officer-park's CSAP 10.2.1 policy title on GET /."""
     private_key, jwk = _signing_material("key-1")

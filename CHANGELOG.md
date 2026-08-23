@@ -22,7 +22,9 @@
 - Officer home (`GET /`) and officer form posts require the same Keyverse Bearer token and hide other officers' policy titles from the home page.
 - Tenant-owned persistence: `policy_document`, `evidence_record`, and `audit_event` store `tenant_identifier`, migrate existing rows to `local_preview`, and isolate reads/writes by Keyverse `org`.
 - OpenAPI `/openapi.json` publishes `KeyverseBearer` (`at+jwt`) on officer policy, evidence, and home operations with `grc.policy.read`, `grc.policy.write`, and `grc.evidence.write`. Catalog and `/healthz` stay public.
-- Officer home browser forms store the Keyverse access token in `sessionStorage` and send it as an `Authorization: Bearer` header so policy and evidence posts work without relying on actor headers.
+- Officer home browser forms store the Keyverse access token in `sessionStorage` and send it as an `Authorization: Bearer` header. Local preview without a verifier posts `X-Actor-Id` from the officer identifier instead of requiring a token.
+- Officer evidence form authenticates before validating `control_ref`, so unauthenticated callers receive 401 rather than a 400 that leaked catalog well-formedness.
+- Keyverse policy-gap queries count only the verified tenant's evidence bindings, so one organization's CSAP mapping cannot hide another organization's uncovered control.
 - Keyverse audit attribution: `audit_event` stores issuer, OAuth client, request correlation, and `allow` without copying the access token; migration `0003_audit_attribution` backfills legacy rows as `local_preview` / `legacy_unattributed`.
 - Deployment-hardening runbook for local-preview migration, rollback, JWKS rotation, issuer outage, clock skew, and emergency read-only.
 
