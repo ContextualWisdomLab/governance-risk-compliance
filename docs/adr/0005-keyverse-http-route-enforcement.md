@@ -23,9 +23,10 @@ the identity issuer; GRC is a resource server.
 3. Action scopes are `grc.policy.read`, `grc.policy.write`, and
    `grc.evidence.write`. Missing scopes return 403; other validation failures
    return 401.
-4. Policy list and gap queries return only documents authored by the verified
-   subject. Official catalog reads remain unauthenticated because they are
-   published control identifiers, not tenant records.
+4. Policy list, gap queries, and the officer home (`GET /`, `POST /officer/policy`,
+   `POST /officer/evidence`) return or mutate only documents authored by the
+   verified subject. Official catalog reads remain unauthenticated because they
+   are published control identifiers, not tenant records.
 5. `/healthz` remains unauthenticated. Remote traffic stays denied until
    deployment hardening.
 

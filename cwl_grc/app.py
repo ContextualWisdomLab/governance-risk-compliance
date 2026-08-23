@@ -28,6 +28,7 @@ from cwl_grc.models import ControlItem, EvidenceRecord, PolicyDocument
 from cwl_grc.officer_console import parse_control_ref, render_officer_home
 from cwl_grc.policy import (
     ControlRef,
+    PolicyGap,
     author_policy,
     list_policy_documents,
     list_policy_gaps,
@@ -109,6 +110,21 @@ def create_app(
             declared_tenant=declared_tenant,
             required_scopes=required_scopes,
         )
+
+    def officer_owned_gaps(
+        session: Session,
+        actor: str,
+        policy_document_id: str | None = None,
+    ) -> list[PolicyGap]:
+        """Return policy gaps owned by the verified officer only."""
+        gaps = list_policy_gaps(session, policy_document_id)
+        owned = {
+            document.policy_document_id
+            for document in session.query(PolicyDocument)
+            .filter_by(created_by_actor=actor)
+            .all()
+        }
+        return [gap for gap in gaps if gap.policy_document_id in owned]
 
     @app.middleware("http")
     async def enforce_developer_preview_boundary(
@@ -251,7 +267,6 @@ def create_app(
         x_tenant_id: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """List latest-version policy mappings that still lack evidence."""
-        gaps = list_policy_gaps(session, policy_document_id)
         if access_token_verifier is not None:
             actor = authorized_actor(
                 authorization=authorization,
@@ -259,13 +274,9 @@ def create_app(
                 declared_tenant=x_tenant_id,
                 required_scopes=POLICY_READ_SCOPES,
             )
-            owned = {
-                document.policy_document_id
-                for document in session.query(PolicyDocument)
-                .filter_by(created_by_actor=actor)
-                .all()
-            }
-            gaps = [gap for gap in gaps if gap.policy_document_id in owned]
+            gaps = officer_owned_gaps(session, actor, policy_document_id)
+        else:
+            gaps = list_policy_gaps(session, policy_document_id)
         return {
             "next_action": "Attach the next evidence on an uncovered policy control.",
             "gaps": [serialize_gap(gap) for gap in gaps],
@@ -334,11 +345,26 @@ def create_app(
         }
 
     @app.get("/", response_class=HTMLResponse)
-    def officer_home(session: Session = Depends(get_session)) -> str:
+    def officer_home(
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_tenant_id: str | None = Header(default=None),
+    ) -> str:
         """Show policy authoring, policy gaps, and the next evidence action."""
+        if access_token_verifier is not None:
+            actor = authorized_actor(
+                authorization=authorization,
+                declared_actor=x_actor_id,
+                declared_tenant=x_tenant_id,
+                required_scopes=POLICY_READ_SCOPES,
+            )
+            gaps = officer_owned_gaps(session, actor)
+        else:
+            gaps = list_policy_gaps(session, None)
         return render_officer_home(
             list_uncovered_controls(session, None),
-            policy_gaps=list_policy_gaps(session, None),
+            policy_gaps=gaps,
             catalog_items=list_control_items(session, None),
         )
 
@@ -349,11 +375,14 @@ def create_app(
         policy_body: str = Form(),
         actor_identifier: str = Form(),
         control_refs: list[str] = Form(default=[]),
+        authorization: str | None = Header(default=None),
+        x_tenant_id: str | None = Header(default=None),
     ) -> RedirectResponse:
         """Author a policy from the officer home and return to the gap list."""
         actor = authorized_actor(
-            authorization=None,
+            authorization=authorization,
             declared_actor=actor_identifier,
+            declared_tenant=x_tenant_id,
             required_scopes=POLICY_WRITE_SCOPES,
         )
         decision = require_purpose(
@@ -384,6 +413,8 @@ def create_app(
         framework: str | None = Form(default=None),
         catalog_identifier: str | None = Form(default=None),
         control_ref: str | None = Form(default=None),
+        authorization: str | None = Header(default=None),
+        x_tenant_id: str | None = Header(default=None),
     ) -> RedirectResponse:
         """Attach evidence from the officer home and return to the gap list."""
         if control_ref:
@@ -401,8 +432,9 @@ def create_app(
                 detail="Name the official control to bind.",
             )
         actor = authorized_actor(
-            authorization=None,
+            authorization=authorization,
             declared_actor=actor_identifier,
+            declared_tenant=x_tenant_id,
             required_scopes=EVIDENCE_WRITE_SCOPES,
         )
         decision = require_purpose(

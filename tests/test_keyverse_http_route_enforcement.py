@@ -202,6 +202,73 @@ def test_keyverse_route_rejects_missing_token_wrong_tenant_and_missing_scope() -
     assert scoped.status_code == 403
 
 
+def test_officer_home_hides_other_officers_policy_title_under_keyverse() -> None:
+    """officer-kim must not see officer-park's CSAP 10.2.1 policy title on GET /."""
+    private_key, jwk = _signing_material("key-1")
+    client = _client(_verifier(jwk))
+    park_token = _token(private_key)
+    created = client.post(
+        "/policy-documents",
+        headers={
+            "Authorization": f"Bearer {park_token}",
+            "X-Purpose": "policy_authoring",
+        },
+        json={
+            "policy_title": "Park Logical Access Policy",
+            "policy_body": "Least privilege for CSAP 10.2.1.",
+            "control_refs": [
+                {
+                    "framework": FrameworkCode.CSAP_2026.value,
+                    "catalog_identifier": "10.2.1",
+                }
+            ],
+        },
+    )
+    assert created.status_code == 201
+
+    denied = client.get("/")
+    assert denied.status_code == 401
+
+    park_home = client.get("/", headers={"Authorization": f"Bearer {park_token}"})
+    assert park_home.status_code == 200
+    assert "Park Logical Access Policy" in park_home.text
+    assert "10.2.1" in park_home.text
+
+    kim_token = _token(private_key, sub="officer-kim", jti="token-kim-home")
+    kim_home = client.get("/", headers={"Authorization": f"Bearer {kim_token}"})
+    assert kim_home.status_code == 200
+    assert "Park Logical Access Policy" not in kim_home.text
+
+    kim_form = client.post(
+        "/officer/policy",
+        headers={"Authorization": f"Bearer {kim_token}"},
+        data={
+            "policy_title": "Kim Access Policy",
+            "policy_body": "Kim authors a different policy.",
+            "actor_identifier": "officer-kim",
+            "control_refs": [f"{FrameworkCode.CSAP_2026.value}|10.2.1"],
+        },
+        follow_redirects=False,
+    )
+    assert kim_form.status_code == 303
+    follow = client.get("/", headers={"Authorization": f"Bearer {kim_token}"})
+    assert "Kim Access Policy" in follow.text
+    assert "Park Logical Access Policy" not in follow.text
+
+    evidence = client.post(
+        "/officer/evidence",
+        headers={"Authorization": f"Bearer {kim_token}"},
+        data={
+            "actor_identifier": "officer-kim",
+            "evidence_title": "CSAP 10.2.1 access-grant register",
+            "payload_text": "Kim recorded the quarterly access review.",
+            "control_ref": f"{FrameworkCode.CSAP_2026.value}|10.2.1",
+        },
+        follow_redirects=False,
+    )
+    assert evidence.status_code == 303
+
+
 def test_local_preview_still_accepts_declared_actor_without_keyverse() -> None:
     """The unauthenticated developer preview keeps the existing officer header contract."""
     client = _client()
