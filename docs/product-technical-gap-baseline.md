@@ -1,1 +1,1 @@
-LOAD_FROM_/workspace/grc-restore/product-technical-gap-baseline.md_VIA_PATHLIB_60662_BYTES
+USE_DISK_FILE:/workspace/grc-restore/product-technical-gap-baseline.md
