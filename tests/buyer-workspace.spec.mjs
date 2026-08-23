@@ -6,6 +6,9 @@ test('keyboard actions expose exact values and truthful preview boundaries', asy
   await expect(page.getByRole('heading', { name: 'Compliance workspace' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'View exact values' }).first()).toBeVisible();
   await expect(page.getByRole('status')).toContainText('Connect the verified GRC workflow');
+  await expect(page.getByText('Prioritized by organization impact')).toBeVisible();
+  await expect(page.getByText('officer-facing state semantics')).toBeVisible();
+  await expect(page.getByText(/buyer/i)).toHaveCount(0);
 
   const exactValues = page.getByRole('link', { name: 'View exact values' }).first();
   await exactValues.focus();
@@ -40,15 +43,42 @@ test('mobile and print fallbacks keep the page usable without false overflow', a
 test('locale switching translates labels without changing state identifiers', async ({ page }) => {
   await page.goto('/apps/grc-workspace/index.html');
 
+  await expect(
+    page.getByRole('region', { name: /Exact values Exact compliance posture values/ }),
+  ).toBeVisible();
+
   await page.locator('#locale-select').selectOption('ko');
   await expect(page.locator('html')).toHaveAttribute('lang', 'ko');
   await expect(page.getByRole('heading', { name: '컴플라이언스 워크스페이스' })).toBeVisible();
   await expect(page.getByRole('link', { name: '증적 요청', exact: true })).toBeVisible();
   await expect(page.locator('[data-state="unknown"]').first()).toHaveText('미확정 3건');
   await expect(page.getByRole('columnheader', { name: '측정 항목' })).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: /정확한 값 출처, 제한사항, 다음 조치를 포함한 정확한 컴플라이언스 상태 값/ }),
+  ).toBeVisible();
 
   await page.locator('#locale-select').selectOption('en');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByRole('heading', { name: 'Compliance workspace' })).toBeVisible();
   await expect(page.locator('[data-state="access_denied"]')).toHaveText('Access denied');
+  await expect(
+    page.getByRole('region', { name: /Exact values Exact compliance posture values/ }),
+  ).toBeVisible();
+});
+
+test('Storybook locale story initializes and switches the real workspace selector', async ({ page }) => {
+  await page.goto('/storybook-static/iframe.html?id=grc-officer-workspace--korean-locale&viewMode=story');
+
+  const localeSelect = page.locator('#locale-select');
+  await expect(localeSelect).toHaveValue('ko');
+  await expect(page.getByRole('heading', { name: '컴플라이언스 워크스페이스' })).toBeVisible();
+
+  await localeSelect.selectOption('en');
+  await expect(localeSelect).toHaveValue('en');
+  await expect(page.locator('[data-locale="en"]')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Compliance workspace' })).toBeVisible();
+
+  await localeSelect.selectOption('ko');
+  await expect(page.locator('[data-locale="ko"]')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '컴플라이언스 워크스페이스' })).toBeVisible();
 });

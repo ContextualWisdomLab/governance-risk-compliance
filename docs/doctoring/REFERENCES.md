@@ -26,6 +26,8 @@ National Institute of Standards and Technology. (n.d.). *NIST SP 800-53 Revision
 
 Storybook. (n.d.). *Accessibility testing*. Retrieved August 21, 2026, from https://storybook.js.org/docs/writing-tests/accessibility-testing
 
+Storybook. (n.d.). *Interaction testing*. Retrieved August 23, 2026, from https://storybook.js.org/docs/writing-tests/interaction-testing
+
 World Wide Web Consortium. (2023). *Web Content Accessibility Guidelines (WCAG) 2.2*. Retrieved August 21, 2026, from https://www.w3.org/TR/WCAG22/
 
 Policy authoring in this slice follows ISO/IEC 27001:2022 clause 5.2 (information security policy as documented information) and Annex A control A.5.1 (policies for information security); COSO (2013) Principle 12 and AICPA (2022) SOC 2 CC5.3 (deploy control activities through policies and procedures); KISA (2023) ISMS-P 1.1.5; and KISA (2026) CSAP 1.1.1. Open Policy Agent Rego was reviewed and not adopted: it is an authorization PDP language, not a policy-document or evidence-binding store.
