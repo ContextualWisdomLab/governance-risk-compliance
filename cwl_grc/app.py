@@ -53,6 +53,23 @@ def parse_framework(value: str | None) -> FrameworkCode | None:
         raise HTTPException(status_code=400, detail="Unknown control framework.") from exc
 
 
+def officer_declared_actor(
+    authorization: str | None,
+    x_actor_id: str | None,
+    form_actor: str | None,
+) -> str | None:
+    """Return a declared actor that cannot override a Bearer subject."""
+    header_actor = (x_actor_id or "").strip() or None
+    if authorization:
+        return header_actor
+    return header_actor or ((form_actor or "").strip() or None)
+
+
+def officer_declared_purpose(x_purpose: str | None, required: PurposeCode) -> str | None:
+    """Return the request purpose, or the officer-home purpose for that route."""
+    return x_purpose or required.value
+
+
 def serialize_control(item: ControlItem, *, covered: bool | None = None) -> dict[str, Any]:
     """Serialize one official control for officers and consuming services."""
     payload: dict[str, Any] = {
@@ -414,21 +431,27 @@ def create_app(
         session: Session = Depends(get_session),
         policy_title: str = Form(),
         policy_body: str = Form(),
-        actor_identifier: str = Form(),
+        actor_identifier: str = Form(default=""),
         control_refs: list[str] = Form(default=[]),
         authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
         x_tenant_id: str | None = Header(default=None),
     ) -> RedirectResponse:
         """Author a policy from the officer home and return to the gap list."""
         principal = authorized_principal(
             authorization=authorization,
-            declared_actor=actor_identifier,
+            declared_actor=officer_declared_actor(
+                authorization,
+                x_actor_id,
+                actor_identifier,
+            ),
             declared_tenant=x_tenant_id,
             required_scopes=POLICY_WRITE_SCOPES,
         )
         decision = require_purpose(
             principal.actor_identifier,
-            PurposeCode.POLICY_AUTHORING.value,
+            officer_declared_purpose(x_purpose, PurposeCode.POLICY_AUTHORING),
             PurposeCode.POLICY_AUTHORING,
             tenant_identifier=principal.tenant_identifier,
         )
@@ -449,13 +472,15 @@ def create_app(
     @app.post("/officer/evidence")
     def officer_attach(
         session: Session = Depends(get_session),
-        actor_identifier: str = Form(),
+        actor_identifier: str = Form(default=""),
         evidence_title: str = Form(),
         payload_text: str = Form(),
         framework: str | None = Form(default=None),
         catalog_identifier: str | None = Form(default=None),
         control_ref: str | None = Form(default=None),
         authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
         x_tenant_id: str | None = Header(default=None),
     ) -> RedirectResponse:
         """Attach evidence from the officer home and return to the gap list."""
@@ -475,13 +500,17 @@ def create_app(
             )
         principal = authorized_principal(
             authorization=authorization,
-            declared_actor=actor_identifier,
+            declared_actor=officer_declared_actor(
+                authorization,
+                x_actor_id,
+                actor_identifier,
+            ),
             declared_tenant=x_tenant_id,
             required_scopes=EVIDENCE_WRITE_SCOPES,
         )
         decision = require_purpose(
             principal.actor_identifier,
-            PurposeCode.EVIDENCE_BINDING.value,
+            officer_declared_purpose(x_purpose, PurposeCode.EVIDENCE_BINDING),
             PurposeCode.EVIDENCE_BINDING,
             tenant_identifier=principal.tenant_identifier,
         )
