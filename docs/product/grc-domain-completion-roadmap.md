@@ -22,12 +22,12 @@ authoritative source
 → risk / finding / deficiency / exception
 → remediation and independent retest
 → closure or time-bounded risk acceptance
-→ buyer report and controlled export
+→ officer report and controlled export
 ```
 
 A policy document, catalog row, evidence artifact, green test workflow, or high
 posture score is not by itself proof of compliance or control effectiveness.
-Every buyer-facing conclusion must be traceable to its authority, scope, time,
+Every officer-facing conclusion must be traceable to its authority, scope, time,
 method, evidence, review decision, and current limitation.
 
 ## Product truth boundaries
@@ -274,7 +274,18 @@ Implement #27 before risk or audit domain logic:
 4. Add test plans, executions, design/operating-effectiveness results,
    deficiencies, exceptions, and evidence usage.
 5. Migrate first-slice direct evidence bindings as `unassessed` compatibility
-   records without inventing controls or effectiveness conclusions.
+   records without inventing controls or effectiveness conclusions. The
+   stable legacy key is `binding_id` plus `control_item_id`. First-slice
+   `control_evidence_binding` rows do not store `requirement_mapping_id`;
+   tenant scope is the bound evidence record's tenant after Keyverse tenant
+   persistence, otherwise the local-development tenant. The compatibility
+   projection never invents a mapping. Until an authorized current
+   `control_requirement_mapping` exists for that tenant and control, the
+   binding projects as `unassessed` at the control-item grain and is excluded
+   from requirement-mapping posture. After such mappings exist, the same
+   binding fans out as `unassessed` to each current authorized mapping for
+   that tenant and `control_item`, recording `legacy_binding_id` as the input
+   fact identifier under `posture-projection-v1`.
 6. Replace the old binary covered/uncovered projection with explicit status:
    `unknown`, `unassessed`, `implemented_not_tested`, `design_effective`,
    `operating_effective`, `ineffective`, `exception`, `stale`, and
@@ -383,7 +394,7 @@ current on the exact artifact:
 
 ### Product accuracy
 
-- The complete buyer loop works end to end.
+- The complete officer loop works end to end.
 - Evidence presence and control effectiveness remain distinguishable.
 - The complete display-token set—`unknown`, `stale`, `unassessed`,
   `not_applicable`, `implemented_not_tested`, `design_effective`,
@@ -417,7 +428,7 @@ current on the exact artifact:
 - Production branch coverage: 100%.
 - Public API docstrings: 100%.
 - Property, fuzz, concurrency, authorization, migration, PostgreSQL integration,
-  accessibility, i18n, and buyer-journey end-to-end tests pass.
+  accessibility, i18n, and officer-journey end-to-end tests pass.
 - Skipped or ignored required tests are release failures.
 
 ### Supply chain and operation
@@ -440,7 +451,7 @@ current on the exact artifact:
 
 ## Definition of commercial completion
 
-The product is commercially complete when an authorized buyer can:
+The product is commercially complete when an authorized officer can:
 
 1. register or import an authoritative source and exact release;
 2. decide and review applicability for a precise tenant and scope;

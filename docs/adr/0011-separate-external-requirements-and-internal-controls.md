@@ -105,7 +105,16 @@ approved uses without duplicating plaintext.
 
 Existing `control_evidence_binding` rows become a compatibility input. Migration
 must preserve them as legacy unassessed evidence links and must not invent an
-internal control, implementation, or effectiveness result.
+internal control, implementation, or effectiveness result. The stable legacy
+key is `binding_id` plus `control_item_id`. Those rows do not store
+`requirement_mapping_id`; tenant scope is the bound evidence record's tenant
+after Keyverse tenant persistence, otherwise the local-development tenant.
+Until an authorized current `control_requirement_mapping` exists for that
+tenant and control, the binding projects as `unassessed` at the control-item
+grain and is excluded from requirement-mapping posture. After such mappings
+exist, the same binding fans out as `unassessed` to each current authorized
+mapping for that tenant and `control_item`, recording `legacy_binding_id` as
+the input fact identifier under `posture-projection-v1`.
 
 ## Consequences
 
@@ -137,7 +146,7 @@ internal control, implementation, or effectiveness result.
   records `projection_rule_version` (`posture-projection-v1`), input fact
   versions and identifiers, precedence, as-of time, and recalculation history
   rather than replacing those facts.
-- Risk, audit, obligation, and buyer-workspace work must depend on this model.
+- Risk, audit, obligation, and officer-workspace work must depend on this model.
 
 ## Rejected alternatives
 
@@ -171,7 +180,7 @@ Purpose-bound usage records provide context without copying plaintext.
 4. Update risk #13 and audit #14 to consume internal-control implementation and
    effectiveness truth.
 5. Implement obligation/applicability #28 and catalog interoperability #29.
-6. Build the buyer workspace and controlled export surface in #30.
+6. Build the officer workspace and controlled export surface in #30.
 
 ## Standards and source constraints
 
