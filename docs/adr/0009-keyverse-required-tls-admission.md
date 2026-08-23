@@ -23,8 +23,9 @@ loopback before any later remote bind.
    fails closed instead of booting header-identity HTTP.
 2. `create_app` fails closed unless a Keyverse access-token verifier is injected.
    Declared `X-Actor-Id` headers cannot satisfy this start. Standalone
-   `cwl-grc serve` and `python -m cwl_grc` print a matching next action; they
-   do not load JWKS or admit remote traffic.
+   `cwl-grc serve` and `python -m cwl_grc` load a reviewed offline JWKS from
+   `CWL_GRC_KEYVERSE_JWKS_PATH` plus issuer, audience, and client identifiers.
+   They do not discover Keyverse on the network or admit remote traffic.
 3. The process binds TLS using `CWL_GRC_TLS_CERTFILE` and `CWL_GRC_TLS_KEYFILE`.
    HTTP, including `/healthz`, returns 503. `X-Forwarded-Proto` is not TLS.
    Uvicorn `proxy_headers` is disabled so a loopback client cannot rewrite the

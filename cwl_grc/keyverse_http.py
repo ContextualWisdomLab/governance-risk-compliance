@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Collection
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException
@@ -21,8 +23,11 @@ from cwl_grc.keyverse_authentication import (
     AccessTokenScopeError,
     AccessTokenValidationError,
     AuthenticatedPrincipal,
+    KeyverseAccessTokenSettings,
     KeyverseAccessTokenVerifier,
+    parse_keyverse_jwks,
 )
+from cwl_grc.remote_access import keyverse_start_is_required
 
 POLICY_READ_SCOPES = ("grc.policy.read",)
 POLICY_WRITE_SCOPES = ("grc.policy.write",)
@@ -71,6 +76,45 @@ def apply_keyverse_openapi_security(schema: dict[str, Any]) -> dict[str, Any]:
         operation = paths[path][method]
         operation["security"] = [{KEYVERSE_BEARER_SCHEME: list(scopes)}]
     return schema
+
+
+def process_access_token_verifier() -> KeyverseAccessTokenVerifier | None:
+    """Load a reviewed offline JWKS verifier when a hardened start is required."""
+    if not keyverse_start_is_required():
+        return None
+    issuer = os.environ.get("CWL_GRC_KEYVERSE_ISSUER", "").strip()
+    audience = os.environ.get("CWL_GRC_KEYVERSE_AUDIENCE", "").strip()
+    jwks_path = os.environ.get("CWL_GRC_KEYVERSE_JWKS_PATH", "").strip()
+    clients = _csv_identifiers(os.environ.get("CWL_GRC_KEYVERSE_CLIENT_IDS", ""))
+    roles = _csv_identifiers(
+        os.environ.get("CWL_GRC_KEYVERSE_ROLES", "compliance_officer")
+    )
+    if not issuer or not audience or not jwks_path or not clients or not roles:
+        raise ValueError(
+            "A reviewed Keyverse issuer, audience, client set, role set, and JWKS "
+            "path are required when CWL_GRC_REQUIRE_KEYVERSE is set."
+        )
+    path = Path(jwks_path)
+    if not path.is_file():
+        raise ValueError("The Keyverse JWKS path must be a readable file.")
+    document = path.read_bytes()
+    try:
+        return KeyverseAccessTokenVerifier(
+            KeyverseAccessTokenSettings(
+                issuer=issuer,
+                audience=audience,
+                allowed_client_ids=clients,
+                allowed_roles=roles,
+            ),
+            parse_keyverse_jwks(document),
+        )
+    except AccessTokenValidationError as exc:
+        raise ValueError(str(exc)) from exc
+
+
+def _csv_identifiers(raw: str) -> frozenset[str]:
+    """Split a comma-separated identifier list and drop empty fragments."""
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
 
 
 @dataclass(frozen=True)

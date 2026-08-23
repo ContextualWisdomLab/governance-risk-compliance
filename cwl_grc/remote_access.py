@@ -32,8 +32,10 @@ def startup_next_action() -> str:
     if required:
         return (
             "Set CWL_GRC_REQUIRE_KEYVERSE to 1, true, yes, 0, false, no, or unset; "
-            "inject a Keyverse verifier; set CWL_GRC_TLS_CERTFILE and "
-            "CWL_GRC_TLS_KEYFILE; and keep the bind on 127.0.0.1."
+            "set CWL_GRC_KEYVERSE_ISSUER, CWL_GRC_KEYVERSE_AUDIENCE, "
+            "CWL_GRC_KEYVERSE_CLIENT_IDS, CWL_GRC_KEYVERSE_JWKS_PATH, "
+            "CWL_GRC_TLS_CERTFILE, and CWL_GRC_TLS_KEYFILE; and keep the bind on "
+            "127.0.0.1."
         )
     return (
         "Set CWL_GRC_EVIDENCE_KEY for a persistent store, use a numeric PORT, "

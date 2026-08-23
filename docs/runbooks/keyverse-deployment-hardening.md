@@ -76,7 +76,9 @@ seconds.
 `CWL_GRC_REQUIRE_KEYVERSE=1` is a loopback hardening switch, not remote
 admission.
 
-1. Inject a Keyverse access-token verifier into `create_app(...)`.
+1. Set `CWL_GRC_KEYVERSE_ISSUER`, `CWL_GRC_KEYVERSE_AUDIENCE`,
+   `CWL_GRC_KEYVERSE_CLIENT_IDS`, and `CWL_GRC_KEYVERSE_JWKS_PATH` to a reviewed
+   public JWKS file. Do not point this start at a live discovery URL.
 2. Set `CWL_GRC_TLS_CERTFILE` and `CWL_GRC_TLS_KEYFILE`.
 3. Keep the bind on `127.0.0.1`. HTTP, including `/healthz`, returns 503.
 4. Do not trust `X-Forwarded-Proto` or actor headers as identity.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import jwt
 import pytest
@@ -161,8 +162,8 @@ def test_cli_serve_fails_closed_when_keyverse_required_without_tls(
     monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", "grc.key")
     assert serve_http() == 2
     missing_verifier = json.loads(capsys.readouterr().out)
-    assert "verifier" in missing_verifier["error"]
-    assert "Keyverse verifier" in missing_verifier["next_action"]
+    assert "JWKS" in missing_verifier["error"]
+    assert "CWL_GRC_KEYVERSE_JWKS_PATH" in missing_verifier["next_action"]
 
 
 def test_invalid_keyverse_flag_fails_closed_instead_of_header_preview(
@@ -194,3 +195,60 @@ def test_preview_startup_error_mentions_evidence_key_not_keyverse(
     assert "CWL_GRC_EVIDENCE_KEY" in payload["error"]
     assert "CWL_GRC_EVIDENCE_KEY" in payload["next_action"]
     assert "TLS" not in payload["next_action"]
+
+
+def _write_reviewed_jwks(tmp_path) -> Path:  # noqa: ANN001
+    """Write one reviewed public JWK set used by the hardened local start."""
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_jwk = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(private_key.public_key()))
+    public_jwk.update({"kid": "key-1", "use": "sig", "alg": "RS256"})
+    path = tmp_path / "keyverse.jwks.json"
+    path.write_text(json.dumps({"keys": [public_jwk]}), encoding="utf-8")
+    return path
+
+
+def test_process_access_token_verifier_loads_reviewed_jwks(
+    monkeypatch, tmp_path
+) -> None:  # noqa: ANN001
+    """A hardened CLI start injects the offline JWKS verifier instead of headers."""
+    from cwl_grc.cli import serve_http
+    from cwl_grc.keyverse_http import process_access_token_verifier
+
+    monkeypatch.delenv("CWL_GRC_REQUIRE_KEYVERSE", raising=False)
+    assert process_access_token_verifier() is None
+
+    monkeypatch.setenv("CWL_GRC_REQUIRE_KEYVERSE", "1")
+    monkeypatch.setenv("CWL_GRC_TLS_CERTFILE", "grc.crt")
+    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", "grc.key")
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_ISSUER", "https://identity.example.test/realms/cwl")
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_AUDIENCE", "cwl-grc-api")
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_CLIENT_IDS", "cwl-grc-web")
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_JWKS_PATH", str(tmp_path / "missing.jwks"))
+    with pytest.raises(ValueError, match="readable file"):
+        process_access_token_verifier()
+
+    empty = tmp_path / "empty.jwks.json"
+    empty.write_text('{"keys": []}', encoding="utf-8")
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_JWKS_PATH", str(empty))
+    with pytest.raises(ValueError, match="public keys"):
+        process_access_token_verifier()
+
+    jwks = _write_reviewed_jwks(tmp_path)
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_JWKS_PATH", str(jwks))
+    verifier = process_access_token_verifier()
+    assert verifier is not None
+    assert verifier.issuer == "https://identity.example.test/realms/cwl"
+
+    captured: dict[str, object] = {}
+
+    def fake_run(app, **kwargs):  # noqa: ANN001
+        captured["verifier"] = app.state.access_token_verifier is not None
+        captured["ssl"] = "ssl_certfile" in kwargs
+
+    monkeypatch.setattr("cwl_grc.cli.uvicorn.run", fake_run)
+    monkeypatch.setenv(
+        "CWL_GRC_EVIDENCE_KEY",
+        "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
+    )
+    assert serve_http() == 0
+    assert captured == {"verifier": True, "ssl": True}

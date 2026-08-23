@@ -203,7 +203,7 @@ def test_main_fails_closed_on_invalid_keyverse_flag(monkeypatch, capsys) -> None
     assert exited.value.code == 2
     payload = json.loads(capsys.readouterr().out)
     assert "CWL_GRC_REQUIRE_KEYVERSE" in payload["error"]
-    assert "inject a Keyverse verifier" in payload["next_action"]
+    assert "CWL_GRC_KEYVERSE_JWKS_PATH" in payload["next_action"]
 
 
 def test_require_purpose_rejects_mismatched_purpose() -> None:

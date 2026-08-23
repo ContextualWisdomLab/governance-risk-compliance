@@ -7,6 +7,7 @@ import json
 import uvicorn
 
 from cwl_grc.app import create_app
+from cwl_grc.keyverse_http import process_access_token_verifier
 from cwl_grc.remote_access import loopback_server_bind, startup_next_action
 
 
@@ -14,7 +15,10 @@ def main() -> None:
     """Serve the local preview on loopback, requiring TLS when Keyverse is required."""
     try:
         settings = loopback_server_bind()
-        uvicorn.run(create_app(), **settings)
+        uvicorn.run(
+            create_app(access_token_verifier=process_access_token_verifier()),
+            **settings,
+        )
     except ValueError as exc:
         print(
             json.dumps(
