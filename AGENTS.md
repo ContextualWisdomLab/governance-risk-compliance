@@ -11,7 +11,7 @@ Build ContextualWisdomLab GRC as the system of record for policy, control, risk,
 - Never copy Orgmetra, Keyverse, AIS, Billing, naruon, EA, or semantic-data-portal product bodies. Those services consume control/evidence contracts only.
 - Never take another dedicated-writer repository's work into this branch.
 - CSAP / SOC 2 / ISMS-P are product-control catalogs in this repo. Do not invent a second SAST stack or unverified control identifier.
-- Never treat `X-Actor-Id` or `X-Purpose` as authentication. When a Keyverse verifier is configured, the verified access-token subject is the actor. Audit events record issuer, client, and request correlation, never the raw token. The HTTP surface remains loopback-only until tenant authorization and production admission are implemented.
+- Never treat `X-Actor-Id`, `X-Purpose`, or CLI `--actor` as authentication. When a Keyverse verifier is configured, the verified access-token subject is the actor. Audit events record issuer, client, and request correlation, never the raw token. The HTTP surface remains loopback-only until tenant authorization and production admission are implemented.
 - Never blanket-mask or destructively alter PII needed by an authorized workflow. Protect exact values with authenticated purpose and tenant authorization, encrypted storage and transport, audit, retention, and purpose-specific field selection that omits unrelated fields.
 - Never dummy-commit or force-push.
 - Work only in the authorized cloud environment.

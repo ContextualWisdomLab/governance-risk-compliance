@@ -37,6 +37,7 @@ def startup_next_action() -> str:
             "CWL_GRC_KEYVERSE_ISSUER, CWL_GRC_KEYVERSE_AUDIENCE, "
             "CWL_GRC_KEYVERSE_CLIENT_IDS, CWL_GRC_KEYVERSE_JWKS_PATH, "
             "CWL_GRC_TLS_CERTFILE, and CWL_GRC_TLS_KEYFILE to readable files; "
+            "use a numeric PORT; set CWL_GRC_ACCESS_TOKEN for CLI writes; "
             "and keep the bind on 127.0.0.1."
         )
     return (
@@ -50,11 +51,20 @@ def request_uses_encrypted_transport(scheme: str | None) -> bool:
     return (scheme or "").lower() == "https"
 
 
+def loopback_port() -> int:
+    """Parse ``PORT`` as a TCP port and fail closed on a non-numeric value."""
+    raw = os.environ.get("PORT", "8080")
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ValueError("PORT must be a numeric TCP port.") from exc
+
+
 def loopback_server_bind() -> dict[str, Any]:
     """Return the loopback Uvicorn bind, requiring TLS when Keyverse is required."""
     settings: dict[str, Any] = {
         "host": "127.0.0.1",
-        "port": int(os.environ.get("PORT", "8080")),
+        "port": loopback_port(),
         "proxy_headers": False,
     }
     if not keyverse_start_is_required():

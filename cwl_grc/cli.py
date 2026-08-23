@@ -14,18 +14,32 @@ import uvicorn
 from fastapi import HTTPException
 
 from cwl_grc.app import create_app, parse_framework, serialize_control
-from cwl_grc.keyverse_http import process_access_token_verifier
-from cwl_grc.remote_access import loopback_server_bind, startup_next_action
+from cwl_grc.keyverse_http import (
+    EVIDENCE_WRITE_SCOPES,
+    POLICY_READ_SCOPES,
+    POLICY_WRITE_SCOPES,
+    RequestPrincipal,
+    authenticate_cli_principal,
+    decision_for_request,
+    process_access_token_verifier,
+)
+from cwl_grc.remote_access import (
+    keyverse_start_is_required,
+    loopback_server_bind,
+    startup_next_action,
+)
 from cwl_grc.authorization import (
     AuthorizationDecision,
     PurposeCode,
     seed_authorization_purposes,
 )
+from cwl_grc.models import PolicyDocument
 from cwl_grc.catalog import seed_control_catalog
 from cwl_grc.database import create_session_factory
 from cwl_grc.encryption import EvidenceCipher
 from cwl_grc.evidence import bind_control_evidence, create_evidence_record
 from cwl_grc.policy import (
+    PolicyGap,
     author_policy,
     list_policy_documents,
     list_policy_gaps,
@@ -48,15 +62,23 @@ def main(argv: list[str] | None = None) -> int:
         return int(exc.code or 2)
     try:
         return _dispatch(namespace)
+    except ValueError as exc:
+        print(
+            json.dumps(
+                {
+                    "error": str(exc),
+                    "next_action": startup_next_action(),
+                }
+            )
+        )
+        return 2
     except HTTPException as exc:
         print(
             json.dumps(
                 {
                     "error": exc.detail,
                     "status_code": exc.status_code,
-                    "next_action": (
-                        "Use an official catalog identifier, then attach the next evidence."
-                    ),
+                    "next_action": _cli_http_next_action(exc),
                 }
             )
         )
@@ -128,15 +150,93 @@ def _dispatch(namespace: argparse.Namespace) -> int:
     return 2
 
 
+def _cli_http_next_action(exc: HTTPException) -> str:
+    """Return the officer next action for one CLI authorization or catalog error."""
+    try:
+        required = keyverse_start_is_required()
+    except ValueError:
+        required = True
+    if exc.status_code in {401, 403} and required:
+        return (
+            "Set CWL_GRC_ACCESS_TOKEN to a Keyverse access token with the required "
+            "scope, then author the next official-control policy (for example CSAP 10.2.1)."
+        )
+    return "Use an official catalog identifier, then attach the next evidence."
+
+
+def _cli_decision(
+    declared_actor: str | None,
+    purpose: PurposeCode,
+    required_scopes: tuple[str, ...],
+) -> AuthorizationDecision:
+    """Build a purpose decision from Keyverse when required, else from ``--actor``."""
+    if not keyverse_start_is_required():
+        if not declared_actor:
+            raise HTTPException(
+                status_code=401,
+                detail="State the actor and purpose before touching evidence.",
+            )
+        return AuthorizationDecision(declared_actor, purpose)
+    principal = authenticate_cli_principal(
+        declared_actor=declared_actor,
+        required_scopes=required_scopes,
+    )
+    return decision_for_request(principal, purpose.value, purpose)
+
+
+def _cli_read_principal() -> RequestPrincipal | None:
+    """Return the verified CLI principal for reads, or None in local preview."""
+    if not keyverse_start_is_required():
+        return None
+    return authenticate_cli_principal(
+        declared_actor=None,
+        required_scopes=POLICY_READ_SCOPES,
+    )
+
+
+def _owned_policy_documents(
+    session: Session,
+    principal: RequestPrincipal | None,
+) -> list[PolicyDocument]:
+    """List policies, limited to the verified officer and tenant when Keyverse is required."""
+    documents = list_policy_documents(session)
+    if principal is None:
+        return documents
+    return [
+        document
+        for document in documents
+        if document.created_by_actor == principal.actor_identifier
+        and document.tenant_identifier == principal.tenant_identifier
+    ]
+
+
+def _owned_policy_gaps(
+    session: Session,
+    principal: RequestPrincipal | None,
+    policy_document_id: str | None,
+) -> list[PolicyGap]:
+    """List uncovered mappings, limited to the verified tenant when Keyverse is required."""
+    tenant = None if principal is None else principal.tenant_identifier
+    gaps = list_policy_gaps(session, policy_document_id, tenant_identifier=tenant)
+    if principal is None:
+        return gaps
+    owned = {
+        document.policy_document_id
+        for document in _owned_policy_documents(session, principal)
+    }
+    return [gap for gap in gaps if gap.policy_document_id in owned]
+
+
 def _policy_command(namespace: argparse.Namespace) -> int:
     """Author, revise, or list policies."""
     action = namespace.policy_command
     session = _open_session()
     try:
         if action == "author":
-            decision = AuthorizationDecision(
+            decision = _cli_decision(
                 namespace.actor,
                 PurposeCode.POLICY_AUTHORING,
+                POLICY_WRITE_SCOPES,
             )
             refs = [parse_cli_control_map(raw) for raw in namespace.maps]
             document = author_policy(
@@ -150,9 +250,10 @@ def _policy_command(namespace: argparse.Namespace) -> int:
             print(json.dumps(serialize_policy(session, document)))
             return 0
         if action == "revise":
-            decision = AuthorizationDecision(
+            decision = _cli_decision(
                 namespace.actor,
                 PurposeCode.POLICY_AUTHORING,
+                POLICY_WRITE_SCOPES,
             )
             refs = [parse_cli_control_map(raw) for raw in namespace.maps]
             document = revise_policy(
@@ -169,7 +270,10 @@ def _policy_command(namespace: argparse.Namespace) -> int:
             payload: dict[str, Any] = {
                 "policies": [
                     serialize_policy(session, document)
-                    for document in list_policy_documents(session)
+                    for document in _owned_policy_documents(
+                        session,
+                        _cli_read_principal(),
+                    )
                 ],
                 "next_action": "Review policy gaps and attach the next evidence.",
             }
@@ -184,7 +288,7 @@ def _gaps_command(policy_document_id: str | None) -> int:
     """Print uncovered policy/control gaps as JSON."""
     session = _open_session()
     try:
-        gaps = list_policy_gaps(session, policy_document_id)
+        gaps = _owned_policy_gaps(session, _cli_read_principal(), policy_document_id)
         print(
             json.dumps(
                 {
@@ -205,9 +309,10 @@ def _bind_command(namespace: argparse.Namespace) -> int:
     session = _open_session()
     cipher = EvidenceCipher(os.environ.get("CWL_GRC_EVIDENCE_KEY"))
     try:
-        decision = AuthorizationDecision(
+        decision = _cli_decision(
             namespace.actor,
             PurposeCode.EVIDENCE_BINDING,
+            EVIDENCE_WRITE_SCOPES,
         )
         framework = parse_framework(namespace.framework)
         if framework is None:
