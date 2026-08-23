@@ -239,18 +239,63 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
                 "'officer', CURRENT_TIMESTAMP)"
             )
         )
+        connection.execute(
+            text(
+                "CREATE TABLE evidence_record ("
+                "evidence_record_id VARCHAR(64) PRIMARY KEY, "
+                "evidence_title VARCHAR(255) NOT NULL, "
+                "collector_actor VARCHAR(128) NOT NULL, "
+                "purpose_code VARCHAR(64) NOT NULL, "
+                "ciphertext_payload BLOB NOT NULL, "
+                "collected_at TIMESTAMP NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO evidence_record VALUES "
+                "('evidence-1', 'Legacy register', 'officer', "
+                "'evidence_binding', X'00', CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE audit_event ("
+                "audit_event_id VARCHAR(64) PRIMARY KEY, "
+                "actor_identifier VARCHAR(128) NOT NULL, "
+                "purpose_code VARCHAR(64) NOT NULL, "
+                "action_name VARCHAR(64) NOT NULL, "
+                "resource_kind VARCHAR(64) NOT NULL, "
+                "resource_identifier VARCHAR(128) NOT NULL, "
+                "recorded_at TIMESTAMP NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO audit_event VALUES "
+                "('audit-1', 'officer', 'policy_authoring', "
+                "'author_policy', 'policy_document', 'policy-1', "
+                "CURRENT_TIMESTAMP)"
+            )
+        )
     apply_schema_migrations(engine)
     apply_schema_migrations(engine)
-    policy_columns = {
-        column["name"]
-        for column in inspect(engine).get_columns("policy_document")
-    }
-    version_columns = {
-        column["name"]
-        for column in inspect(engine).get_columns("policy_version")
-    }
+    inspector = inspect(engine)
+    policy_columns = {column["name"] for column in inspector.get_columns("policy_document")}
+    version_columns = {column["name"] for column in inspector.get_columns("policy_version")}
+    evidence_columns = {column["name"] for column in inspector.get_columns("evidence_record")}
+    audit_columns = {column["name"] for column in inspector.get_columns("audit_event")}
     assert "current_version_number" in policy_columns
+    assert "tenant_identifier" in policy_columns
     assert "is_finalized" in version_columns
+    assert "tenant_identifier" in evidence_columns
+    assert "tenant_identifier" in audit_columns
+    index_names = {
+        index["name"]
+        for table_name in ("policy_document", "evidence_record")
+        for index in inspector.get_indexes(table_name)
+    }
+    assert "policy_document_tenant_actor" in index_names
+    assert "evidence_record_tenant_actor" in index_names
     with engine.connect() as connection:
         counter = connection.execute(
             text(
@@ -267,9 +312,60 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
         receipt_count = connection.execute(
             text("SELECT COUNT(*) FROM schema_migration")
         ).scalar_one()
+        tenant = connection.execute(
+            text(
+                "SELECT tenant_identifier FROM policy_document "
+                "WHERE policy_document_id = 'policy-1'"
+            )
+        ).scalar_one()
+        evidence_tenant = connection.execute(
+            text(
+                "SELECT tenant_identifier FROM evidence_record "
+                "WHERE evidence_record_id = 'evidence-1'"
+            )
+        ).scalar_one()
+        audit_tenant = connection.execute(
+            text(
+                "SELECT tenant_identifier FROM audit_event "
+                "WHERE audit_event_id = 'audit-1'"
+            )
+        ).scalar_one()
     assert counter == 3
     assert finalized in {True, 1}
-    assert receipt_count == 1
+    assert receipt_count == 2
+    assert tenant == "local_preview"
+    assert evidence_tenant == "local_preview"
+    assert audit_tenant == "local_preview"
+
+
+def test_tenant_ownership_migration_skips_tables_that_are_not_present(
+    tmp_path: Path,
+) -> None:
+    """0002 records a receipt when a partial store has not created owned tables yet."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'partial.sqlite'}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE schema_migration ("
+                "migration_key VARCHAR(64) PRIMARY KEY, "
+                "applied_at TIMESTAMP NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO schema_migration VALUES "
+                "('0001_policy_integrity', CURRENT_TIMESTAMP)"
+            )
+        )
+    apply_schema_migrations(engine)
+    with engine.connect() as connection:
+        keys = {
+            row[0]
+            for row in connection.execute(
+                text("SELECT migration_key FROM schema_migration")
+            )
+        }
+    assert keys == {"0001_policy_integrity", "0002_tenant_ownership"}
 
 
 def test_integrity_guard_ddl_covers_supported_and_unknown_dialects() -> None:

@@ -202,6 +202,79 @@ def test_keyverse_route_rejects_missing_token_wrong_tenant_and_missing_scope() -
     assert scoped.status_code == 403
 
 
+def test_keyverse_tenant_owned_policies_are_isolated_by_org_claim() -> None:
+    """The same officer in another Keyverse org cannot read or revise tenant records."""
+    private_key, jwk = _signing_material("key-1")
+    client = _client(_verifier(jwk))
+    acme_token = _token(private_key, org="tenant-acme", jti="token-acme-1")
+    other_token = _token(private_key, org="tenant-other", jti="token-other-1")
+    created = client.post(
+        "/policy-documents",
+        headers={
+            "Authorization": f"Bearer {acme_token}",
+            "X-Purpose": "policy_authoring",
+        },
+        json={
+            "policy_title": "Acme Retention Policy",
+            "policy_body": "Keep CSAP 10.2.1 grants for the declared tenant.",
+            "control_refs": [
+                {
+                    "framework": FrameworkCode.CSAP_2026.value,
+                    "catalog_identifier": "10.2.1",
+                }
+            ],
+        },
+    )
+    assert created.status_code == 201
+    policy_id = created.json()["policy_document_id"]
+
+    other_list = client.get(
+        "/policy-documents",
+        headers={"Authorization": f"Bearer {other_token}"},
+    )
+    assert other_list.status_code == 200
+    assert other_list.json()["policies"] == []
+
+    other_home = client.get("/", headers={"Authorization": f"Bearer {other_token}"})
+    assert "Acme Retention Policy" not in other_home.text
+
+    revised = client.post(
+        f"/policy-documents/{policy_id}/versions",
+        headers={
+            "Authorization": f"Bearer {other_token}",
+            "X-Purpose": "policy_authoring",
+        },
+        json={"policy_body": "Cross-tenant rewrite.", "control_refs": []},
+    )
+    assert revised.status_code == 404
+
+    evidence = client.post(
+        "/evidence-records",
+        headers={
+            "Authorization": f"Bearer {acme_token}",
+            "X-Purpose": "evidence_binding",
+        },
+        json={
+            "evidence_title": "Acme CSAP 10.2.1 register",
+            "payload_text": "Officer Park approved unique user IDs.",
+        },
+    )
+    assert evidence.status_code == 201
+    bound = client.post(
+        "/control-evidence-bindings",
+        headers={
+            "Authorization": f"Bearer {other_token}",
+            "X-Purpose": "evidence_binding",
+        },
+        json={
+            "framework": FrameworkCode.CSAP_2026.value,
+            "catalog_identifier": "10.2.1",
+            "evidence_record_id": evidence.json()["evidence_record_id"],
+        },
+    )
+    assert bound.status_code == 404
+
+
 def test_officer_home_hides_other_officers_policy_title_under_keyverse() -> None:
     """officer-kim must not see officer-park's CSAP 10.2.1 policy title on GET /."""
     private_key, jwk = _signing_material("key-1")

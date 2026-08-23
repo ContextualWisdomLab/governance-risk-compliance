@@ -22,12 +22,16 @@ class PurposeCode(StrEnum):
     POLICY_AUTHORING = "policy_authoring"
 
 
+LOCAL_PREVIEW_TENANT = "local_preview"
+
+
 @dataclass(frozen=True)
 class AuthorizationDecision:
-    """An actor acting under one declared purpose."""
+    """An actor acting under one declared purpose for one tenant."""
 
     actor_identifier: str
     purpose_code: PurposeCode
+    tenant_identifier: str = LOCAL_PREVIEW_TENANT
 
 
 def seed_authorization_purposes(session: Session) -> None:
@@ -63,6 +67,8 @@ def require_purpose(
     actor_identifier: str | None,
     purpose_value: str | None,
     required: PurposeCode,
+    *,
+    tenant_identifier: str | None = None,
 ) -> AuthorizationDecision:
     """Accept only a named actor acting under the required purpose."""
     if not actor_identifier or not purpose_value:
@@ -79,4 +85,5 @@ def require_purpose(
             status_code=403,
             detail=f"This action requires {required.value}.",
         )
-    return AuthorizationDecision(actor_identifier, purpose_code)
+    tenant = (tenant_identifier or "").strip() or LOCAL_PREVIEW_TENANT
+    return AuthorizationDecision(actor_identifier, purpose_code, tenant)

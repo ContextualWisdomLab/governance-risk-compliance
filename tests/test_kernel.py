@@ -76,6 +76,14 @@ def test_require_purpose_accepts_only_declared_codes() -> None:
     )
     assert allowed.actor_identifier == "officer-ahn"
     assert allowed.purpose_code is PurposeCode.EVIDENCE_BINDING
+    assert allowed.tenant_identifier == "local_preview"
+    named = require_purpose(
+        "officer-ahn",
+        PurposeCode.EVIDENCE_BINDING.value,
+        PurposeCode.EVIDENCE_BINDING,
+        tenant_identifier=" tenant-acme ",
+    )
+    assert named.tenant_identifier == "tenant-acme"
 
 
 def test_require_purpose_rejects_blank_actor() -> None:

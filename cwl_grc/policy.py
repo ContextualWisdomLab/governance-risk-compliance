@@ -103,6 +103,7 @@ def author_policy(
     document = PolicyDocument(
         policy_document_id=uuid4().hex,
         policy_title=title,
+        tenant_identifier=decision.tenant_identifier,
         created_by_actor=decision.actor_identifier,
         created_at=datetime.now(timezone.utc).replace(tzinfo=None),
         current_version_number=1,
@@ -130,7 +131,7 @@ def revise_policy(
 ) -> PolicyDocument:
     """Atomically allocate and append the next immutable policy edition."""
     document = session.get(PolicyDocument, policy_document_id)
-    if document is None:
+    if document is None or document.tenant_identifier != decision.tenant_identifier:
         raise HTTPException(status_code=404, detail="That policy document is not on file.")
     body = policy_body.strip()
     if not body:

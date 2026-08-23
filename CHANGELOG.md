@@ -19,6 +19,8 @@
 - Provider-neutral Keyverse JWT access-token verification kernel and typed authenticated-principal contract.
 - Bounded pinned-HTTPS Keyverse OIDC metadata and public-JWK loading through the provider-loader boundary, retaining exact source-byte digests and atomic last-known-good snapshots.
 - HTTP route adapter that verifies Keyverse Bearer access tokens, rejects actor-header impersonation, matches declared tenant to the `org` claim, and returns only the verified officer's policies and gaps.
+- Officer home (`GET /`) and officer form posts require the same Keyverse Bearer token and hide other officers' policy titles from the home page.
+- Tenant-owned persistence: `policy_document`, `evidence_record`, and `audit_event` store `tenant_identifier`, migrate existing rows to `local_preview`, and isolate reads/writes by Keyverse `org`.
 
 ### Security
 
@@ -44,3 +46,4 @@
 - `docs/adr/0003-keyverse-jwt-access-token-profile.md` — closed RFC 9068-style Keyverse access-token profile before route and tenant integration.
 - `docs/adr/0004-keyverse-oidc-provider-loading.md` — bounded pinned-HTTPS loading of Keyverse OIDC metadata and public JWKs before route and tenant integration.
 - `docs/adr/0005-keyverse-http-route-enforcement.md` — Bearer access-token route enforcement using the Keyverse principal as actor, with local preview preserved when no verifier is configured.
+- `docs/adr/0006-keyverse-tenant-owned-persistence.md` — persist Keyverse `org` on policy, evidence, and audit rows and isolate reads/writes by tenant.

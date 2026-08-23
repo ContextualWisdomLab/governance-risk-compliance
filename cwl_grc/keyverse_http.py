@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Collection
+from dataclasses import dataclass
 
 from fastapi import HTTPException
 
+from cwl_grc.authorization import LOCAL_PREVIEW_TENANT
 from cwl_grc.keyverse_authentication import (
     AccessTokenValidationError,
     AuthenticatedPrincipal,
@@ -15,6 +17,14 @@ from cwl_grc.keyverse_authentication import (
 POLICY_READ_SCOPES = ("grc.policy.read",)
 POLICY_WRITE_SCOPES = ("grc.policy.write",)
 EVIDENCE_WRITE_SCOPES = ("grc.evidence.write",)
+
+
+@dataclass(frozen=True)
+class RequestPrincipal:
+    """Actor and tenant resolved for one HTTP or local-preview action."""
+
+    actor_identifier: str
+    tenant_identifier: str
 
 
 def extract_bearer_token(authorization: str | None) -> str:
@@ -40,8 +50,8 @@ def authenticate_keyverse_request(
     declared_actor: str | None,
     declared_tenant: str | None = None,
     required_scopes: Collection[str] = (),
-) -> str:
-    """Return the verified actor, or the local preview actor when Keyverse is unset.
+) -> RequestPrincipal:
+    """Return the verified actor and tenant, or local-preview declarations.
 
     When a verifier is configured, ``X-Actor-Id`` is not identity. A matching
     header is tolerated; a mismatched header is impersonation and fails closed.
@@ -52,7 +62,8 @@ def authenticate_keyverse_request(
                 status_code=401,
                 detail="State the actor and purpose before touching evidence.",
             )
-        return declared_actor
+        tenant = (declared_tenant or "").strip() or LOCAL_PREVIEW_TENANT
+        return RequestPrincipal(declared_actor, tenant)
     try:
         principal = verifier.verify(
             extract_bearer_token(authorization),
@@ -62,7 +73,7 @@ def authenticate_keyverse_request(
         status = 403 if "required scope" in str(exc) else 401
         raise HTTPException(status_code=status, detail=str(exc)) from exc
     _reject_impersonation(principal, declared_actor, declared_tenant)
-    return principal.actor_id
+    return RequestPrincipal(principal.actor_id, principal.tenant_id)
 
 
 def _reject_impersonation(

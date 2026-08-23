@@ -25,7 +25,7 @@ flowchart LR
 
 ## Runtime layers
 
-1. **Officer home**: buyer-oriented HTML that authors a policy, lists policy gaps, and attaches the next evidence in a local preview.
+1. **Officer home**: officer-facing HTML that authors a policy, lists policy gaps, and attaches the next evidence in a local preview.
 2. **HTTP API**: policy author/revise/list, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, `/healthz`.
 3. **Preview network boundary**: always rejects proxy-forwarded and non-loopback traffic; no runtime override exists before Keyverse authentication.
 4. **CLI tools**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and the local Uvicorn `cwl-grc serve`.
@@ -36,15 +36,15 @@ flowchart LR
 
 | Object | Role |
 | --- | --- |
-| `policy_document` | Stable policy identity, title, and optimistic current-version counter |
+| `policy_document` | Stable policy identity, title, Keyverse tenant identifier, and optimistic current-version counter |
 | `policy_version` | Edition finalized exactly once; database triggers reject later update/delete |
 | `policy_control_mapping` | Edition → official `control_item`; insert only before finalization and never update/delete |
 | `control_framework` | One official catalog edition |
 | `control_item` | One official identifier and statement |
 | `authorization_purpose` | Declared purpose attached to policy or evidence work; not actor authentication |
-| `evidence_record` | Encrypted-at-rest artifact; exact values remain usable in an authorized workflow |
+| `evidence_record` | Encrypted-at-rest artifact scoped to a tenant identifier; exact values remain usable in an authorized workflow |
 | `control_evidence_binding` | Many-to-many bind of artifact to control |
-| `audit_event` | Append-only action record protected at the database boundary |
+| `audit_event` | Append-only action record scoped to a tenant identifier and protected at the database boundary |
 | `schema_migration` | Applied schema-upgrade receipt |
 
 A policy gap is a latest finalized-edition mapping whose control has zero `control_evidence_binding` rows. There is no second evidence-binding table.
