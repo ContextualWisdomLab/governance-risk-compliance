@@ -30,6 +30,8 @@ def test_local_request_classifier_fails_closed() -> None:
     assert request_is_local(None, None, None) is False
     assert request_is_local("127.0.0.1", "198.51.100.23", None) is False
     assert request_is_local("127.0.0.1", None, "for=198.51.100.23") is False
+    assert request_is_local("127.0.0.1", None, None, "https") is False
+    assert request_is_local("127.0.0.1", None, None, None, "example.test") is False
 
 
 def test_forwarded_remote_preview_is_always_denied(monkeypatch) -> None:  # noqa: ANN001
@@ -46,9 +48,13 @@ def test_forwarded_remote_preview_is_always_denied(monkeypatch) -> None:  # noqa
         "/healthz",
         headers={"Forwarded": "for=198.51.100.23"},
     )
+    forwarded_proto = client.get(
+        "/healthz",
+        headers={"X-Forwarded-Proto": "https"},
+    )
 
     assert local.status_code == 200
-    for response in (forwarded, standardized):
+    for response in (forwarded, standardized, forwarded_proto):
         assert response.status_code == 503
         assert response.json() == {
             "detail": (
@@ -112,11 +118,14 @@ def test_loopback_bind_requires_tls_files_when_keyverse_is_required(
     """A Keyverse-required start cannot bind HTTP even on 127.0.0.1."""
     monkeypatch.delenv("CWL_GRC_REQUIRE_KEYVERSE", raising=False)
     assert keyverse_start_is_required() is False
+    monkeypatch.setenv("CWL_GRC_REQUIRE_KEYVERSE", "0")
+    assert keyverse_start_is_required() is False
+    monkeypatch.delenv("CWL_GRC_REQUIRE_KEYVERSE", raising=False)
     assert request_uses_encrypted_transport("https") is True
     assert request_uses_encrypted_transport("http") is False
     assert request_uses_encrypted_transport(None) is False
     preview = loopback_server_bind()
-    assert preview == {"host": "127.0.0.1", "port": 8080}
+    assert preview == {"host": "127.0.0.1", "port": 8080, "proxy_headers": False}
     monkeypatch.setenv("CWL_GRC_REQUIRE_KEYVERSE", "yes")
     monkeypatch.setenv("PORT", "8443")
     with pytest.raises(ValueError, match="TLS certificate"):
@@ -127,6 +136,7 @@ def test_loopback_bind_requires_tls_files_when_keyverse_is_required(
     assert hardened == {
         "host": "127.0.0.1",
         "port": 8443,
+        "proxy_headers": False,
         "ssl_certfile": "grc.crt",
         "ssl_keyfile": "grc.key",
     }
@@ -153,3 +163,34 @@ def test_cli_serve_fails_closed_when_keyverse_required_without_tls(
     missing_verifier = json.loads(capsys.readouterr().out)
     assert "verifier" in missing_verifier["error"]
     assert "Keyverse verifier" in missing_verifier["next_action"]
+
+
+def test_invalid_keyverse_flag_fails_closed_instead_of_header_preview(
+    monkeypatch, capsys
+) -> None:  # noqa: ANN001
+    """A misspelled hardened-start flag must not boot the unauthenticated preview."""
+    from cwl_grc.cli import serve_http
+
+    monkeypatch.setenv("CWL_GRC_REQUIRE_KEYVERSE", "treu")
+    with pytest.raises(ValueError, match="CWL_GRC_REQUIRE_KEYVERSE must be"):
+        keyverse_start_is_required()
+    assert serve_http() == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert "CWL_GRC_REQUIRE_KEYVERSE" in payload["error"]
+    assert "0, false, no, or unset" in payload["next_action"]
+
+
+def test_preview_startup_error_mentions_evidence_key_not_keyverse(
+    monkeypatch, capsys, tmp_path
+) -> None:  # noqa: ANN001
+    """Ordinary preview failures must not tell officers to inject Keyverse TLS."""
+    from cwl_grc.cli import serve_http
+
+    monkeypatch.delenv("CWL_GRC_REQUIRE_KEYVERSE", raising=False)
+    monkeypatch.delenv("CWL_GRC_EVIDENCE_KEY", raising=False)
+    monkeypatch.setenv("CWL_GRC_DATABASE_URL", f"sqlite:///{tmp_path / 'grc.sqlite'}")
+    assert serve_http() == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert "CWL_GRC_EVIDENCE_KEY" in payload["error"]
+    assert "CWL_GRC_EVIDENCE_KEY" in payload["next_action"]
+    assert "TLS" not in payload["next_action"]

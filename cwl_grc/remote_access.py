@@ -7,13 +7,38 @@ from ipaddress import ip_address
 from typing import Any
 
 
+KEYVERSE_REQUIRED_VALUES = frozenset({"1", "true", "yes"})
+KEYVERSE_OPTIONAL_VALUES = frozenset({"", "0", "false", "no"})
+
+
 def keyverse_start_is_required() -> bool:
     """Return whether this process must start with a Keyverse verifier and TLS."""
-    return os.environ.get("CWL_GRC_REQUIRE_KEYVERSE", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-    }
+    raw = os.environ.get("CWL_GRC_REQUIRE_KEYVERSE", "").strip().lower()
+    if raw in KEYVERSE_REQUIRED_VALUES:
+        return True
+    if raw in KEYVERSE_OPTIONAL_VALUES:
+        return False
+    raise ValueError(
+        "CWL_GRC_REQUIRE_KEYVERSE must be 1, true, yes, 0, false, no, or unset."
+    )
+
+
+def startup_next_action() -> str:
+    """Return the operator next action that matches the failed local start."""
+    try:
+        required = keyverse_start_is_required()
+    except ValueError:
+        required = True
+    if required:
+        return (
+            "Set CWL_GRC_REQUIRE_KEYVERSE to 1, true, yes, 0, false, no, or unset; "
+            "inject a Keyverse verifier; set CWL_GRC_TLS_CERTFILE and "
+            "CWL_GRC_TLS_KEYFILE; and keep the bind on 127.0.0.1."
+        )
+    return (
+        "Set CWL_GRC_EVIDENCE_KEY for a persistent store, use a numeric PORT, "
+        "and keep the bind on 127.0.0.1."
+    )
 
 
 def request_uses_encrypted_transport(scheme: str | None) -> bool:
@@ -26,6 +51,7 @@ def loopback_server_bind() -> dict[str, Any]:
     settings: dict[str, Any] = {
         "host": "127.0.0.1",
         "port": int(os.environ.get("PORT", "8080")),
+        "proxy_headers": False,
     }
     if not keyverse_start_is_required():
         return settings
@@ -44,9 +70,11 @@ def request_is_local(
     client_host: str | None,
     forwarded_for: str | None,
     forwarded: str | None,
+    forwarded_proto: str | None = None,
+    forwarded_host: str | None = None,
 ) -> bool:
     """Accept only direct loopback requests with no proxy forwarding evidence."""
-    if forwarded_for or forwarded:
+    if forwarded_for or forwarded or forwarded_proto or forwarded_host:
         return False
     if client_host in {"localhost", "testclient"}:
         return True

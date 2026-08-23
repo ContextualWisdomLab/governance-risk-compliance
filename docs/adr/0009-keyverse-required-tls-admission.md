@@ -19,12 +19,18 @@ loopback before any later remote bind.
 ## Decision
 
 1. `CWL_GRC_REQUIRE_KEYVERSE=1` (or `true`/`yes`) is the hardened local start.
+   `0`/`false`/`no`/unset keep the developer preview. Any other nonempty value
+   fails closed instead of booting header-identity HTTP.
 2. `create_app` fails closed unless a Keyverse access-token verifier is injected.
-   Declared `X-Actor-Id` headers cannot satisfy this start.
+   Declared `X-Actor-Id` headers cannot satisfy this start. Standalone
+   `cwl-grc serve` and `python -m cwl_grc` print a matching next action; they
+   do not load JWKS or admit remote traffic.
 3. The process binds TLS using `CWL_GRC_TLS_CERTFILE` and `CWL_GRC_TLS_KEYFILE`.
    HTTP, including `/healthz`, returns 503. `X-Forwarded-Proto` is not TLS.
-4. The bind remains `127.0.0.1`. Forwarded and non-loopback traffic stay 503.
-   Unset, the developer preview is unchanged.
+   Uvicorn `proxy_headers` is disabled so a loopback client cannot rewrite the
+   ASGI scheme.
+4. The bind remains `127.0.0.1`. Forwarded, forwarded-proto, forwarded-host, and
+   non-loopback traffic stay 503. Unset, the developer preview is unchanged.
 
 ## Consequences
 

@@ -195,6 +195,8 @@ def create_app(
                 client_host,
                 request.headers.get("x-forwarded-for"),
                 request.headers.get("forwarded"),
+                request.headers.get("x-forwarded-proto"),
+                request.headers.get("x-forwarded-host"),
             )
             if not local_request:
                 response: Response = JSONResponse(

@@ -27,7 +27,7 @@
 - Keyverse policy-gap queries count only the verified tenant's evidence bindings, so one organization's CSAP mapping cannot hide another organization's uncovered control.
 - Keyverse audit attribution: `audit_event` stores issuer, OAuth client, request correlation, and `allow` without copying the access token; migration `0003_audit_attribution` backfills legacy rows as `local_preview` / `legacy_unattributed`.
 - Deployment-hardening runbook for local-preview migration, rollback, JWKS rotation, issuer outage, clock skew, and emergency read-only.
-- Hardened local start: `CWL_GRC_REQUIRE_KEYVERSE` refuses header-identity boots and admits only loopback TLS (`CWL_GRC_TLS_CERTFILE` / `CWL_GRC_TLS_KEYFILE`). This is not remote production exposure.
+- Hardened local start: `CWL_GRC_REQUIRE_KEYVERSE` refuses header-identity boots and admits only loopback TLS (`CWL_GRC_TLS_CERTFILE` / `CWL_GRC_TLS_KEYFILE`). Invalid flag values fail closed. Proxy headers cannot rewrite TLS. Preview startup errors name the evidence key, not Keyverse TLS. This is not remote production exposure.
 
 ### Security
 
