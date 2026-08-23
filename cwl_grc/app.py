@@ -46,7 +46,11 @@ from cwl_grc.policy import (
     serialize_gap,
     serialize_policy,
 )
-from cwl_grc.remote_access import request_is_local
+from cwl_grc.remote_access import (
+    keyverse_start_is_required,
+    request_is_local,
+    request_uses_encrypted_transport,
+)
 
 
 def parse_framework(value: str | None) -> FrameworkCode | None:
@@ -96,6 +100,11 @@ def create_app(
     access_token_verifier: KeyverseAccessTokenVerifier | None = None,
 ) -> FastAPI:
     """Build a local-only GRC app with durable-key enforcement."""
+    if keyverse_start_is_required() and access_token_verifier is None:
+        raise ValueError(
+            "A Keyverse access-token verifier is required; declared actor headers "
+            "are not a production start."
+        )
     url = database_url or os.environ.get(
         "CWL_GRC_DATABASE_URL",
         "sqlite:///grc_product.sqlite",
@@ -190,6 +199,18 @@ def create_app(
                         "detail": (
                             "Remote preview is disabled. Configure Keyverse-backed identity and "
                             "tenant authorization before exposing CWL GRC."
+                        )
+                    },
+                )
+            elif keyverse_start_is_required() and not request_uses_encrypted_transport(
+                request.url.scheme
+            ):
+                response = JSONResponse(
+                    status_code=503,
+                    content={
+                        "detail": (
+                            "Encrypted transport is required when Keyverse is required. "
+                            "Serve TLS on loopback; do not expose CWL GRC over HTTP."
                         )
                     },
                 )

@@ -14,6 +14,7 @@ import uvicorn
 from fastapi import HTTPException
 
 from cwl_grc.app import create_app, parse_framework, serialize_control
+from cwl_grc.remote_access import loopback_server_bind
 from cwl_grc.authorization import (
     AuthorizationDecision,
     PurposeCode,
@@ -62,9 +63,24 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def serve_http() -> int:
-    """Serve the unauthenticated developer preview on loopback and $PORT."""
-    port = int(os.environ.get("PORT", "8080"))
-    uvicorn.run(create_app(), host="127.0.0.1", port=port)
+    """Serve the local preview on loopback, requiring TLS when Keyverse is required."""
+    try:
+        settings = loopback_server_bind()
+        app = create_app()
+    except ValueError as exc:
+        print(
+            json.dumps(
+                {
+                    "error": str(exc),
+                    "next_action": (
+                        "Inject a Keyverse verifier, set CWL_GRC_TLS_CERTFILE and "
+                        "CWL_GRC_TLS_KEYFILE, and keep the bind on 127.0.0.1."
+                    ),
+                }
+            )
+        )
+        return 2
+    uvicorn.run(app, **settings)
     return 0
 
 

@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-import os
-
 import uvicorn
 
 from cwl_grc.app import create_app
+from cwl_grc.remote_access import loopback_server_bind
 
 
 def main() -> None:
-    """Serve the unauthenticated developer preview on loopback and $PORT."""
-    port = int(os.environ.get("PORT", "8080"))
-    uvicorn.run(create_app(), host="127.0.0.1", port=port)
+    """Serve the local preview on loopback, requiring TLS when Keyverse is required."""
+    settings = loopback_server_bind()
+    uvicorn.run(create_app(), **settings)
 
 
 if __name__ == "__main__":  # pragma: no cover

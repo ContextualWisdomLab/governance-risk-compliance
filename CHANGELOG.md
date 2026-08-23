@@ -25,6 +25,7 @@
 - Officer home browser forms store the Keyverse access token in `sessionStorage` and send it as an `Authorization: Bearer` header so policy and evidence posts work without relying on actor headers.
 - Keyverse audit attribution: `audit_event` stores issuer, OAuth client, request correlation, and `allow` without copying the access token; migration `0003_audit_attribution` backfills legacy rows as `local_preview` / `legacy_unattributed`.
 - Deployment-hardening runbook for local-preview migration, rollback, JWKS rotation, issuer outage, clock skew, and emergency read-only.
+- Hardened local start: `CWL_GRC_REQUIRE_KEYVERSE` refuses header-identity boots and admits only loopback TLS (`CWL_GRC_TLS_CERTFILE` / `CWL_GRC_TLS_KEYFILE`). This is not remote production exposure.
 
 ### Security
 
@@ -54,3 +55,4 @@
 - `docs/adr/0006-keyverse-tenant-owned-persistence.md` — persist Keyverse `org` on policy, evidence, and audit rows and isolate reads/writes by tenant.
 - `docs/adr/0007-keyverse-openapi-security.md` — publish Keyverse Bearer security schemes on officer policy and evidence OpenAPI operations.
 - `docs/adr/0008-keyverse-audit-event-attribution.md` — persist Keyverse issuer, client, and request correlation on audit events without storing bearer tokens.
+- `docs/adr/0009-keyverse-required-tls-admission.md` — require an injected Keyverse verifier and loopback TLS before a hardened local start.
