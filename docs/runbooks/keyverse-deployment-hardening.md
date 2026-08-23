@@ -79,13 +79,15 @@ admission.
 1. Set `CWL_GRC_KEYVERSE_ISSUER`, `CWL_GRC_KEYVERSE_AUDIENCE`,
    `CWL_GRC_KEYVERSE_CLIENT_IDS`, and `CWL_GRC_KEYVERSE_JWKS_PATH` to a reviewed
    public JWKS file. Do not point this start at a live discovery URL.
-2. Set `CWL_GRC_TLS_CERTFILE` and `CWL_GRC_TLS_KEYFILE`.
-3. Keep the bind on `127.0.0.1`. HTTP, including `/healthz`, returns 503.
-4. Do not trust `X-Forwarded-Proto` or actor headers as identity.
+2. Set `CWL_GRC_TLS_CERTFILE` and `CWL_GRC_TLS_KEYFILE` to readable files.
+   Empty paths and missing files fail closed before Uvicorn starts.
+3. Set `CWL_GRC_EVIDENCE_KEY` for any persistent store.
+4. Keep the bind on `127.0.0.1`. HTTP, including `/healthz`, returns 503.
+5. Do not trust `X-Forwarded-Proto` or actor headers as identity.
 
-If the verifier, certificate, or key is missing, `cwl-grc serve` exits 2 and
-states that next action. Unset `CWL_GRC_REQUIRE_KEYVERSE` remains the
-unauthenticated developer preview.
+If the verifier, certificate, key, or evidence key is missing, `cwl-grc serve`
+exits 2 and states that next action. Unset `CWL_GRC_REQUIRE_KEYVERSE` remains
+the unauthenticated developer preview.
 
 ## What remains before production
 

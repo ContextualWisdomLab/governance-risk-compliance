@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from ipaddress import ip_address
+from pathlib import Path
 from typing import Any
 
 
@@ -32,10 +33,11 @@ def startup_next_action() -> str:
     if required:
         return (
             "Set CWL_GRC_REQUIRE_KEYVERSE to 1, true, yes, 0, false, no, or unset; "
-            "set CWL_GRC_KEYVERSE_ISSUER, CWL_GRC_KEYVERSE_AUDIENCE, "
+            "set CWL_GRC_EVIDENCE_KEY for a persistent store; set "
+            "CWL_GRC_KEYVERSE_ISSUER, CWL_GRC_KEYVERSE_AUDIENCE, "
             "CWL_GRC_KEYVERSE_CLIENT_IDS, CWL_GRC_KEYVERSE_JWKS_PATH, "
-            "CWL_GRC_TLS_CERTFILE, and CWL_GRC_TLS_KEYFILE; and keep the bind on "
-            "127.0.0.1."
+            "CWL_GRC_TLS_CERTFILE, and CWL_GRC_TLS_KEYFILE to readable files; "
+            "and keep the bind on 127.0.0.1."
         )
     return (
         "Set CWL_GRC_EVIDENCE_KEY for a persistent store, use a numeric PORT, "
@@ -63,8 +65,12 @@ def loopback_server_bind() -> dict[str, Any]:
         raise ValueError(
             "TLS certificate and key files are required when CWL_GRC_REQUIRE_KEYVERSE is set."
         )
-    settings["ssl_certfile"] = cert
-    settings["ssl_keyfile"] = key
+    cert_path = Path(cert)
+    key_path = Path(key)
+    if not cert_path.is_file() or not key_path.is_file():
+        raise ValueError("TLS certificate and key files must be readable files.")
+    settings["ssl_certfile"] = str(cert_path)
+    settings["ssl_keyfile"] = str(key_path)
     return settings
 
 

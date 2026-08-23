@@ -113,8 +113,18 @@ def test_keyverse_required_start_admits_https_and_rejects_http(
     assert healthy.json() == {"status": "ok", "service": "cwl-grc"}
 
 
+def _write_tls_files(tmp_path) -> tuple[Path, Path]:  # noqa: ANN001
+    """Write readable TLS path placeholders used by the hardened local start."""
+    cert = tmp_path / "grc.crt"
+    key = tmp_path / "grc.key"
+    cert.write_text("certificate", encoding="utf-8")
+    key.write_text("key", encoding="utf-8")
+    return cert, key
+
+
 def test_loopback_bind_requires_tls_files_when_keyverse_is_required(
     monkeypatch,
+    tmp_path,
 ) -> None:  # noqa: ANN001
     """A Keyverse-required start cannot bind HTTP even on 127.0.0.1."""
     monkeypatch.delenv("CWL_GRC_REQUIRE_KEYVERSE", raising=False)
@@ -131,20 +141,30 @@ def test_loopback_bind_requires_tls_files_when_keyverse_is_required(
     monkeypatch.setenv("PORT", "8443")
     with pytest.raises(ValueError, match="TLS certificate"):
         loopback_server_bind()
-    monkeypatch.setenv("CWL_GRC_TLS_CERTFILE", "grc.crt")
-    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", "grc.key")
+    missing_cert = tmp_path / "missing.crt"
+    missing_key = tmp_path / "missing.key"
+    cert, key = _write_tls_files(tmp_path)
+    monkeypatch.setenv("CWL_GRC_TLS_CERTFILE", str(missing_cert))
+    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", str(key))
+    with pytest.raises(ValueError, match="readable files"):
+        loopback_server_bind()
+    monkeypatch.setenv("CWL_GRC_TLS_CERTFILE", str(cert))
+    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", str(missing_key))
+    with pytest.raises(ValueError, match="readable files"):
+        loopback_server_bind()
+    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", str(key))
     hardened = loopback_server_bind()
     assert hardened == {
         "host": "127.0.0.1",
         "port": 8443,
         "proxy_headers": False,
-        "ssl_certfile": "grc.crt",
-        "ssl_keyfile": "grc.key",
+        "ssl_certfile": str(cert),
+        "ssl_keyfile": str(key),
     }
 
 
 def test_cli_serve_fails_closed_when_keyverse_required_without_tls(
-    monkeypatch, capsys
+    monkeypatch, capsys, tmp_path
 ) -> None:  # noqa: ANN001
     """Officer CLI states the next action instead of binding HTTP under Keyverse."""
     from cwl_grc.cli import serve_http
@@ -158,12 +178,21 @@ def test_cli_serve_fails_closed_when_keyverse_required_without_tls(
     missing_tls = json.loads(capsys.readouterr().out)
     assert "TLS" in missing_tls["error"]
     assert "127.0.0.1" in missing_tls["next_action"]
-    monkeypatch.setenv("CWL_GRC_TLS_CERTFILE", "grc.crt")
-    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", "grc.key")
+    assert "CWL_GRC_EVIDENCE_KEY" in missing_tls["next_action"]
+    monkeypatch.setenv("CWL_GRC_TLS_CERTFILE", str(tmp_path / "missing.crt"))
+    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", str(tmp_path / "missing.key"))
+    assert serve_http() == 2
+    missing_files = json.loads(capsys.readouterr().out)
+    assert "readable files" in missing_files["error"]
+    assert "CWL_GRC_TLS_CERTFILE" in missing_files["next_action"]
+    cert, key = _write_tls_files(tmp_path)
+    monkeypatch.setenv("CWL_GRC_TLS_CERTFILE", str(cert))
+    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", str(key))
     assert serve_http() == 2
     missing_verifier = json.loads(capsys.readouterr().out)
     assert "JWKS" in missing_verifier["error"]
     assert "CWL_GRC_KEYVERSE_JWKS_PATH" in missing_verifier["next_action"]
+    assert "CWL_GRC_EVIDENCE_KEY" in missing_verifier["next_action"]
 
 
 def test_invalid_keyverse_flag_fails_closed_instead_of_header_preview(
@@ -218,8 +247,9 @@ def test_process_access_token_verifier_loads_reviewed_jwks(
     assert process_access_token_verifier() is None
 
     monkeypatch.setenv("CWL_GRC_REQUIRE_KEYVERSE", "1")
-    monkeypatch.setenv("CWL_GRC_TLS_CERTFILE", "grc.crt")
-    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", "grc.key")
+    cert, key = _write_tls_files(tmp_path)
+    monkeypatch.setenv("CWL_GRC_TLS_CERTFILE", str(cert))
+    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", str(key))
     monkeypatch.setenv("CWL_GRC_KEYVERSE_ISSUER", "https://identity.example.test/realms/cwl")
     monkeypatch.setenv("CWL_GRC_KEYVERSE_AUDIENCE", "cwl-grc-api")
     monkeypatch.setenv("CWL_GRC_KEYVERSE_CLIENT_IDS", "cwl-grc-web")
@@ -252,3 +282,27 @@ def test_process_access_token_verifier_loads_reviewed_jwks(
     )
     assert serve_http() == 0
     assert captured == {"verifier": True, "ssl": True}
+
+
+def test_hardened_start_missing_evidence_key_names_key_in_next_action(
+    monkeypatch, capsys, tmp_path
+) -> None:  # noqa: ANN001
+    """A hardened persistent start states the evidence key, not only Keyverse TLS."""
+    from cwl_grc.cli import serve_http
+
+    cert, key = _write_tls_files(tmp_path)
+    jwks = _write_reviewed_jwks(tmp_path)
+    monkeypatch.setenv("CWL_GRC_REQUIRE_KEYVERSE", "1")
+    monkeypatch.setenv("CWL_GRC_TLS_CERTFILE", str(cert))
+    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", str(key))
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_ISSUER", "https://identity.example.test/realms/cwl")
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_AUDIENCE", "cwl-grc-api")
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_CLIENT_IDS", "cwl-grc-web")
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_JWKS_PATH", str(jwks))
+    monkeypatch.delenv("CWL_GRC_EVIDENCE_KEY", raising=False)
+    monkeypatch.setenv("CWL_GRC_DATABASE_URL", f"sqlite:///{tmp_path / 'grc.sqlite'}")
+    assert serve_http() == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert "CWL_GRC_EVIDENCE_KEY" in payload["error"]
+    assert "CWL_GRC_EVIDENCE_KEY" in payload["next_action"]
+    assert "CWL_GRC_TLS_CERTFILE" in payload["next_action"]

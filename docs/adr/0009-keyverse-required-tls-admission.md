@@ -26,10 +26,12 @@ loopback before any later remote bind.
    `cwl-grc serve` and `python -m cwl_grc` load a reviewed offline JWKS from
    `CWL_GRC_KEYVERSE_JWKS_PATH` plus issuer, audience, and client identifiers.
    They do not discover Keyverse on the network or admit remote traffic.
-3. The process binds TLS using `CWL_GRC_TLS_CERTFILE` and `CWL_GRC_TLS_KEYFILE`.
-   HTTP, including `/healthz`, returns 503. `X-Forwarded-Proto` is not TLS.
-   Uvicorn `proxy_headers` is disabled so a loopback client cannot rewrite the
-   ASGI scheme.
+3. The process binds TLS using readable `CWL_GRC_TLS_CERTFILE` and
+   `CWL_GRC_TLS_KEYFILE` paths. Empty or missing files fail closed before
+   Uvicorn starts. HTTP, including `/healthz`, returns 503. `X-Forwarded-Proto`
+   is not TLS. Uvicorn `proxy_headers` is disabled so a loopback client cannot
+   rewrite the ASGI scheme. Hardened-start next actions also name
+   `CWL_GRC_EVIDENCE_KEY` for persistent stores.
 4. The bind remains `127.0.0.1`. Forwarded, forwarded-proto, forwarded-host, and
    non-loopback traffic stay 503. Unset, the developer preview is unchanged.
 
