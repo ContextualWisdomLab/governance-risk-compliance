@@ -1,4 +1,4 @@
-"""Buyer-facing officer home: policies, coverage gaps, and the next evidence action."""
+"""Officer home: policies, coverage gaps, and the next evidence action."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from cwl_grc.catalog import FrameworkCode, framework_label
 from cwl_grc.models import ControlItem
 from cwl_grc.policy import PolicyGap
 
-_BUYER_FRAMEWORKS = (
+_OFFICER_FRAMEWORKS = (
     FrameworkCode.CSAP_2026,
     FrameworkCode.SOC2_TSC_2017,
     FrameworkCode.ISMS_P_2023,
@@ -21,6 +21,61 @@ _POLICY_FRAMEWORKS = (
     FrameworkCode.ISO27001_2022,
 )
 
+_OFFICER_HOME_SCRIPT = """
+(function () {
+  var tokenKey = "cwlGrcKeyverseAccessToken";
+  var tokenInput = document.getElementById("keyverse-access-token");
+  var stored = sessionStorage.getItem(tokenKey);
+  if (stored && tokenInput) {
+    tokenInput.value = stored;
+  }
+  function submitOfficerForm(form, purpose) {
+    if (!form) {
+      return;
+    }
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!tokenInput || !tokenInput.value) {
+        if (tokenInput) {
+          tokenInput.reportValidity();
+        }
+        return;
+      }
+      var token = tokenInput.value;
+      sessionStorage.setItem(tokenKey, token);
+      fetch(form.action, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + token,
+          "X-Purpose": purpose
+        },
+        body: new FormData(form)
+      }).then(function (response) {
+        if (response.ok || response.redirected) {
+          sessionStorage.setItem(tokenKey, token);
+          window.location.assign("/");
+          return;
+        }
+        return response.text().then(function () {
+          document.body.insertAdjacentHTML(
+            "afterbegin",
+            "<p>The officer action could not be completed.</p>"
+          );
+        });
+      });
+    });
+  }
+  submitOfficerForm(
+    document.getElementById("officer-policy-form"),
+    "policy_authoring"
+  );
+  submitOfficerForm(
+    document.getElementById("officer-evidence-form"),
+    "evidence_binding"
+  );
+})();
+""".strip()
+
 
 def render_officer_home(
     uncovered: list[ControlItem],
@@ -31,7 +86,7 @@ def render_officer_home(
     gaps = policy_gaps or []
     catalog = catalog_items or []
     sections: list[str] = []
-    for code in _BUYER_FRAMEWORKS:
+    for code in _OFFICER_FRAMEWORKS:
         rows = [item for item in uncovered if item.framework_key == code.value]
         items = "".join(_row(item) for item in rows) or (
             "<li>Every seeded control in this catalog has evidence. Review the bindings or attach another artifact.</li>"
@@ -47,7 +102,7 @@ def render_officer_home(
         f"{escape(item.framework_key)} {escape(item.catalog_identifier)} — {escape(item.control_title)}"
         "</option>"
         for item in uncovered
-        if item.framework_key in {code.value for code in _BUYER_FRAMEWORKS}
+        if item.framework_key in {code.value for code in _OFFICER_FRAMEWORKS}
     )
     mapping_source = catalog or uncovered
     policy_options = "".join(
@@ -72,8 +127,11 @@ def render_officer_home(
 <body>
   <h1>Author the next policy, then attach evidence on uncovered controls</h1>
   <p>Map each policy to official CSAP / SOC 2 / ISMS-P / ISO 27001 identifiers. Officer contact details stay usable; they are not masked.</p>
+  <label>Keyverse access token
+    <input id="keyverse-access-token" type="password" required autocomplete="off">
+  </label>
   <h2>Author the next policy</h2>
-  <form method="post" action="/officer/policy">
+  <form id="officer-policy-form" method="post" action="/officer/policy">
     <label>Policy title
       <input name="policy_title" required placeholder="Logical Access Policy">
     </label>
@@ -81,7 +139,7 @@ def render_officer_home(
       <textarea name="policy_body" required></textarea>
     </label>
     <label>Officer identifier
-      <input name="actor_identifier" required placeholder="officer-ahn">
+      <input name="actor_identifier" placeholder="officer-ahn">
     </label>
     <label>Official controls this policy maps
       <select name="control_refs" multiple>{policy_options}</select>
@@ -92,12 +150,12 @@ def render_officer_home(
   <ul>{gap_items}</ul>
   {''.join(sections)}
   <h2>Attach the next evidence</h2>
-  <form method="post" action="/officer/evidence">
+  <form id="officer-evidence-form" method="post" action="/officer/evidence">
     <label>Uncovered control
       <select name="control_ref" required>{evidence_options}</select>
     </label>
     <label>Officer identifier
-      <input name="actor_identifier" required placeholder="officer-ahn">
+      <input name="actor_identifier" placeholder="officer-ahn">
     </label>
     <label>Evidence title
       <input name="evidence_title" required placeholder="CSAP 10.2.1 access-grant register">
@@ -107,6 +165,9 @@ def render_officer_home(
     </label>
     <button type="submit">Attach the next evidence</button>
   </form>
+  <script>
+{_OFFICER_HOME_SCRIPT}
+  </script>
 </body>
 </html>
 """
