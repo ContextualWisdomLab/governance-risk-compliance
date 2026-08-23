@@ -27,8 +27,10 @@ the identity issuer; GRC is a resource server.
    exception text.
 4. Policy list, gap queries, and the officer home (`GET /`, `POST /officer/policy`,
    `POST /officer/evidence`) return or mutate only documents authored by the
-   verified subject. Official catalog reads remain unauthenticated because they
-   are published control identifiers, not tenant records.
+   verified subject. Gap coverage counts only evidence bindings whose
+   `evidence_record.tenant_identifier` matches the verified Keyverse `org`.
+   Official catalog reads remain unauthenticated because they are published
+   control identifiers, not tenant records.
 5. `/healthz` remains unauthenticated. Remote traffic stays denied until
    deployment hardening.
 6. Officer home HTML forms cannot attach an `Authorization` header on native

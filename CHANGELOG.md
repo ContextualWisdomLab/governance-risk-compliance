@@ -24,6 +24,7 @@
 - OpenAPI `/openapi.json` publishes `KeyverseBearer` (`at+jwt`) on officer policy, evidence, and home operations with `grc.policy.read`, `grc.policy.write`, and `grc.evidence.write`. Catalog and `/healthz` stay public.
 - Officer home browser forms store the Keyverse access token in `sessionStorage` and send it as an `Authorization: Bearer` header. Local preview without a verifier posts `X-Actor-Id` from the officer identifier instead of requiring a token.
 - Officer evidence form authenticates before validating `control_ref`, so unauthenticated callers receive 401 rather than a 400 that leaked catalog well-formedness.
+- Keyverse policy-gap queries count only the verified tenant's evidence bindings, so one organization's CSAP mapping cannot hide another organization's uncovered control.
 
 ### Security
 

@@ -47,7 +47,7 @@ flowchart LR
 | `audit_event` | Append-only action record scoped to a tenant identifier and protected at the database boundary |
 | `schema_migration` | Applied schema-upgrade receipt |
 
-A policy gap is a latest finalized-edition mapping whose control has zero `control_evidence_binding` rows. There is no second evidence-binding table.
+A policy gap is a latest finalized-edition mapping whose control has zero tenant-owned `control_evidence_binding` rows. Keyverse gap queries join bindings to `evidence_record.tenant_identifier` so one tenant cannot close another tenant's official-control gap. There is no second evidence-binding table.
 
 Cross-service reads use published HTTP contracts after an authenticated service boundary exists. Peer products do not query these tables.
 

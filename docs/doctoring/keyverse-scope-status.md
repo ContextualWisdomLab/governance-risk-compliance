@@ -31,6 +31,9 @@ resource and action restriction without collapsing those two outcomes.
 - Officer home `fetch` sends Bearer only when a Keyverse token is present.
   Local preview without a verifier sends `X-Actor-Id` from the officer
   identifier so browser authoring remains usable.
+- Policy-gap coverage is tenant-scoped: another Keyverse `org` binding the
+  same official control (for example CSAP `10.2.1`) does not close this
+  tenant's gap.
 
 ## References
 
