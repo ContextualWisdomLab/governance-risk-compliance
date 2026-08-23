@@ -44,7 +44,7 @@ flowchart LR
 | `authorization_purpose` | Declared purpose attached to policy or evidence work; not actor authentication |
 | `evidence_record` | Encrypted-at-rest artifact scoped to a tenant identifier; exact values remain usable in an authorized workflow |
 | `control_evidence_binding` | Many-to-many bind of artifact to control |
-| `audit_event` | Append-only action record scoped to a tenant identifier and protected at the database boundary |
+| `audit_event` | Append-only action record scoped to tenant, Keyverse issuer/client, request correlation, and `allow`; protected at the database boundary |
 | `schema_migration` | Applied schema-upgrade receipt |
 
 A policy gap is a latest finalized-edition mapping whose control has zero `control_evidence_binding` rows. There is no second evidence-binding table.
@@ -59,7 +59,7 @@ Policy creation writes an unfinalized `policy_version`, writes its official-cont
 
 ## Security posture
 
-The current HTTP surface is an unauthenticated developer preview unless a Keyverse access-token verifier is injected. `X-Actor-Id` and `X-Purpose` are audit and purpose declarations, not proof of identity. When the verifier is present, policy and evidence routes require a signed Keyverse Bearer token; the verified subject is the actor and policy reads are limited to that officer. `/openapi.json` publishes the same Bearer scheme and scopes. The application binds its command-line server to loopback and always denies non-loopback or proxy-forwarded traffic. There is no unauthenticated remote-preview override.
+The current HTTP surface is an unauthenticated developer preview unless a Keyverse access-token verifier is injected. `X-Actor-Id` and `X-Purpose` are audit and purpose declarations, not proof of identity. When the verifier is present, policy and evidence routes require a signed Keyverse Bearer token; the verified subject is the actor and policy reads are limited to that officer. Authorized mutations write `audit_event` rows with issuer, client, tenant, subject, purpose, `allow`, and `X-Request-ID` correlation; compact JWT material is rejected. `/openapi.json` publishes the same Bearer scheme and scopes. The application binds its command-line server to loopback and always denies non-loopback or proxy-forwarded traffic. There is no unauthenticated remote-preview override. See `docs/runbooks/keyverse-deployment-hardening.md`.
 
 Production exposure still requires encrypted transport and deployment controls in addition to this adapter. Evidence payloads remain encrypted at rest. Every persistent store requires explicit Fernet key material; ephemeral keys exist only for explicitly selected in-memory tests. The product does not destructively mask operational evidence; authenticated views and exports must select only the fields required for the approved purpose and omit unrelated fields. SAST remains a CWL Security lane. OPA/Rego is not part of this kernel.
 

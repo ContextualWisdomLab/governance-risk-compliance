@@ -13,7 +13,7 @@ This repository is the ContextualWisdomLab home for policy, control, risk, evide
 5. Read the policy-gap list and attach the next evidence on an uncovered mapped control.
 6. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
 
-The HTTP surface is an **unauthenticated developer preview** unless `create_app(access_token_verifier=...)` is supplied. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. When a Keyverse verifier is configured, policy and evidence routes require a Bearer access token, use the verified subject as the actor, stamp the Keyverse `org` on owned rows, and return only that officer's policies for that tenant. `/openapi.json` publishes that Keyverse Bearer contract; catalog and `/healthz` stay public. The command-line server binds to `127.0.0.1`, and the app always rejects proxy-forwarded or non-loopback traffic. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
+The HTTP surface is an **unauthenticated developer preview** unless `create_app(access_token_verifier=...)` is supplied. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. When a Keyverse verifier is configured, policy and evidence routes require a Bearer access token, use the verified subject as the actor, stamp the Keyverse `org` on owned rows, return only that officer's policies for that tenant, and write audit events with issuer, client, and request correlation—never the raw token. `/openapi.json` publishes that Keyverse Bearer contract; catalog and `/healthz` stay public. The command-line server binds to `127.0.0.1`, and the app always rejects proxy-forwarded or non-loopback traffic. Follow `docs/runbooks/keyverse-deployment-hardening.md` for local-preview migration and issuer outage steps. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and production admission are implemented.
 
 ## Operator CLI
 
@@ -48,7 +48,7 @@ Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `n
 
 ## Integrity guarantees
 
-- `audit_event` rows are append-only at the database boundary.
+- `audit_event` rows are append-only at the database boundary and record issuer, client, tenant, subject, purpose, `allow`, and a request correlation reference without storing access tokens.
 - A `policy_version` is created open, receives its mappings, and is finalized exactly once.
 - Finalized policy text and mappings cannot be updated, deleted, or extended through SQL.
 - `policy_document.current_version_number` serializes revision allocation; a stale writer receives `409 Conflict` and must reload.

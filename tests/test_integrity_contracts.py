@@ -289,13 +289,18 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
     assert "is_finalized" in version_columns
     assert "tenant_identifier" in evidence_columns
     assert "tenant_identifier" in audit_columns
+    assert "issuer_identifier" in audit_columns
+    assert "client_identifier" in audit_columns
+    assert "correlation_reference" in audit_columns
+    assert "decision_outcome" in audit_columns
     index_names = {
         index["name"]
-        for table_name in ("policy_document", "evidence_record")
+        for table_name in ("policy_document", "evidence_record", "audit_event")
         for index in inspector.get_indexes(table_name)
     }
     assert "policy_document_tenant_actor" in index_names
     assert "evidence_record_tenant_actor" in index_names
+    assert "audit_event_tenant_correlation" in index_names
     with engine.connect() as connection:
         counter = connection.execute(
             text(
@@ -330,12 +335,25 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
                 "WHERE audit_event_id = 'audit-1'"
             )
         ).scalar_one()
+        audit_attribution = connection.execute(
+            text(
+                "SELECT issuer_identifier, client_identifier, "
+                "correlation_reference, decision_outcome FROM audit_event "
+                "WHERE audit_event_id = 'audit-1'"
+            )
+        ).one()
     assert counter == 3
     assert finalized in {True, 1}
-    assert receipt_count == 2
+    assert receipt_count == 3
     assert tenant == "local_preview"
     assert evidence_tenant == "local_preview"
     assert audit_tenant == "local_preview"
+    assert audit_attribution == (
+        "local_preview",
+        "local_preview",
+        "legacy_unattributed",
+        "allow",
+    )
 
 
 def test_tenant_ownership_migration_skips_tables_that_are_not_present(
@@ -365,7 +383,138 @@ def test_tenant_ownership_migration_skips_tables_that_are_not_present(
                 text("SELECT migration_key FROM schema_migration")
             )
         }
-    assert keys == {"0001_policy_integrity", "0002_tenant_ownership"}
+    assert keys == {
+        "0001_policy_integrity",
+        "0002_tenant_ownership",
+        "0003_audit_attribution",
+    }
+
+
+def test_audit_attribution_migration_skips_existing_columns(
+    tmp_path: Path,
+) -> None:
+    """0003 is idempotent when issuer, client, correlation, and decision already exist."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'attributed.sqlite'}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE schema_migration ("
+                "migration_key VARCHAR(64) PRIMARY KEY, "
+                "applied_at TIMESTAMP NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO schema_migration VALUES "
+                "('0001_policy_integrity', CURRENT_TIMESTAMP), "
+                "('0002_tenant_ownership', CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE audit_event ("
+                "audit_event_id VARCHAR(64) PRIMARY KEY, "
+                "tenant_identifier VARCHAR(128) NOT NULL, "
+                "actor_identifier VARCHAR(128) NOT NULL, "
+                "purpose_code VARCHAR(64) NOT NULL, "
+                "action_name VARCHAR(64) NOT NULL, "
+                "resource_kind VARCHAR(64) NOT NULL, "
+                "resource_identifier VARCHAR(128) NOT NULL, "
+                "recorded_at TIMESTAMP NOT NULL, "
+                "issuer_identifier VARCHAR(1024) NOT NULL, "
+                "client_identifier VARCHAR(128) NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO audit_event VALUES ("
+                "'audit-2', 'local_preview', 'officer', 'policy_authoring', "
+                "'author_policy', 'policy_document', 'policy-1', "
+                "CURRENT_TIMESTAMP, 'local_preview', 'local_preview')"
+            )
+        )
+    apply_schema_migrations(engine)
+    apply_schema_migrations(engine)
+    inspector = inspect(engine)
+    columns = {column["name"] for column in inspector.get_columns("audit_event")}
+    assert "correlation_reference" in columns
+    assert "decision_outcome" in columns
+    with engine.connect() as connection:
+        row = connection.execute(
+            text(
+                "SELECT correlation_reference, decision_outcome "
+                "FROM audit_event WHERE audit_event_id = 'audit-2'"
+            )
+        ).one()
+        keys = {
+            item[0]
+            for item in connection.execute(text("SELECT migration_key FROM schema_migration"))
+        }
+    assert row == ("legacy_unattributed", "allow")
+    assert "0003_audit_attribution" in keys
+
+
+def test_audit_attribution_migration_keeps_existing_attribution_values(
+    tmp_path: Path,
+) -> None:
+    """0003 does not rewrite issuer, client, correlation, or decision when present."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'complete-audit.sqlite'}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE schema_migration ("
+                "migration_key VARCHAR(64) PRIMARY KEY, "
+                "applied_at TIMESTAMP NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO schema_migration VALUES "
+                "('0001_policy_integrity', CURRENT_TIMESTAMP), "
+                "('0002_tenant_ownership', CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE audit_event ("
+                "audit_event_id VARCHAR(64) PRIMARY KEY, "
+                "tenant_identifier VARCHAR(128) NOT NULL, "
+                "actor_identifier VARCHAR(128) NOT NULL, "
+                "purpose_code VARCHAR(64) NOT NULL, "
+                "action_name VARCHAR(64) NOT NULL, "
+                "resource_kind VARCHAR(64) NOT NULL, "
+                "resource_identifier VARCHAR(128) NOT NULL, "
+                "recorded_at TIMESTAMP NOT NULL, "
+                "issuer_identifier VARCHAR(1024) NOT NULL, "
+                "client_identifier VARCHAR(128) NOT NULL, "
+                "correlation_reference VARCHAR(128) NOT NULL, "
+                "decision_outcome VARCHAR(32) NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO audit_event VALUES ("
+                "'audit-3', 'tenant-acme', 'officer-park', 'policy_authoring', "
+                "'author_policy', 'policy_document', 'policy-1', "
+                "CURRENT_TIMESTAMP, 'https://identity.example.test/realms/cwl', "
+                "'cwl-grc-web', 'kept-correlation', 'allow')"
+            )
+        )
+    apply_schema_migrations(engine)
+    with engine.connect() as connection:
+        row = connection.execute(
+            text(
+                "SELECT issuer_identifier, client_identifier, "
+                "correlation_reference, decision_outcome "
+                "FROM audit_event WHERE audit_event_id = 'audit-3'"
+            )
+        ).one()
+    assert row == (
+        "https://identity.example.test/realms/cwl",
+        "cwl-grc-web",
+        "kept-correlation",
+        "allow",
+    )
 
 
 def test_integrity_guard_ddl_covers_supported_and_unknown_dialects() -> None:

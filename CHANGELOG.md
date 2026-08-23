@@ -23,6 +23,8 @@
 - Tenant-owned persistence: `policy_document`, `evidence_record`, and `audit_event` store `tenant_identifier`, migrate existing rows to `local_preview`, and isolate reads/writes by Keyverse `org`.
 - OpenAPI `/openapi.json` publishes `KeyverseBearer` (`at+jwt`) on officer policy, evidence, and home operations with `grc.policy.read`, `grc.policy.write`, and `grc.evidence.write`. Catalog and `/healthz` stay public.
 - Officer home browser forms store the Keyverse access token in `sessionStorage` and send it as an `Authorization: Bearer` header so policy and evidence posts work without relying on actor headers.
+- Keyverse audit attribution: `audit_event` stores issuer, OAuth client, request correlation, and `allow` without copying the access token; migration `0003_audit_attribution` backfills legacy rows as `local_preview` / `legacy_unattributed`.
+- Deployment-hardening runbook for local-preview migration, rollback, JWKS rotation, issuer outage, clock skew, and emergency read-only.
 
 ### Security
 
@@ -51,3 +53,4 @@
 - `docs/adr/0005-keyverse-http-route-enforcement.md` — Bearer access-token route enforcement using the Keyverse principal as actor, with local preview preserved when no verifier is configured.
 - `docs/adr/0006-keyverse-tenant-owned-persistence.md` — persist Keyverse `org` on policy, evidence, and audit rows and isolate reads/writes by tenant.
 - `docs/adr/0007-keyverse-openapi-security.md` — publish Keyverse Bearer security schemes on officer policy and evidence OpenAPI operations.
+- `docs/adr/0008-keyverse-audit-event-attribution.md` — persist Keyverse issuer, client, and request correlation on audit events without storing bearer tokens.

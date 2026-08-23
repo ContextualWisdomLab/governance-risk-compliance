@@ -125,6 +125,13 @@ class AuditEvent(Base):
     """Append-only record of an authorized GRC action."""
 
     __tablename__ = "audit_event"
+    __table_args__ = (
+        Index(
+            "audit_event_tenant_correlation",
+            "tenant_identifier",
+            "correlation_reference",
+        ),
+    )
 
     audit_event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     tenant_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -134,6 +141,10 @@ class AuditEvent(Base):
     resource_kind: Mapped[str] = mapped_column(String(64), nullable=False)
     resource_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    issuer_identifier: Mapped[str] = mapped_column(String(1024), nullable=False)
+    client_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
+    correlation_reference: Mapped[str] = mapped_column(String(128), nullable=False)
+    decision_outcome: Mapped[str] = mapped_column(String(32), nullable=False)
 
 
 class PolicyDocument(Base):

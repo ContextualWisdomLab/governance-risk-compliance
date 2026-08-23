@@ -11,7 +11,12 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from cwl_grc.authorization import PurposeCode, require_purpose, seed_authorization_purposes
+from cwl_grc.authorization import PurposeCode, seed_authorization_purposes
+from cwl_grc.correlation import (
+    bind_request_correlation,
+    current_correlation_reference,
+    reset_request_correlation,
+)
 from cwl_grc.catalog import FrameworkCode, list_control_items, seed_control_catalog
 from cwl_grc.coverage import list_uncovered_controls
 from cwl_grc.database import create_session_factory, session_dependency
@@ -26,6 +31,7 @@ from cwl_grc.keyverse_http import (
     RequestPrincipal,
     apply_keyverse_openapi_security,
     authenticate_keyverse_request,
+    decision_for_request,
 )
 from cwl_grc.models import ControlItem, EvidenceRecord, PolicyDocument
 from cwl_grc.officer_console import parse_control_ref, render_officer_home
@@ -169,23 +175,30 @@ def create_app(
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Reject every non-loopback or proxy-forwarded request until real auth exists."""
-        client_host = getattr(request.client, "host", None)
-        local_request = request_is_local(
-            client_host,
-            request.headers.get("x-forwarded-for"),
-            request.headers.get("forwarded"),
-        )
-        if not local_request:
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "detail": (
-                        "Remote preview is disabled. Configure Keyverse-backed identity and "
-                        "tenant authorization before exposing CWL GRC."
-                    )
-                },
+        correlation_token = bind_request_correlation(request.headers.get("x-request-id"))
+        try:
+            client_host = getattr(request.client, "host", None)
+            local_request = request_is_local(
+                client_host,
+                request.headers.get("x-forwarded-for"),
+                request.headers.get("forwarded"),
             )
-        return await call_next(request)
+            if not local_request:
+                response: Response = JSONResponse(
+                    status_code=503,
+                    content={
+                        "detail": (
+                            "Remote preview is disabled. Configure Keyverse-backed identity and "
+                            "tenant authorization before exposing CWL GRC."
+                        )
+                    },
+                )
+            else:
+                response = await call_next(request)
+            response.headers["X-Request-ID"] = current_correlation_reference()
+            return response
+        finally:
+            reset_request_correlation(correlation_token)
 
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:
@@ -229,11 +242,10 @@ def create_app(
             declared_tenant=x_tenant_id,
             required_scopes=POLICY_WRITE_SCOPES,
         )
-        decision = require_purpose(
-            principal.actor_identifier,
+        decision = decision_for_request(
+            principal,
             x_purpose,
             PurposeCode.POLICY_AUTHORING,
-            tenant_identifier=principal.tenant_identifier,
         )
         document = author_policy(
             session,
@@ -261,11 +273,10 @@ def create_app(
             declared_tenant=x_tenant_id,
             required_scopes=POLICY_WRITE_SCOPES,
         )
-        decision = require_purpose(
-            principal.actor_identifier,
+        decision = decision_for_request(
+            principal,
             x_purpose,
             PurposeCode.POLICY_AUTHORING,
-            tenant_identifier=principal.tenant_identifier,
         )
         document = revise_policy(
             session,
@@ -346,11 +357,10 @@ def create_app(
             declared_tenant=x_tenant_id,
             required_scopes=EVIDENCE_WRITE_SCOPES,
         )
-        decision = require_purpose(
-            principal.actor_identifier,
+        decision = decision_for_request(
+            principal,
             x_purpose,
             PurposeCode.EVIDENCE_BINDING,
-            tenant_identifier=principal.tenant_identifier,
         )
         record = create_evidence_record(
             session,
@@ -377,11 +387,10 @@ def create_app(
             declared_tenant=x_tenant_id,
             required_scopes=EVIDENCE_WRITE_SCOPES,
         )
-        decision = require_purpose(
-            principal.actor_identifier,
+        decision = decision_for_request(
+            principal,
             x_purpose,
             PurposeCode.EVIDENCE_BINDING,
-            tenant_identifier=principal.tenant_identifier,
         )
         framework = parse_framework(body.get("framework"))
         if framework is None:
@@ -449,11 +458,10 @@ def create_app(
             declared_tenant=x_tenant_id,
             required_scopes=POLICY_WRITE_SCOPES,
         )
-        decision = require_purpose(
-            principal.actor_identifier,
+        decision = decision_for_request(
+            principal,
             officer_declared_purpose(x_purpose, PurposeCode.POLICY_AUTHORING),
             PurposeCode.POLICY_AUTHORING,
-            tenant_identifier=principal.tenant_identifier,
         )
         refs: list[ControlRef] = []
         for raw in control_refs:
@@ -484,6 +492,21 @@ def create_app(
         x_tenant_id: str | None = Header(default=None),
     ) -> RedirectResponse:
         """Attach evidence from the officer home and return to the gap list."""
+        principal = authorized_principal(
+            authorization=authorization,
+            declared_actor=officer_declared_actor(
+                authorization,
+                x_actor_id,
+                actor_identifier,
+            ),
+            declared_tenant=x_tenant_id,
+            required_scopes=EVIDENCE_WRITE_SCOPES,
+        )
+        decision = decision_for_request(
+            principal,
+            officer_declared_purpose(x_purpose, PurposeCode.EVIDENCE_BINDING),
+            PurposeCode.EVIDENCE_BINDING,
+        )
         if control_ref:
             try:
                 framework, catalog_identifier = parse_control_ref(control_ref)
@@ -498,22 +521,6 @@ def create_app(
                 status_code=400,
                 detail="Name the official control to bind.",
             )
-        principal = authorized_principal(
-            authorization=authorization,
-            declared_actor=officer_declared_actor(
-                authorization,
-                x_actor_id,
-                actor_identifier,
-            ),
-            declared_tenant=x_tenant_id,
-            required_scopes=EVIDENCE_WRITE_SCOPES,
-        )
-        decision = require_purpose(
-            principal.actor_identifier,
-            officer_declared_purpose(x_purpose, PurposeCode.EVIDENCE_BINDING),
-            PurposeCode.EVIDENCE_BINDING,
-            tenant_identifier=principal.tenant_identifier,
-        )
         record = create_evidence_record(
             session,
             cipher,

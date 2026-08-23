@@ -7,7 +7,7 @@ CWL GRC is the ContextualWisdomLab system of record for policy, control, risk, e
 - This repo owns GRC truth and the control/evidence contracts other CWL services consume.
 - Keyverse owns identity. Orgmetra owns employment. AIS owns books. Billing owns metering. naruon owns office work. enterprise-architecture-core owns EA. semantic-data-portal owns ontology.
 - CWL Security owns SAST/Strix/CodeQL/Semgrep.
-- The current HTTP surface is a local developer preview. Purpose headers are declarations for audit context, not authentication. Remote deployment is forbidden until Keyverse-backed identity and tenant authorization exist.
+- The current HTTP surface is a local developer preview. Purpose headers are declarations for audit context, not authentication. When Keyverse is configured, audit events store issuer, client, and request correlation without copying the access token. Remote deployment is forbidden until Keyverse-backed identity and tenant authorization exist.
 - Operational PII remains exact for authorized workflows. Do not destructively mask it; omit unrelated fields from purpose-specific views and exports, and enforce encryption, retention, and audit.
 
 ## Writing guidance

@@ -83,13 +83,23 @@ def test_require_purpose_accepts_only_declared_codes() -> None:
     assert allowed.actor_identifier == "officer-ahn"
     assert allowed.purpose_code is PurposeCode.EVIDENCE_BINDING
     assert allowed.tenant_identifier == "local_preview"
+    assert allowed.issuer_identifier == "local_preview"
+    assert allowed.client_identifier == "local_preview"
+    assert allowed.decision_outcome == "allow"
+    assert allowed.correlation_reference
     named = require_purpose(
         "officer-ahn",
         PurposeCode.EVIDENCE_BINDING.value,
         PurposeCode.EVIDENCE_BINDING,
         tenant_identifier=" tenant-acme ",
+        issuer_identifier=" https://identity.example.test/realms/cwl ",
+        client_identifier=" cwl-grc-web ",
+        correlation_reference=" officer-ahn-evidence ",
     )
     assert named.tenant_identifier == "tenant-acme"
+    assert named.issuer_identifier == "https://identity.example.test/realms/cwl"
+    assert named.client_identifier == "cwl-grc-web"
+    assert named.correlation_reference == "officer-ahn-evidence"
 
 
 def test_require_purpose_rejects_blank_actor() -> None:

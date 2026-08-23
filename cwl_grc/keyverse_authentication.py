@@ -132,6 +132,11 @@ class KeyverseAccessTokenVerifier:
         self._now = now or (lambda: datetime.now(timezone.utc))
         self._token_replay_guard = token_replay_guard
 
+    @property
+    def issuer(self) -> str:
+        """Return the exact HTTPS issuer this verifier authenticates."""
+        return self._settings.issuer
+
     def verify(
         self,
         token: str,
