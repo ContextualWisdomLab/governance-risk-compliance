@@ -5,7 +5,7 @@ Repository: `ContextualWisdomLab/governance-risk-compliance`
 Baseline parent branch head: `a747077757484c880fccf76e30cac068c593d3b0` (protected `develop`)
 Baseline source parent: `c78ef79499d05e13a8651ccfa2a2979724323160` (pre-refresh PR #19 source parent; re-query the current document branch head below)
 Develop-based officer-workspace head: `ed1e6222df0ff021fb72d40d79a242bae71754c4`
-Tracked current open direct-to-develop heads: PR #17 `7b4adbe0964e12e4b31e197ab10a63aabf0f593c`, PR #18 `35d3e55ccd2c5e89efec6c28b7613f1d605cac13`, PR #34 `ed1e6222df0ff021fb72d40d79a242bae71754c4`, PR #37 `9fffa505512d4cf7eccbb6cd240dab6a1e8acb73`, PR #38 `c1445d7105ee7366794a0acb0d0507777850ce9e`, PR #43 `f41c387c62998de2d136ce8f4a110b4cb22906ac`, PR #51 `1a8f90dd15f37ffc86b8a0efd217a8b2812e5f99`, and PR #53 `976945dbbe22b0b8fa7893150e2723738a0ff484`. PR #19 is the current document branch; stacked PR #54 is `3e972f4de9e9a1f5a17379ac93b33bdcb2b0f4cf` on current PR #34 head `ed1e6222df0ff021fb72d40d79a242bae71754c4`; stacked PR #55 is `126f5ba10c4f5cf5aa9f65ee533a346e8687cc3b` on PR #38 `c1445d7105ee7366794a0acb0d0507777850ce9e`; PR #41 is feature-base PR head `2346afe6a063f502517ee235d6c3e87488da8357` on base `8881d3966e3e9da29b8dce990a95295a2780618b`; re-query all exact heads before merge.
+Tracked current open direct-to-develop heads: PR #17 `7b4adbe0964e12e4b31e197ab10a63aabf0f593c`, PR #18 `35d3e55ccd2c5e89efec6c28b7613f1d605cac13`, PR #34 `ed1e6222df0ff021fb72d40d79a242bae71754c4`, PR #37 `9fffa505512d4cf7eccbb6cd240dab6a1e8acb73`, PR #38 `c1445d7105ee7366794a0acb0d0507777850ce9e`, PR #43 `f41c387c62998de2d136ce8f4a110b4cb22906ac`, PR #51 `1a8f90dd15f37ffc86b8a0efd217a8b2812e5f99`, and PR #53 `976945dbbe22b0b8fa7893150e2723738a0ff484`. PR #19 is the current document branch; stacked PR #54 is `3e972f4de9e9a1f5a17379ac93b33bdcb2b0f4cf` on current PR #34 head `ed1e6222df0ff021fb72d40d79a242bae71754c4`; stacked PR #55 is `ab5113c66543392c3a8755fba3e866eb097c4111` on PR #38 `c1445d7105ee7366794a0acb0d0507777850ce9e`; stacked PR #56 is `7794192bd21bc08b4c46e527addfc8cc1a01558e` on PR #55; stacked PR #57 is `9442212fe1b77c11f0d3c6d45e669b60c6bac93e` on PR #56; PR #41 is feature-base PR head `2346afe6a063f502517ee235d6c3e87488da8357` on base `8881d3966e3e9da29b8dce990a95295a2780618b`; re-query all exact heads before merge.
 Historical Keyverse stack-only merges: PR #6 `b9b3d5c49367d0b128c87aa478d8921eb1f6c349` merged as `bb23d654f58ea1afdb4087fafdf47caf1de1aaea`, PR #7 `25350d6177244d9a39ae3275feca813d5b4a737d` merged as `b44f3e9f83b637a9a580468be5b5b5f95422127b`, and PR #16 `8dfa6bae1a9366335f15294f06abf8313f1380e4` merged as `34a1b25c38c78f367bc77b90301ef0f68a1ad8ba`. These PRs are closed; their feature-branch merges did not update protected `develop`.
 Historical evidence-lifecycle stack-only merges: PR #20 `e91b2384177451ebf80858e518d729e258c40f00` merged as `781b6e3b9f4c33c7d82e46d2881777ea470ff875`, PR #21 `04facc110a7437f7a86b8572707ffb5f65e0515e` merged as `b25cd7dbb9cb1e823f184acc67cea0aa8cea7280`, PR #22 `9c1923e8e6f6145d0f789a97db4dd15f94f2adf3` merged into its feature branch as `04facc110a7437f7a86b8572707ffb5f65e0515e`, and PR #50 `ba78e4790f3e361826991455ce83634004f2875d` merged as `8d355811a2a6b809cfa7e4c03e36a1c6f48bdf49`. PRs #23–#26 and #31 remain historical feature-branch merges; none is an active child PR in the current open-PR snapshot.
 
@@ -209,12 +209,34 @@ branches: #44 as `ffca199364d24b197b04bbe2f6505851e6b915b3`, #45 as
 events; the repository's protected `develop` tip did not change, and the live
 PR records did not contain independent approving reviews for these events.
 
-The next production action is to integrate one verified Keyverse tenant and
-actor through the existing policy/evidence flow and prove that the same boundary
-holds for every read, write, export, audit event, background job, and stored
-relationship. The next product-model action is issue #27: establish internal
-control, implementation, testing, effectiveness, deficiency, and evidence-usage
-truth before risk and audit workflows depend on the current catalog model.
+PR #55 exact head `ab5113c66543392c3a8755fba3e866eb097c4111` (stacked on
+PR #38) enforces Keyverse Bearer tokens on officer HTTP routes, stamps
+tenant identifiers, publishes OpenAPI `KeyverseBearer`, keeps local-preview
+forms usable without a token, and scopes policy-gap coverage to the verified
+tenant's evidence bindings so one organization's CSAP mapping cannot hide
+another organization's uncovered control. Local evidence is 111 tests with
+100% statement/branch/docstring coverage. Independent approval is absent.
+
+PR #56 exact head `7794192bd21bc08b4c46e527addfc8cc1a01558e` restacks audit
+attribution on that parent by merge (no force-push): authorized mutations
+persist issuer, OAuth client, request correlation, and `allow` without
+copying the access token. Local evidence is 119 tests with 100% coverage.
+Independent approval is absent.
+
+PR #57 exact head `9442212fe1b77c11f0d3c6d45e669b60c6bac93e` restacks the
+hardened loopback start on PR #56. `CWL_GRC_REQUIRE_KEYVERSE` refuses
+header-identity boots, requires loopback TLS files, fails closed on invalid
+flag values, disables Uvicorn proxy-header scheme rewriting, and prints
+evidence-key next actions for ordinary preview failures. Local evidence is
+126 tests with 100% coverage. This is not remote production exposure.
+Independent approval is absent.
+
+The next production action is independent non-author review of the merge-ready
+direct-to-`develop` PRs and of the Keyverse stack (#38 → #55 → #56 → #57).
+Do not enable non-loopback customer admission until that review exists. The
+next product-model action is issue #27: establish internal control,
+implementation, testing, effectiveness, deficiency, and evidence-usage truth
+before risk and audit workflows depend on the current catalog model.
 
 The complete domain sequence is defined in
 [`docs/product/grc-domain-completion-roadmap.md`](product/grc-domain-completion-roadmap.md).
@@ -278,7 +300,7 @@ issues and PRs.
 
 | ID | Priority | Officer-visible gap | Current evidence | Proposed acceptance slice | Authority |
 | --- | --- | --- | --- | --- | --- |
-| G-01 | P0 | An officer cannot safely use the product remotely because caller identity and tenant are not verified. | Local-only boundary in `cwl_grc/remote_access.py`; issue #4; PR #38 `c1445d7105ee7366794a0acb0d0507777850ce9e` verifies RFC 9068 access tokens and loads OIDC/JWKS; stacked PR #55 `126f5ba10c4f5cf5aa9f65ee533a346e8687cc3b` enforces Bearer tokens on policy/evidence routes, rejects actor-header impersonation, and returns only the verified officer's policies. Remote traffic remains denied. | Complete Keyverse-backed remote exposure, tenant-owned persistence, OpenAPI security, and deployment hardening. | [Issue #4](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/4) |
+| G-01 | P0 | An officer cannot safely use the product remotely because caller identity and tenant are not verified. | Local-only boundary in `cwl_grc/remote_access.py`; issue #4; PR #38 `c1445d7105ee7366794a0acb0d0507777850ce9e` verifies RFC 9068 access tokens and loads OIDC/JWKS; stacked PR #55 `ab5113c66543392c3a8755fba3e866eb097c4111` enforces Bearer tokens, tenant-owned rows, and tenant-scoped gap coverage; PR #56 `7794192bd21bc08b4c46e527addfc8cc1a01558e` attributes audit events without copying tokens; PR #57 `9442212fe1b77c11f0d3c6d45e669b60c6bac93e` requires a Keyverse verifier and loopback TLS for hardened start. Remote traffic remains denied. | Independent review of the Keyverse stack, then non-loopback customer admission only after that review. Do not treat loopback TLS as production exposure. | [Issue #4](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/4) |
 | G-02 | P0 | Operators can encounter ambiguous schema ownership or migration failure in durable PostgreSQL deployments. | PR #18 implements the first schema-lifecycle slice, including explicit ownership, compatibility checks, PostgreSQL acceptance, and review fixes. | Merge only after fresh exact-head Product, PostgreSQL, SAST, Security, semantic review, zero valid unresolved findings, and live branch-policy evidence. | [Issue #8](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/8) |
 | G-03 | P0 | Loss, rotation, retention, legal hold, or recovery failure can make exact operational evidence unavailable or non-compliant. | PR #20 and PR #21 are closed stack-only merges with feature-branch merge commits `781b6e3b9f4c33c7d82e46d2881777ea470ff875` and `b25cd7dbb9cb1e823f184acc67cea0aa8cea7280`; PR #22 and PR #50 are also historical feature-branch merges. None is protected `develop` integration. | Add production KMS/HSM, durable rewrap receipts, disposition, purpose-specific disclosure, encrypted backup, PITR, restore verification, RPO/RTO, and emergency read-only operation. | [Issue #9](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/9) |
 | G-04 | P0 | A buyer cannot independently verify that a released artifact came from reviewed source or can be rolled back safely. | No signed production OCI/wheel release, artifact-bound SBOM/provenance, protected promotion, or revocation rehearsal is merged. | Build immutable signed artifacts, verify the exact security result, promote by digest, enforce rulesets, and rehearse install/upgrade/rollback/revocation. | [Issue #10](https://github.com/ContextualWisdomLab/governance-risk-compliance/issues/10) |
@@ -359,7 +381,9 @@ merge, force-push, or predecessor-head evidence is valid.
 | [#51](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/51) | `1a8f90dd15f37ffc86b8a0efd217a8b2812e5f99` (2026-08-23) | Ready, merge-blocked, review-required | GRC OpenTelemetry request boundary from the fork source. Exact-head `osv-scan` succeeded after re-run against current central main (PR ContextualWisdomLab/.github#1209 plus follow-up #1257 preserving base results in `RUNNER_TEMP`). Independent approval remains absent. |
 | [#53](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/53) | `976945dbbe22b0b8fa7893150e2723738a0ff484` (2026-08-22) | Open, normal-merge candidate, review/checks pending | First G-06 version-one policy API contract on `develop`: strict models, bounded cursor pagination, target-scoped durable idempotency with concurrent unique-key recovery, ETags/If-Match, batched page serialization, bounded non-reflective RFC 9457 errors, OpenAPI deprecation markers, deterministic mapping serialization for stable ETags, and explicit loopback-only preview boundary. Exact-head local evidence passes 100% statement/branch/docstring coverage, Ruff, compile, lock, actionlint, wheel/install smoke, Semgrep zero findings, pip-audit no known vulnerabilities, and PostgreSQL clean-install/legacy-upgrade rehearsal. Current hosted observation is 22 success and 8 skipped checks; independent approval remains absent and Gitleaks/osv-scanner were unavailable locally. |
 | [#54](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/54) | `3e972f4de9e9a1f5a17379ac93b33bdcb2b0f4cf` (2026-08-23) | Draft, stacked, restacked by merge | Officer-gap slice on PR #34 `ed1e6222df0ff021fb72d40d79a242bae71754c4`; `GET /workspace/posture` now requires declared actor, `coverage_review` purpose, and tenant, and hides other officers' policy gaps and legacy evidence. Local 59-test 100% statement/branch/docstring evidence. Remains Draft behind PR #34. |
-| [#55](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/55) | `126f5ba10c4f5cf5aa9f65ee533a346e8687cc3b` (2026-08-23) | Ready, stacked on #38, last-pusher seonghobae, no independent APPROVE | Keyverse HTTP adapter: Bearer RFC 9068 access tokens on policy/evidence routes and officer home, actor-header impersonation rejected, tenant header must match `org`, officer-scoped policy list/gaps/home. Local 103-test 100% statement/branch/docstring evidence. Must stay behind PR #38. Independent review remains the merge blocker. |
+| [#55](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/55) | `ab5113c66543392c3a8755fba3e866eb097c4111` (2026-08-23) | Ready, stacked on #38, last-pusher seonghobae, no independent APPROVE | Keyverse HTTP adapter: Bearer RFC 9068 on policy/evidence/officer home, actor-header impersonation rejected, tenant header must match `org`, tenant-scoped policy-gap coverage, local-preview forms without a token. Local 111-test 100% statement/branch/docstring evidence. Must stay behind PR #38. Independent review remains the merge blocker. |
+| [#56](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/56) | `7794192bd21bc08b4c46e527addfc8cc1a01558e` (2026-08-23) | Ready, stacked on #55, restacked by merge | Audit attribution: issuer, OAuth client, correlation, and `allow` without copying tokens. Restacked onto current #55 by merge commit (no force-push). Local 119-test 100% coverage. Independent review remains the merge blocker. |
+| [#57](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/57) | `9442212fe1b77c11f0d3c6d45e669b60c6bac93e` (2026-08-23) | Ready, stacked on #56, restacked by merge | Hardened loopback start: required Keyverse verifier, TLS files, fail-closed invalid `CWL_GRC_REQUIRE_KEYVERSE` values, disabled proxy-header scheme rewrite, matching preview next actions. Local 126-test 100% coverage. Not remote production exposure. Independent review remains the merge blocker. |
 | [#16](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/16) | `8dfa6bae1a9366335f15294f06abf8313f1380e4` (2026-08-21) | Merged, stack-only | Tenant isolation merged into its feature branch as `34a1b25c38c78f367bc77b90301ef0f68a1ad8ba`; the historical stack had 120 tests and 100% coverage/docstrings, but this did not update protected `develop`. |
 | [#7](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/7) | `25350d6177244d9a39ae3275feca813d5b4a737d` (2026-08-21) | Merged, stack-only | Route enforcement merged into its feature branch as `b44f3e9f83b637a9a580468be5b5b5f95422127b`; the historical stack had 110 tests and 100% coverage/docstrings, but this did not update protected `develop`. |
 | [#6](https://github.com/ContextualWisdomLab/governance-risk-compliance/pull/6) | `b9b3d5c49367d0b128c87aa478d8921eb1f6c349` (2026-08-21) | Merged, stack-only | Bounded OIDC/JWKS loading merged into its feature branch as `bb23d654f58ea1afdb4087fafdf47caf1de1aaea`; the historical stack had 97 tests and 100% coverage/docstrings, but this did not update protected `develop`. |
@@ -474,10 +498,13 @@ release evidence.
    producing a disconnected scaffold.
 
 Next action: obtain independent non-author approval for merge-ready
-direct-to-`develop` PRs including #51; keep Draft PR #54 stacked on PR #34;
-keep PR #55 stacked on PR #38 at `126f5ba10c4f5cf5aa9f65ee533a346e8687cc3b`;
-merge ContextualWisdomLab/.github#1257; implement Keyverse tenant-owned
-persistence as the next G-01 slice after this HTTP adapter.
+direct-to-`develop` PRs; keep Draft PR #54 stacked on PR #34; keep the
+Keyverse stack #38 → #55 `ab5113c66543392c3a8755fba3e866eb097c4111` →
+#56 `7794192bd21bc08b4c46e527addfc8cc1a01558e` →
+#57 `9442212fe1b77c11f0d3c6d45e669b60c6bac93e`; merge
+ContextualWisdomLab/.github#1257; do not enable non-loopback customer
+admission until independent review exists. Repair exact-head check failures
+before new remote-admission work.
 
 ## Product status
 
