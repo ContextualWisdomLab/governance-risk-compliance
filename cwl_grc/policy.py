@@ -17,6 +17,7 @@ from cwl_grc.catalog import FrameworkCode, get_control_item
 from cwl_grc.models import (
     ControlEvidenceBinding,
     ControlItem,
+    EvidenceRecord,
     PolicyControlMapping,
     PolicyDocument,
     PolicyVersion,
@@ -171,8 +172,23 @@ def list_policy_documents(session: Session) -> list[PolicyDocument]:
     return list(session.query(PolicyDocument).order_by(PolicyDocument.created_at.desc()).all())
 
 
-def list_policy_gaps(session: Session, policy_document_id: str | None) -> list[PolicyGap]:
-    """Return latest-version mappings that have no control-evidence binding."""
+def _bound_control_ids(session: Session, tenant_identifier: str | None) -> set[str]:
+    """Return control identifiers covered by evidence owned by one tenant."""
+    query = session.query(ControlEvidenceBinding.control_item_id)
+    if tenant_identifier is not None:
+        query = query.join(
+            EvidenceRecord,
+            EvidenceRecord.evidence_record_id == ControlEvidenceBinding.evidence_record_id,
+        ).filter(EvidenceRecord.tenant_identifier == tenant_identifier)
+    return {row[0] for row in query.all()}
+
+
+def list_policy_gaps(
+    session: Session,
+    policy_document_id: str | None,
+    tenant_identifier: str | None = None,
+) -> list[PolicyGap]:
+    """Return latest-version mappings that have no tenant-owned evidence binding."""
     if policy_document_id:
         document = session.get(PolicyDocument, policy_document_id)
         if document is None:
@@ -180,9 +196,7 @@ def list_policy_gaps(session: Session, policy_document_id: str | None) -> list[P
         documents = [document]
     else:
         documents = list(session.query(PolicyDocument).order_by(PolicyDocument.created_at.desc()).all())
-    bound_ids = {
-        row[0] for row in session.query(ControlEvidenceBinding.control_item_id).all()
-    }
+    bound_ids = _bound_control_ids(session, tenant_identifier)
     gaps: list[PolicyGap] = []
     for document in documents:
         version = current_version(session, document)

@@ -166,7 +166,11 @@ def create_app(
         policy_document_id: str | None = None,
     ) -> list[PolicyGap]:
         """Return policy gaps owned by the verified officer and tenant only."""
-        gaps = list_policy_gaps(session, policy_document_id)
+        gaps = list_policy_gaps(
+            session,
+            policy_document_id,
+            tenant_identifier=principal.tenant_identifier,
+        )
         owned = {
             document.policy_document_id
             for document in session.query(PolicyDocument)
