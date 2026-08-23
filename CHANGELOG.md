@@ -18,6 +18,7 @@
 - Versioned schema-upgrade receipts for existing first-slice stores.
 - Provider-neutral Keyverse JWT access-token verification kernel and typed authenticated-principal contract.
 - Bounded pinned-HTTPS Keyverse OIDC metadata and public-JWK loading through the provider-loader boundary, retaining exact source-byte digests and atomic last-known-good snapshots.
+- HTTP route adapter that verifies Keyverse Bearer access tokens, rejects actor-header impersonation, matches declared tenant to the `org` claim, and returns only the verified officer's policies and gaps.
 
 ### Security
 
@@ -42,3 +43,4 @@
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
 - `docs/adr/0003-keyverse-jwt-access-token-profile.md` — closed RFC 9068-style Keyverse access-token profile before route and tenant integration.
 - `docs/adr/0004-keyverse-oidc-provider-loading.md` — bounded pinned-HTTPS loading of Keyverse OIDC metadata and public JWKs before route and tenant integration.
+- `docs/adr/0005-keyverse-http-route-enforcement.md` — Bearer access-token route enforcement using the Keyverse principal as actor, with local preview preserved when no verifier is configured.
