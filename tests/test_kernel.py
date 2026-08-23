@@ -119,7 +119,9 @@ def test_purpose_labels_and_empty_officer_home() -> None:
     assert 'id="keyverse-access-token"' in html
     assert 'type="password"' in html
     assert "sessionStorage" in html
-    assert 'Authorization: "Bearer " + token' in html
+    assert 'headers.Authorization = "Bearer " + token' in html
+    assert 'headers["X-Actor-Id"] = actor' in html
+    assert "required" not in html.split('id="keyverse-access-token"')[1].split(">")[0]
     assert "policy_authoring" in html
     assert "evidence_binding" in html
     assert "fetch(form.action" in html

@@ -484,6 +484,16 @@ def create_app(
         x_tenant_id: str | None = Header(default=None),
     ) -> RedirectResponse:
         """Attach evidence from the officer home and return to the gap list."""
+        principal = authorized_principal(
+            authorization=authorization,
+            declared_actor=officer_declared_actor(
+                authorization,
+                x_actor_id,
+                actor_identifier,
+            ),
+            declared_tenant=x_tenant_id,
+            required_scopes=EVIDENCE_WRITE_SCOPES,
+        )
         if control_ref:
             try:
                 framework, catalog_identifier = parse_control_ref(control_ref)
@@ -498,16 +508,6 @@ def create_app(
                 status_code=400,
                 detail="Name the official control to bind.",
             )
-        principal = authorized_principal(
-            authorization=authorization,
-            declared_actor=officer_declared_actor(
-                authorization,
-                x_actor_id,
-                actor_identifier,
-            ),
-            declared_tenant=x_tenant_id,
-            required_scopes=EVIDENCE_WRITE_SCOPES,
-        )
         decision = require_purpose(
             principal.actor_identifier,
             officer_declared_purpose(x_purpose, PurposeCode.EVIDENCE_BINDING),

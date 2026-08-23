@@ -26,7 +26,11 @@ resource and action restriction without collapsing those two outcomes.
 - `authenticate_keyverse_request` returns 403 for `AccessTokenScopeError`
   even when the message does not contain `"required scope"`.
 - Missing, malformed, or unsigned Bearer material remains 401.
-- Tenant-header mismatch remains 403 (authenticated principal, wrong org).
+- Officer evidence form authenticates before `control_ref` validation so an
+  unauthenticated caller cannot probe catalog well-formedness (401, not 400).
+- Officer home `fetch` sends Bearer only when a Keyverse token is present.
+  Local preview without a verifier sends `X-Actor-Id` from the officer
+  identifier so browser authoring remains usable.
 
 ## References
 

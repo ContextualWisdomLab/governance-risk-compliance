@@ -108,7 +108,9 @@ def test_officer_home_forms_send_keyverse_bearer_and_purpose() -> None:
     assert "policy_authoring" in home.text
     assert "evidence_binding" in home.text
     assert "fetch(form.action" in home.text
-    assert "X-Actor-Id" not in home.text.split("<script>")[1]
+    script = home.text.split("<script>")[1]
+    assert 'headers.Authorization = "Bearer " + token' in script
+    assert 'headers["X-Actor-Id"] = actor' in script
     assert "console.log" not in home.text
 
     spoofed = client.post(
@@ -187,3 +189,39 @@ def test_officer_home_forms_send_keyverse_bearer_and_purpose() -> None:
     records = client.get("/policy-gaps", headers={"Authorization": f"Bearer {token}"})
     assert records.status_code == 200
     assert records.json()["gaps"] == []
+
+
+def test_local_preview_officer_forms_send_declared_actor_without_bearer() -> None:
+    """Local preview browser posts use X-Actor-Id when no Keyverse token is present."""
+    client = _client()
+    authored = client.post(
+        "/officer/policy",
+        headers={"X-Actor-Id": "officer-ahn", "X-Purpose": "policy_authoring"},
+        data={
+            "policy_title": "Local Preview Officer Policy",
+            "policy_body": "Declared actor is identity only when Keyverse is off.",
+            "actor_identifier": "officer-ahn",
+            "control_refs": [f"{FrameworkCode.CSAP_2026.value}|10.2.1"],
+        },
+        follow_redirects=False,
+    )
+    assert authored.status_code == 303
+    missing = client.post(
+        "/officer/evidence",
+        data={
+            "control_ref": "not-a-ref",
+            "evidence_title": "Must authenticate first",
+            "payload_text": "ahn@example.co.kr",
+        },
+    )
+    assert missing.status_code == 401
+    dummy_bearer = client.post(
+        "/officer/policy",
+        headers={"Authorization": "Bearer unused-local-preview", "X-Purpose": "policy_authoring"},
+        data={
+            "policy_title": "Token without actor",
+            "policy_body": "Local preview ignores Bearer and needs a declared actor.",
+            "control_refs": [f"{FrameworkCode.CSAP_2026.value}|10.2.1"],
+        },
+    )
+    assert dummy_bearer.status_code == 401
