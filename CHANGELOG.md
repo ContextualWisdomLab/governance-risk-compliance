@@ -9,14 +9,14 @@
 - Officer home form to author a policy and see uncovered policy requirements.
 - `cwl-grc` CLI: `policy author|revise|list`, `gaps`, `bind`, and `serve`.
 - Official policy-deployment identifiers: SOC 2 `CC5.3` and COSO 2013 Principle 12.
-- First buyer slice: official CSAP / SOC 2 / ISMS-P / ISO/IEC 27001:2022 / NIST SP 800-53 Rev. 5 / COSO 2013 / COSO 2017 control seeds.
+- First officer slice: official CSAP / SOC 2 / ISMS-P / ISO/IEC 27001:2022 / NIST SP 800-53 Rev. 5 / COSO 2013 / COSO 2017 control seeds.
 - Evidence create and control–evidence binding with declared actor/purpose audit context and encryption at rest.
 - Uncovered-control query and officer home that states the next action.
 - `/healthz` probe, standalone `python -m cwl_grc` entry, and `create_app()` module factory.
 - Product CI for lint, docstring coverage, and 100% statement/branch test coverage.
 - Hash-locked `uv.lock` dependency graph for runtime and development dependencies.
 - Versioned schema-upgrade receipts for existing first-slice stores.
-- `docs/product-technical-gap-baseline.md` with observed product truth, the live PR queue, officer-visible production and domain gaps, standards corrections, ownership boundaries, and exact next actions. The 2026-08-24 refresh records PR #58 CLI Keyverse fail-closed and PR #34 Strix provider-unavailable.
+- `docs/product-technical-gap-baseline.md` with observed product truth, the live PR queue, officer-visible production and domain gaps, standards corrections, ownership boundaries, and exact next actions. The 2026-08-24 refresh records PR #58 hosted Devin success, terminal hosted check counts for merge-ready develop PRs, PR #34 Strix provider-unavailable, and central `.github` #1257 still blocked on Strix/OpenCode.
 - `docs/product/grc-domain-completion-roadmap.md` defining the closed obligation → requirement → policy → internal control → implementation → test/evidence → risk/audit → remediation → controlled-reporting loop and its release gates.
 - Current doctoring references for ISO 37301:2021 and Amendment 1:2024, ISO 19011:2026 Edition 4, OSCAL 1.2.3, and the NIST OLIR Program without claiming certification or source-text redistribution rights.
 
