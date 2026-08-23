@@ -21,14 +21,20 @@ the identity issuer; GRC is a resource server.
    access token. The verified `sub` is the actor. `X-Actor-Id` cannot override
    it. A declared `X-Tenant-Id` must match the Keyverse `org` claim.
 3. Action scopes are `grc.policy.read`, `grc.policy.write`, and
-   `grc.evidence.write`. Missing scopes return 403; other validation failures
-   return 401.
+   `grc.evidence.write`. Missing scopes raise `AccessTokenScopeError` and
+   return 403 (`insufficient_scope`); other validation failures return 401.
+   HTTP status is selected from the exception type, not from matching the
+   exception text.
 4. Policy list, gap queries, and the officer home (`GET /`, `POST /officer/policy`,
    `POST /officer/evidence`) return or mutate only documents authored by the
    verified subject. Official catalog reads remain unauthenticated because they
    are published control identifiers, not tenant records.
 5. `/healthz` remains unauthenticated. Remote traffic stays denied until
    deployment hardening.
+6. Officer home HTML forms cannot attach an `Authorization` header on native
+   submit. The page stores the Keyverse access token in `sessionStorage` and
+   sends it as Bearer on `fetch` so the next policy or evidence action works in
+   a browser.
 
 ## Consequences
 
@@ -40,6 +46,10 @@ a verifier. This still does not authorize remote production exposure.
 
 Bertocci, V. (2021). *JSON Web Token (JWT) profile for OAuth 2.0 access tokens*
 (RFC 9068). RFC Editor. https://www.rfc-editor.org/rfc/rfc9068
+
+Jones, M. B., & Hardt, D. (2012). *The OAuth 2.0 authorization framework:
+Bearer token usage* (RFC 6750). Internet Engineering Task Force.
+https://doi.org/10.17487/RFC6750
 
 Lodderstedt, T., Bradley, J., Labunets, A., & Fett, D. (2025). *Best current
 practice for OAuth 2.0 security* (RFC 9700). RFC Editor.
