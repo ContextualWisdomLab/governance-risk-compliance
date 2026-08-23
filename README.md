@@ -50,7 +50,7 @@ The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `
 | See policy/control gaps | `GET /policy-gaps?policy_document_id=`, `cwl-grc gaps`, or `/` |
 | List official controls | `GET /controls?framework=csap_2026` |
 | See catalog coverage gaps | `GET /controls/uncovered?framework=soc2_tsc_2017` |
-| See truthful local posture | `GET /workspace/posture` |
+| See truthful local posture | `GET /workspace/posture` with `X-Actor-Id`, `X-Purpose: coverage_review`, and `X-Tenant-Id` |
 | Store evidence | `POST /evidence-records` with `X-Actor-Id` and `X-Purpose: evidence_binding` |
 | Bind evidence | `POST /control-evidence-bindings` or `cwl-grc bind` |
 | Probe | `GET /healthz` |

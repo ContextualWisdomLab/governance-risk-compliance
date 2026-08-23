@@ -9,6 +9,7 @@ from cwl_grc import create_app
 from cwl_grc.authorization import (
     PurposeCode,
     purpose_label,
+    require_declared_tenant,
     require_purpose,
     seed_authorization_purposes,
 )
@@ -76,6 +77,16 @@ def test_require_purpose_accepts_only_declared_codes() -> None:
     )
     assert allowed.actor_identifier == "officer-ahn"
     assert allowed.purpose_code is PurposeCode.EVIDENCE_BINDING
+
+
+def test_require_declared_tenant_rejects_blank_labels() -> None:
+    assert require_declared_tenant(" acme-korea ") == "acme-korea"
+    try:
+        require_declared_tenant("   ")
+    except Exception as exc:
+        assert getattr(exc, "status_code", None) == 401
+    else:
+        raise AssertionError("blank tenant must be rejected")
 
 
 def test_require_purpose_rejects_blank_actor() -> None:

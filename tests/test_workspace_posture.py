@@ -13,9 +13,21 @@ def _client() -> TestClient:
     return TestClient(create_app(database_url="sqlite://", evidence_key=None))
 
 
-def _legacy_binding(client: TestClient) -> None:
+def _review_headers(
+    actor: str = "officer-preview",
+    tenant: str = "acme-korea",
+) -> dict[str, str]:
+    """Return declared local-preview review headers."""
+    return {
+        "X-Actor-Id": actor,
+        "X-Purpose": "coverage_review",
+        "X-Tenant-Id": tenant,
+    }
+
+
+def _legacy_binding(client: TestClient, actor: str = "officer-preview") -> None:
     """Create one realistic legacy evidence binding for the projection test."""
-    headers = {"X-Actor-Id": "officer-preview", "X-Purpose": "evidence_binding"}
+    headers = {"X-Actor-Id": actor, "X-Purpose": "evidence_binding"}
     evidence = client.post(
         "/evidence-records",
         headers=headers,
@@ -39,14 +51,16 @@ def _legacy_binding(client: TestClient) -> None:
 
 def test_posture_preview_exposes_truthful_not_assessed_boundary() -> None:
     """The empty local store must not be presented as effective compliance."""
-    response = _client().get("/workspace/posture")
+    response = _client().get("/workspace/posture", headers=_review_headers())
 
     assert response.status_code == 200
     body = response.json()
     assert body["projection"] == "workspace_posture"
     assert body["availability"] == "local_developer_preview"
     assert body["posture_status"] == "not_assessed"
-    assert body["authorization"]["status"] == "not_configured"
+    assert body["authorization"]["status"] == "declared_preview"
+    assert body["authorization"]["tenant_identifier"] == "acme-korea"
+    assert body["authorization"]["actor_identifier"] == "officer-preview"
     assert body["metrics"]["official_control_count"] > 0
     assert body["metrics"]["legacy_evidence_only_count"] == 0
     assert body["metrics"]["effective_control_count"] == 0
@@ -69,7 +83,7 @@ def test_legacy_evidence_remains_unknown_until_effectiveness_exists() -> None:
     client = _client()
     _legacy_binding(client)
 
-    body = client.get("/workspace/posture").json()
+    body = client.get("/workspace/posture", headers=_review_headers()).json()
     row = next(item for item in body["exact_value_rows"] if item["catalog_identifier"] == "10.2.1")
 
     assert row["status"] == "unknown"
@@ -98,9 +112,65 @@ def test_posture_reports_policy_gap_count_without_claiming_certification() -> No
     )
     assert authored.status_code == 201
 
-    body = client.get("/workspace/posture").json()
+    body = client.get("/workspace/posture", headers=_review_headers()).json()
 
     assert body["metrics"]["policy_gap_count"] == 1
     assert body["policy_gap_rows"][0]["catalog_identifier"] == "10.2.1"
     assert body["posture_status"] == "not_assessed"
     assert any("internal controls" in action for action in body["next_actions"])
+
+
+def test_posture_requires_declared_tenant_actor_and_coverage_purpose() -> None:
+    """Refuse a global unscoped posture read in the local preview."""
+    client = _client()
+
+    missing = client.get("/workspace/posture")
+    assert missing.status_code == 401
+
+    missing_tenant = client.get(
+        "/workspace/posture",
+        headers={"X-Actor-Id": "officer-preview", "X-Purpose": "coverage_review"},
+    )
+    assert missing_tenant.status_code == 401
+    assert "tenant" in missing_tenant.json()["detail"].lower()
+
+    wrong_purpose = client.get(
+        "/workspace/posture",
+        headers={
+            "X-Actor-Id": "officer-preview",
+            "X-Purpose": "evidence_binding",
+            "X-Tenant-Id": "acme-korea",
+        },
+    )
+    assert wrong_purpose.status_code == 403
+
+
+def test_posture_hides_other_officer_policy_gaps_and_evidence() -> None:
+    """Another officer's records must not change this officer's next action."""
+    client = _client()
+    authored = client.post(
+        "/policy-documents",
+        headers={"X-Actor-Id": "officer-other", "X-Purpose": "policy_authoring"},
+        json={
+            "policy_title": "Other Officer Access Policy",
+            "policy_body": "Review grants for a different actor.",
+            "control_refs": [
+                {
+                    "framework": FrameworkCode.CSAP_2026.value,
+                    "catalog_identifier": "10.2.1",
+                }
+            ],
+        },
+    )
+    assert authored.status_code == 201
+    _legacy_binding(client, actor="officer-other")
+
+    body = client.get("/workspace/posture", headers=_review_headers()).json()
+    row = next(item for item in body["exact_value_rows"] if item["catalog_identifier"] == "10.2.1")
+
+    assert body["authorization"]["actor_identifier"] == "officer-preview"
+    assert body["metrics"]["policy_gap_count"] == 0
+    assert body["policy_gap_rows"] == []
+    assert row["status"] == "not_assessed"
+    assert body["metrics"]["legacy_evidence_only_count"] == 0
+    assert body["metrics"]["effective_control_count"] == 0

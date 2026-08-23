@@ -59,6 +59,17 @@ def purpose_label(code: PurposeCode) -> str:
             assert_never(unreachable)
 
 
+def require_declared_tenant(tenant_identifier: str | None) -> str:
+    """Accept a declared tenant label for local preview scoping."""
+    tenant = (tenant_identifier or "").strip()
+    if not tenant:
+        raise HTTPException(
+            status_code=401,
+            detail="Declare the tenant before reviewing workspace posture.",
+        )
+    return tenant
+
+
 def require_purpose(
     actor_identifier: str | None,
     purpose_value: str | None,
