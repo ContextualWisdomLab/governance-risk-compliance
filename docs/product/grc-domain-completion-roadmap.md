@@ -252,7 +252,9 @@ and independent review.
 
 ### Wave 0 — Production foundation
 
-1. Merge the Keyverse stack in order: #5 → #6 → #7 → #16.
+1. Merge the live Keyverse stack in order: #38 → #55 → #56 → #57 → #58.
+   Closed PR #5 is superseded by #38. Closed PRs #6, #7, and #16 are
+   stack-only history and did not update protected `develop`.
 2. Complete #8 PostgreSQL lifecycle and exact-head integration evidence.
 3. Complete #9 key lifecycle, retention, legal hold, backup, restore, and
    purpose-specific disclosure.
