@@ -37,6 +37,15 @@ class AccessTokenValidationError(ValueError):
     """Signal that untrusted bearer material failed a closed validation rule."""
 
 
+class AccessTokenScopeError(AccessTokenValidationError):
+    """Signal that a verified token is missing an action-specific scope.
+
+    Insufficient scope is authorization failure (HTTP 403), not authentication
+    failure (HTTP 401). RFC 6750 maps `insufficient_scope` to 403 after the
+    token itself has been authenticated.
+    """
+
+
 @dataclass(frozen=True)
 class KeyverseAccessTokenSettings:
     """Immutable resource-server policy for one Keyverse access-token profile."""
@@ -273,7 +282,7 @@ def require_access_scopes(
     """Reject an authenticated principal missing any action-specific scope."""
     missing = set(required_scopes).difference(principal.scopes)
     if missing:
-        raise AccessTokenValidationError("The Keyverse token lacks a required scope.")
+        raise AccessTokenScopeError("The Keyverse token lacks a required scope.")
 
 
 def _read_untrusted_header(token: str) -> dict[str, Any]:

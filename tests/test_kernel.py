@@ -113,7 +113,7 @@ def test_purpose_labels_and_empty_officer_home() -> None:
     html = render_officer_home([])
     assert "Every seeded control in this catalog has evidence" in html
     assert "Buyer" not in (officer_console.__doc__ or "")
-    assert "officer home" in (officer_console.__doc__ or "")
+    assert "officer home" in (officer_console.__doc__ or "").casefold()
     assert not hasattr(officer_console, "_BUYER_FRAMEWORKS")
     assert _OFFICER_FRAMEWORKS
     assert 'id="keyverse-access-token"' in html

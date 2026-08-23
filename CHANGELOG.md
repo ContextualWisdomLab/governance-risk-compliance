@@ -22,6 +22,7 @@
 - Officer home (`GET /`) and officer form posts require the same Keyverse Bearer token and hide other officers' policy titles from the home page.
 - Tenant-owned persistence: `policy_document`, `evidence_record`, and `audit_event` store `tenant_identifier`, migrate existing rows to `local_preview`, and isolate reads/writes by Keyverse `org`.
 - OpenAPI `/openapi.json` publishes `KeyverseBearer` (`at+jwt`) on officer policy, evidence, and home operations with `grc.policy.read`, `grc.policy.write`, and `grc.evidence.write`. Catalog and `/healthz` stay public.
+- Officer home browser forms store the Keyverse access token in `sessionStorage` and send it as an `Authorization: Bearer` header so policy and evidence posts work without relying on actor headers.
 
 ### Security
 
@@ -38,6 +39,7 @@
 - Check required action scopes before consuming an optional one-time-use Keyverse token replay guard.
 - Reject ID-token/access-token confusion, unsigned or alternate-algorithm tokens, unsupported critical headers, unknown or duplicate keys, private/symmetric/encryption JWKs, stale/future tokens, and client/subject confusion.
 - Bound offline Keyverse JWK input to 1 MiB and support reviewed old/new public-key overlap without enabling network discovery or remote GRC traffic.
+- Map a verified token that lacks an action scope to HTTP 403 through `AccessTokenScopeError` (RFC 6750 `insufficient_scope`) instead of matching exception text for `"required scope"`.
 - Reject provider refresh clocks whose `tzinfo` exists without a defined UTC offset.
 
 ### ADR

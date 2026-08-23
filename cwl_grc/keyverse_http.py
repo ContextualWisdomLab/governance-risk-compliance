@@ -10,6 +10,7 @@ from fastapi import HTTPException
 
 from cwl_grc.authorization import LOCAL_PREVIEW_TENANT
 from cwl_grc.keyverse_authentication import (
+    AccessTokenScopeError,
     AccessTokenValidationError,
     AuthenticatedPrincipal,
     KeyverseAccessTokenVerifier,
@@ -115,7 +116,7 @@ def authenticate_keyverse_request(
             required_scopes=required_scopes,
         )
     except AccessTokenValidationError as exc:
-        status = 403 if "required scope" in str(exc) else 401
+        status = 403 if isinstance(exc, AccessTokenScopeError) else 401
         raise HTTPException(status_code=status, detail=str(exc)) from exc
     _reject_impersonation(principal, declared_actor, declared_tenant)
     return RequestPrincipal(principal.actor_id, principal.tenant_id)

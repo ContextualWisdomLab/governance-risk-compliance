@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from cwl_grc.app import create_app
 from cwl_grc.catalog import FrameworkCode
 from cwl_grc.keyverse_authentication import (
+    AccessTokenScopeError,
     KeyverseAccessTokenSettings,
     KeyverseAccessTokenVerifier,
     parse_keyverse_jwks,
@@ -200,6 +201,32 @@ def test_keyverse_route_rejects_missing_token_wrong_tenant_and_missing_scope() -
         json={"evidence_title": "Register", "payload_text": "Exact officer note."},
     )
     assert scoped.status_code == 403
+
+
+def test_missing_scope_is_forbidden_by_exception_type_not_message_text() -> None:
+    """Insufficient scope is 403 because the token is authentic, not because of wording."""
+    from fastapi import HTTPException
+
+    from cwl_grc.keyverse_http import authenticate_keyverse_request
+
+    class _ScopeVerifier:
+        def verify(self, token: str, *, required_scopes=()):  # noqa: ANN001
+            raise AccessTokenScopeError(
+                "token is authentic but this action is not granted"
+            )
+
+    try:
+        authenticate_keyverse_request(
+            _ScopeVerifier(),
+            authorization="Bearer authentic-token",
+            declared_actor=None,
+            required_scopes=("grc.policy.write",),
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 403
+        assert "required scope" not in str(exc.detail)
+    else:
+        raise AssertionError("missing scope must be forbidden")
 
 
 def test_keyverse_tenant_owned_policies_are_isolated_by_org_claim() -> None:
