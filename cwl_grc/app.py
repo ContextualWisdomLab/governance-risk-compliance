@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable, Iterator
 from typing import Any
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Response
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -23,6 +24,7 @@ from cwl_grc.keyverse_http import (
     POLICY_READ_SCOPES,
     POLICY_WRITE_SCOPES,
     RequestPrincipal,
+    apply_keyverse_openapi_security,
     authenticate_keyverse_request,
 )
 from cwl_grc.models import ControlItem, EvidenceRecord, PolicyDocument
@@ -95,6 +97,20 @@ def create_app(
     app = FastAPI(title="CWL GRC", version="0.1.0")
     app.state.evidence_cipher = cipher
     app.state.access_token_verifier = access_token_verifier
+
+    def custom_openapi() -> dict[str, Any]:
+        """Publish Keyverse Bearer security on officer policy and evidence routes."""
+        if app.openapi_schema is not None:
+            return app.openapi_schema
+        schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            routes=app.routes,
+        )
+        app.openapi_schema = apply_keyverse_openapi_security(schema)
+        return app.openapi_schema
+
+    app.openapi = custom_openapi
 
     def authorized_principal(
         *,

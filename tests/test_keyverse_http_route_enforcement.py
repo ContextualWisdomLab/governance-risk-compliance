@@ -379,3 +379,34 @@ def test_bearer_extraction_rejects_malformed_authorization_values() -> None:
         else:
             raise AssertionError("malformed authorization must fail closed")
     assert extract_bearer_token("Bearer compact-token") == "compact-token"
+
+
+def test_openapi_publishes_keyverse_bearer_on_officer_routes() -> None:
+    """Officer policy and evidence operations declare Keyverse Bearer scopes."""
+    client = _client()
+    first = client.get("/openapi.json")
+    second = client.get("/openapi.json")
+    assert first.status_code == 200
+    assert second.json() == first.json()
+    spec = first.json()
+    scheme = spec["components"]["securitySchemes"]["KeyverseBearer"]
+    assert scheme["type"] == "http"
+    assert scheme["scheme"] == "bearer"
+    assert scheme["bearerFormat"] == "at+jwt"
+    assert "grc.policy.read" in scheme["description"]
+    assert "grc.policy.write" in scheme["description"]
+    assert "grc.evidence.write" in scheme["description"]
+    assert spec["paths"]["/policy-documents"]["post"]["security"] == [
+        {"KeyverseBearer": ["grc.policy.write"]}
+    ]
+    assert spec["paths"]["/policy-documents"]["get"]["security"] == [
+        {"KeyverseBearer": ["grc.policy.read"]}
+    ]
+    assert spec["paths"]["/evidence-records"]["post"]["security"] == [
+        {"KeyverseBearer": ["grc.evidence.write"]}
+    ]
+    assert spec["paths"]["/"]["get"]["security"] == [
+        {"KeyverseBearer": ["grc.policy.read"]}
+    ]
+    assert "security" not in spec["paths"]["/healthz"]["get"]
+    assert "security" not in spec["paths"]["/controls"]["get"]
