@@ -68,14 +68,36 @@ def test_storybook_inventory_covers_reusable_states_with_a11y_enabled() -> None:
     assert "renderFixture({ accessDenied: false, stale: true })" in stories
     assert "globals: { viewport: { value: 'mobile1', isRotated: false } }" in stories
     assert "parameters: { viewport: { defaultViewport: 'mobile1' } }" not in stories
+    assert "from 'storybook/test'" in stories
+    assert "title: 'GRC/Officer workspace'" in stories
     for story in (
         "ComplianceOfficerDesktop",
         "ComplianceOfficerMobile",
         "AccessDenied",
         "StaleEvidence",
         "KoreanLocale",
+        "TouchAndInteraction",
+        "PerformanceBudget",
+        "LocaleStyleSelection",
+        "TypographyAndColor",
+        "ReducedMotion",
+        "ChartsAndData",
     ):
         assert story in stories
+    for play in (
+        "playAccessibility",
+        "playTouchAndInteraction",
+        "playPerformance",
+        "playStyleSelection",
+        "playLayoutAndResponsive",
+        "playTypographyAndColor",
+        "playAnimation",
+        "playFormsAndFeedback",
+        "playNavigation",
+        "playChartsAndData",
+    ):
+        assert f"async function {play}" in stories
+        assert f"play: {play}" in stories
     assert '"storybook": "10.5.10"' in package
     assert '"@storybook/web-components-vite": "10.5.10"' in package
     assert '"@storybook/addon-a11y": "10.5.10"' in package
@@ -136,6 +158,12 @@ def test_i18n_contract_keeps_english_and_korean_semantics_aligned() -> None:
         assert f"'{key}'" in i18n
     assert "local developer preview" in i18n
     assert "로컬 개발자 미리보기" in i18n
+    assert "officer-facing" in i18n
+    assert "담당자 화면" in i18n
+    assert "Prioritized by organization impact" in i18n
+    assert "조직 영향 기준 우선순위" in i18n
+    assert "buyer-facing" not in i18n
+    assert "구매자" not in i18n
     assert "export function initializeLocale" in controller
     assert "applyLocale(root, requestedLocale)" in controller
     assert "select.addEventListener('change'" in controller

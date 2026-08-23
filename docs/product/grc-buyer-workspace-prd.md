@@ -6,7 +6,7 @@
 - Figma: `ta1jjWSjmADz2BFxka9UPs`
 - Design decision: ADR 0012
 
-## Buyer outcome
+## Officer outcome
 
 A compliance officer can distinguish proven posture from incomplete posture, trace a claim through requirement → control → test → evidence, and identify the next safe action without treating a dashboard projection as authoritative truth.
 
@@ -20,9 +20,9 @@ A compliance officer can distinguish proven posture from incomplete posture, tra
 
 ## Acceptance evidence
 
-The Figma desktop frame `1:72`, mobile frame `1:150`, reusable component section `1:2`, and interaction-state section `1:227` use the same semantic vocabulary as Storybook and `apps/grc-workspace/styles.css`. Storybook must expose desktop, mobile, stale-evidence, and access-denied stories with the a11y addon enabled.
+The Figma desktop frame `1:72`, mobile frame `1:150`, reusable component section `1:2`, and interaction-state section `1:227` use the same semantic vocabulary as Storybook and `apps/grc-workspace/styles.css`. Storybook must expose desktop, mobile, stale-evidence, access-denied, locale, and the ten UX-dimension `play` stories with the a11y addon enabled. Customer-facing copy uses officer and organization language, not “Buyer”.
 
-Repository tests and the exact-head Chromium check must fail if the explicit buyer states, next-action labels, exact-value table, focus-visible rule, reduced-motion rule, print rule, responsive rule, Storybook inventory, or Figma traceability are removed.
+Repository tests and the exact-head Chromium check must fail if the explicit officer states, next-action labels, exact-value table, focus-visible rule, reduced-motion rule, print rule, responsive rule, Storybook inventory, Storybook `play` functions, or Figma traceability are removed.
 
 ## Non-goals
 

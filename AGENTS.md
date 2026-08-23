@@ -28,7 +28,7 @@ Build ContextualWisdomLab GRC as the system of record for policy, control, risk,
 - Reuse semantic tokens and components for repeated states/actions. Keep `unknown`, `not assessed`, `stale`, `blocked`, and `access denied` distinct in text, not color alone.
 - Every projected metric must expose an exact-value alternative with source version, period/unit where applicable, limitations, provenance, and the next action.
 - Supported journeys target WCAG 2.2 AA: keyboard operation, visible focus, screen-reader names/states, touch alternatives, reduced motion, responsive layouts, error recovery, and print/PDF preservation are review gates.
-- Customer-facing explanatory copy must tell the buyer what to do next. A chart, badge, or percentage is a projection, never a second source of truth.
+- Customer-facing explanatory copy must tell the officer what to do next. A chart, badge, or percentage is a projection, never a second source of truth. Do not use “Buyer” in officer-visible language.
 
 ## Documentation rules
 

@@ -6,6 +6,9 @@ test('keyboard actions expose exact values and truthful preview boundaries', asy
   await expect(page.getByRole('heading', { name: 'Compliance workspace' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'View exact values' }).first()).toBeVisible();
   await expect(page.getByRole('status')).toContainText('Connect the verified GRC workflow');
+  await expect(page.getByText('Prioritized by organization impact')).toBeVisible();
+  await expect(page.getByText('officer-facing state semantics')).toBeVisible();
+  await expect(page.getByText(/buyer/i)).toHaveCount(0);
 
   const exactValues = page.getByRole('link', { name: 'View exact values' }).first();
   await exactValues.focus();
@@ -64,7 +67,7 @@ test('locale switching translates labels without changing state identifiers', as
 });
 
 test('Storybook locale story initializes and switches the real workspace selector', async ({ page }) => {
-  await page.goto('/storybook-static/iframe.html?id=grc-buyer-workspace--korean-locale&viewMode=story');
+  await page.goto('/storybook-static/iframe.html?id=grc-officer-workspace--korean-locale&viewMode=story');
 
   const localeSelect = page.locator('#locale-select');
   await expect(localeSelect).toHaveValue('ko');

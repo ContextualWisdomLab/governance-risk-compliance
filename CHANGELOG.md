@@ -4,6 +4,7 @@
 
 ### Added
 
+- Storybook CSF `play` functions for the officer workspace covering Accessibility, Touch & Interaction, Performance, Style Selection, Layout & Responsive, Typography & Color, Animation, Forms & Feedback, Navigation, and Charts & Data, with officer/organization language instead of customer-facing “Buyer” copy.
 - Bounded GRC buyer-workspace design slice for issue #30 with a truthful compliance-officer posture projection, explicit `unknown`, `not assessed`, `stale`, `blocked`, and `access denied` states, persistent next actions, and an exact-value table that preserves source version, limitation, and next action.
 - Figma design authority `ta1jjWSjmADz2BFxka9UPs` with desktop/mobile frames, reusable semantic components, and interaction-state contracts paired with repository Storybook.
 - Storybook 10.5.10 Web Components + Vite inventory with accessibility addon coverage for desktop, mobile, stale-evidence, and access-denied states, plus an exact-PR-head build workflow.

@@ -19,14 +19,23 @@ The first bounded slice is intentionally a design/runtime fixture. It must make 
 
 Use the Figma design file `ta1jjWSjmADz2BFxka9UPs` and repository Storybook as paired design authority for this slice.
 
-The shared semantic tokens are defined in `apps/grc-workspace/styles.css`. Repeated states use explicit text plus color: `effective`, `unknown`, `not assessed`, `stale`, `blocked`, and `access denied`. Repeated actions use persistent controls for requesting evidence, opening the evidence room, and revealing exact values. No buyer-critical action depends on hover, drag, animation, or a chart alone.
+The shared semantic tokens are defined in `apps/grc-workspace/styles.css`. Repeated states use explicit text plus color: `effective`, `unknown`, `not assessed`, `stale`, `blocked`, and `access denied`. Repeated actions use persistent controls for requesting evidence, opening the evidence room, and revealing exact values. No officer-critical action depends on hover, drag, animation, or a chart alone.
 
 Storybook 10.5.10 uses the official Web Components + Vite framework and `@storybook/addon-a11y`. The stories import the real page shell from `apps/grc-workspace/index.html?raw` and select state visibility from that markup, so Storybook and the browser preview have one markup authority. The checked-in npm lockfile and `mise.toml` pin the frontend toolchain; the exact-head workflow also runs a real Chromium interaction check. The initial inventory is:
 
-- `ComplianceOfficerDesktop`
-- `ComplianceOfficerMobile`
-- `AccessDenied`
-- `StaleEvidence`
+- `ComplianceOfficerDesktop` (Accessibility play)
+- `ComplianceOfficerMobile` (Layout & Responsive play)
+- `AccessDenied` (Forms & Feedback play)
+- `StaleEvidence` (Navigation play)
+- `KoreanLocale`
+- `TouchAndInteraction`
+- `PerformanceBudget`
+- `LocaleStyleSelection`
+- `TypographyAndColor`
+- `ReducedMotion`
+- `ChartsAndData`
+
+Each Storybook CSF story uses a `play` function from `storybook/test` so officer events (keyboard focus, 44 px touch targets, locale switch, hash navigation, exact-value table inspection, denied-access request, and reduced-motion assertions) are executable scene definitions rather than screenshots. Customer-facing copy uses officer and organization language, not “Buyer”.
 
 The accessibility target is WCAG 2.2 AA for supported journeys. The fixture therefore requires keyboard operation, visible focus, text-equivalent status, a minimum 44 px action height, reduced-motion handling, forced-colors resilience, responsive stacking, print behavior, and an exact-value table for projected summary values. The 44 px target is an intentional product-system margin above WCAG 2.2 AA Success Criterion 2.5.8's 24 CSS pixel minimum.
 
@@ -42,12 +51,14 @@ The Figma and Storybook artifacts in this ADR are design evidence, not authentic
 
 ## Consequences
 
-A reviewer can compare the desktop/mobile Figma frames with executable Storybook states and the static fixture from one traceable token/state vocabulary. Buyer-facing gaps can be repaired without inventing product truth. The trade-off is an additional frontend dev dependency surface; the checked-in lockfile, exact-head Storybook build, and Chromium interaction check remain design evidence rather than release evidence.
+A reviewer can compare the desktop/mobile Figma frames with executable Storybook states and the static fixture from one traceable token/state vocabulary. Officer-facing gaps can be repaired without inventing product truth. The trade-off is an additional frontend dev dependency surface; the checked-in lockfile, exact-head Storybook build, and Chromium interaction check remain design evidence rather than release evidence.
 
 ## References
 
 Storybook. (2026). *Storybook for Web components with Vite*. https://storybook.js.org/docs/get-started/frameworks/web-components-vite
 
 Storybook. (2026). *Accessibility tests*. https://storybook.js.org/docs/writing-tests/accessibility-testing
+
+Storybook. (2026). *Interaction tests*. https://storybook.js.org/docs/writing-tests/interaction-testing
 
 World Wide Web Consortium. (2023). *Web Content Accessibility Guidelines (WCAG) 2.2*. https://www.w3.org/TR/WCAG22/
