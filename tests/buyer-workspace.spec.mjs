@@ -82,3 +82,35 @@ test('Storybook locale story initializes and switches the real workspace selecto
   await expect(page.locator('[data-locale="ko"]')).toBeVisible();
   await expect(page.getByRole('heading', { name: '컴플라이언스 워크스페이스' })).toBeVisible();
 });
+
+test('reduced motion emulation clamps every transition and animation', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/apps/grc-workspace/index.html');
+
+  for (const action of await page.locator('.button').all()) {
+    const styles = await action.evaluate((node) => {
+      const computed = getComputedStyle(node);
+      return {
+        animationName: computed.animationName,
+        animationDuration: Number.parseFloat(computed.animationDuration) || 0,
+        transitionDuration: Math.max(
+          ...computed.transitionDuration.split(',').map((value) => Number.parseFloat(value) || 0),
+        ),
+      };
+    });
+    expect(styles.animationDuration).toBeLessThanOrEqual(0.02);
+    expect(styles.transitionDuration).toBeLessThanOrEqual(0.02);
+  }
+});
+
+test('reduced motion keeps the exact-values table reachable by keyboard', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/apps/grc-workspace/index.html');
+
+  const exactValues = page.getByRole('link', { name: 'View exact values' }).first();
+  await exactValues.focus();
+  await expect(exactValues).toBeFocused();
+  await exactValues.press('Enter');
+  await expect(page).toHaveURL(/#exact-title$/);
+  await expect(page.getByRole('table')).toContainText('Source version');
+});

@@ -89,10 +89,31 @@ async function playTypographyAndColor({ canvas, canvasElement }) {
   await expect(root.getByText('Prioritized by organization impact')).toBeVisible();
 }
 
+function reducedMotionGuardText() {
+  for (const sheet of document.styleSheets) {
+    let rules;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      continue;
+    }
+    for (const rule of rules) {
+      if (rule.media && /prefers-reduced-motion:\s*reduce/.test(rule.media.mediaText)) {
+        return rule.cssRules.length > 0 ? rule.cssText : '';
+      }
+    }
+  }
+  return '';
+}
+
 async function playAnimation({ canvasElement }) {
   const action = workspaceHost({ canvasElement }).querySelector('.button');
   await expect(getComputedStyle(action).animationName).toBe('none');
   await expect(Number.parseFloat(getComputedStyle(action).transitionDuration) || 0).toBeLessThan(0.05);
+  const guard = reducedMotionGuardText();
+  await expect(guard).toContain('prefers-reduced-motion');
+  await expect(guard).toContain('animation-duration');
+  await expect(guard).toContain('0.01ms');
 }
 
 async function playFormsAndFeedback({ canvas, canvasElement, userEvent }) {

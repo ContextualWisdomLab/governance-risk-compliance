@@ -39,5 +39,5 @@ Keep README, AGENTS, CLAUDE, ARCHITECTURE, CHANGELOG, ADRs, and doctoring refere
 - Production code requires public docstrings.
 - Production statement and branch coverage must remain 100% where tooling exposes it.
 - Tests use real catalog identifiers and realistic officer workflows.
-- Product CI lives in `.github/workflows/product.yml`; organization-wide review and security lanes remain centrally owned.
+- Product CI lives in `.github/workflows/product.yml` for the Python product; the buyer-workspace design lane lives in `.github/workflows/buyer-workspace.yml` (Node, Storybook, Playwright) with its own path filters. Organization-wide review and security lanes remain centrally owned.
 - Storybook design evidence must build from the exact pull-request head before the buyer-workspace design runtime can become merge evidence.
