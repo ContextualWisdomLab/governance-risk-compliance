@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 import hashlib
 import json
 import re
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -150,6 +150,7 @@ def register_source_artifact(
         artifact_content_class, _CONTENT_CLASSES, "artifact content class"
     )
     source_host = _validated_source_host(source_url, allowed_source_hosts)
+    source_url = _canonical_source_url(source_url)
     policy = session.get(SourceLicensePolicy, license_policy_code)
     if policy is None:
         raise HTTPException(status_code=422, detail="The license policy is not registered.")
@@ -518,6 +519,24 @@ def _validated_source_host(source_url: str, allowed_hosts: set[str]) -> str:
     if host not in normalized_hosts:
         raise ValueError("source URL host is not allowlisted.")
     return host
+
+
+def _canonical_source_url(source_url: str) -> str:
+    """Collapse spellings that point at the identical HTTPS resource."""
+    source_url = _required_text(source_url, "source URL")
+    parsed = urlsplit(source_url)
+    host = (parsed.hostname or "").lower().rstrip(".")
+    port = "" if parsed.port in (None, 443) else f":{parsed.port}"
+    netloc = f"{host}{port}" if host else parsed.netloc
+    return urlunsplit(
+        (
+            parsed.scheme.lower(),
+            netloc,
+            parsed.path,
+            parsed.query,
+            parsed.fragment,
+        )
+    )
 
 
 def _validated_digest(value: str) -> str:

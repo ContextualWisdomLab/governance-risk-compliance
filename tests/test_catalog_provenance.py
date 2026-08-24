@@ -166,6 +166,35 @@ def test_source_registration_accepts_explicit_default_https_port() -> None:
             allowed_source_hosts={"pages.nist.gov"},
         )
         assert artifact.source_host == "pages.nist.gov"
+        assert artifact.source_url == "https://pages.nist.gov/OSCAL/"
+
+
+def test_source_registration_collapses_equivalent_url_spellings() -> None:
+    """Default ports, trailing dots, and host case register one shared artifact."""
+    factory = _factory()
+    with factory() as session:
+        first = register_source_artifact(
+            session,
+            _DECISION,
+            publisher_name="NIST",
+            source_reference="equivalent-pointer",
+            source_url="https://PAGES.NIST.gov./OSCAL/",
+            artifact_content_class="identifier_only",
+            license_policy_code="identifier_only",
+            allowed_source_hosts={"pages.nist.gov"},
+        )
+        second = register_source_artifact(
+            session,
+            _DECISION,
+            publisher_name="NIST",
+            source_reference="equivalent-pointer",
+            source_url="https://pages.nist.gov:443/OSCAL/",
+            artifact_content_class="identifier_only",
+            license_policy_code="identifier_only",
+            allowed_source_hosts={"pages.nist.gov"},
+        )
+        assert second.source_artifact_id == first.source_artifact_id
+        assert first.source_url == "https://pages.nist.gov/OSCAL/"
 
 
 def test_source_registration_rejects_wrong_policy_and_purpose() -> None:

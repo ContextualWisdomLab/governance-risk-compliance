@@ -47,7 +47,7 @@ Policy authoring requires the declared purpose `policy_authoring`. Evidence crea
 
 Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `nist_sp_800_53_r5`, `coso_ic_2013`, `coso_erm_2017`.
 
-Catalog provenance is the Issue #29 first vertical slice. It records an exact HTTPS source pointer, an externally computed SHA-256 digest and edition metadata, a deterministic parser receipt, and a release only after a successful import. Officers can list releases and compare source metadata plus import receipts, while requirement-level control diffs remain unavailable until verified catalog rows exist. It stores no raw source bytes and does not fetch remote content, import control requirements, create OSCAL/OLIR mappings, or publish a framework edition yet; those are follow-on slices. Source hosts are supplied as an explicit allowlist by the local operator.
+Catalog provenance is the Issue #29 first vertical slice. It records an exact HTTPS source pointer, an externally computed SHA-256 digest and edition metadata, a deterministic parser receipt, and a release only after a successful import. Officers can list releases and compare source metadata plus import receipts, while requirement-level control diffs remain unavailable until verified catalog rows exist. It stores no raw source bytes and does not fetch remote content, import control requirements, create OSCAL/OLIR mappings, or publish a framework edition yet; those are follow-on slices. Source hosts come from the reviewed server-owned allowlist (`DEFAULT_CATALOG_SOURCE_HOSTS`); an HTTP request cannot expand it.
 
 ## Integrity guarantees
 

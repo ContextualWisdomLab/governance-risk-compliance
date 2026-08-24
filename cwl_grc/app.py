@@ -6,6 +6,7 @@ import os
 from collections.abc import Awaitable, Callable, Iterator
 from datetime import date
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -453,9 +454,15 @@ def create_app(
         session: Session = Depends(get_session),
         x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
+        actor_identifier: str | None = Query(default=None),
+        purpose_code: str | None = Query(default=None),
     ) -> str:
         """Show policy authoring, policy gaps, and the next evidence action."""
-        require_purpose(x_actor_id, x_purpose, PurposeCode.POLICY_AUTHORING)
+        require_purpose(
+            x_actor_id or actor_identifier,
+            x_purpose or purpose_code,
+            PurposeCode.POLICY_AUTHORING,
+        )
         return render_officer_home(
             list_uncovered_controls(session, None),
             policy_gaps=list_policy_gaps(session, None),
@@ -488,7 +495,11 @@ def create_app(
                 ) from exc
             refs.append(ControlRef(framework, catalog_identifier))
         author_policy(session, decision, policy_title, policy_body, refs)
-        return RedirectResponse(url="/", status_code=303)
+        return RedirectResponse(
+            url=f"/?actor_identifier={quote(decision.actor_identifier)}"
+            f"&purpose_code={PurposeCode.POLICY_AUTHORING.value}",
+            status_code=303,
+        )
 
     @app.post("/officer/evidence")
     def officer_attach(
@@ -534,7 +545,11 @@ def create_app(
             catalog_identifier,
             record.evidence_record_id,
         )
-        return RedirectResponse(url="/", status_code=303)
+        return RedirectResponse(
+            url=f"/?actor_identifier={quote(decision.actor_identifier)}"
+            f"&purpose_code={PurposeCode.POLICY_AUTHORING.value}",
+            status_code=303,
+        )
 
     return app
 

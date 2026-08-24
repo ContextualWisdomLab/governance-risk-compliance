@@ -325,3 +325,54 @@ def test_officer_can_bind_evidence_from_home_form() -> None:
     assert posted.status_code == 303
     gaps = client.get("/controls/uncovered", headers=_catalog_headers(), params={"framework": FrameworkCode.CSAP_2026.value})
     assert "12.3.1" not in {item["catalog_identifier"] for item in gaps.json()["controls"]}
+
+
+def test_officer_form_redirect_survives_browser_navigation() -> None:
+    """A form submit followed by its redirect must not land on a 401."""
+    client = _client()
+    posted = client.post(
+        "/officer/evidence",
+        data={
+            "framework": FrameworkCode.SOC2_TSC_2017.value,
+            "catalog_identifier": "CC6.1",
+            "actor_identifier": "officer-nam",
+            "evidence_title": "SOC 2 CC6.1 access roster",
+            "payload_text": "nam@example.go.kr quarterly review.",
+        },
+        follow_redirects=False,
+    )
+    assert posted.status_code == 303
+    location = posted.headers["location"]
+    assert location.startswith("/?actor_identifier=officer-nam&purpose_code=policy_authoring")
+    followed = client.get(location)
+    assert followed.status_code == 200
+    assert "CC6.1" in followed.text
+
+
+def test_officer_policy_form_redirect_survives_browser_navigation() -> None:
+    """Policy authoring redirects keep the declared-purpose context for the browser."""
+    client = _client()
+    posted = client.post(
+        "/officer/policy",
+        data={
+            "policy_title": "Access review cadence",
+            "policy_body": "Quarterly access reviews are recorded.",
+            "actor_identifier": "officer-seo",
+        },
+        follow_redirects=False,
+    )
+    assert posted.status_code == 303
+    followed = client.get(posted.headers["location"])
+    assert followed.status_code == 200
+    assert "Policy requirements that still lack evidence" in followed.text
+
+
+def test_officer_home_still_requires_declared_purpose() -> None:
+    """Query-param fallback cannot bypass the purpose declaration requirement."""
+    anonymous = _client().get("/")
+    assert anonymous.status_code == 401
+    wrong_purpose = _client().get(
+        "/",
+        params={"actor_identifier": "officer-min", "purpose_code": "evidence_binding"},
+    )
+    assert wrong_purpose.status_code == 403
