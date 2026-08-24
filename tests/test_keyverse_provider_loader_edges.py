@@ -11,7 +11,6 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-import cwl_grc.keyverse_provider_loader as loader_module
 from cwl_grc.keyverse_authentication import KeyverseAccessTokenSettings
 from cwl_grc.keyverse_provider_loader import (
     KeyverseProviderLoadError,
@@ -365,8 +364,10 @@ def test_loader_default_clock_and_injected_default_fetcher(
             """Return the static document for one validated endpoint."""
             return static.fetch(endpoint, maximum_bytes)
 
-    monkeypatch.setattr(loader_module, "PinnedHttpsDocumentFetcher", FakePinnedFetcher)
-    monkeypatch.setattr(loader_module, "_system_resolver", _resolver)
+    monkeypatch.setattr(
+        "cwl_grc.keyverse_provider_loader.PinnedHttpsDocumentFetcher", FakePinnedFetcher
+    )
+    monkeypatch.setattr("cwl_grc.keyverse_provider_loader._system_resolver", _resolver)
     snapshot = load_keyverse_provider(_settings())
     assert snapshot.loaded_at.tzinfo is timezone.utc
     assert constructed == [5.0]
