@@ -11,7 +11,6 @@ from pathlib import Path
 import pytest
 
 import cwl_grc.production_readiness as production_readiness
-from cwl_grc.production_readiness import load_manifest
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -22,7 +21,7 @@ INDEX_PATH = "docs/production/readiness-evidence-index.json"
 
 def _all_ready_manifest(evidence: list[object]) -> dict[str, object]:
     """Return the canonical gate set marked ready with the supplied evidence."""
-    manifest = deepcopy(load_manifest(MANIFEST_PATH))
+    manifest = deepcopy(production_readiness.load_manifest(MANIFEST_PATH))
     gates = manifest["gates"]
     assert isinstance(gates, list)
     for gate in gates:
@@ -194,6 +193,18 @@ def test_release_mode_rejects_backslash_repository_path(
     path = tmp_path / "manifest.json"
     evidence = _bound_repository_evidence()
     evidence["path"] = r"tests\evidence.py"
+    _write_manifest(path, _all_ready_manifest([evidence]))
+
+    assert production_readiness.main(_main_arguments(path, REPOSITORY_ROOT)) == 2
+
+
+def test_release_mode_rejects_nested_git_repository_path(
+    tmp_path: Path,
+) -> None:
+    """Git internals below the root cannot serve as readiness evidence."""
+    path = tmp_path / "manifest.json"
+    evidence = _bound_repository_evidence()
+    evidence["path"] = "sub/.git/config"
     _write_manifest(path, _all_ready_manifest([evidence]))
 
     assert production_readiness.main(_main_arguments(path, REPOSITORY_ROOT)) == 2

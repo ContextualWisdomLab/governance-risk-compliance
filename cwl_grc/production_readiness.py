@@ -422,7 +422,7 @@ def _is_canonical_repository_path(value: str) -> bool:
     return (
         not candidate.is_absolute()
         and bool(candidate.parts)
-        and candidate.parts[0] != ".git"
+        and all(part != ".git" for part in candidate.parts)
         and all(part not in {".", ".."} for part in candidate.parts)
         and candidate.as_posix() == value
     )
