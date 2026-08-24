@@ -16,6 +16,8 @@
 - Product CI for lint, docstring coverage, and 100% statement/branch test coverage.
 - Hash-locked `uv.lock` dependency graph for runtime and development dependencies.
 - Versioned schema-upgrade receipts for existing first-slice stores.
+- Provider-neutral Keyverse JWT access-token verification kernel and typed authenticated-principal contract.
+- Bounded pinned-HTTPS Keyverse OIDC metadata and public-JWK loading through the provider-loader boundary, retaining exact source-byte digests and atomic last-known-good snapshots.
 
 ### Security
 
@@ -28,8 +30,15 @@
 - Pin the CSAP 2026.07 catalog provenance to the official KISA resource notice rather than a generic product page.
 - Pin every Product workflow action to an immutable commit and verify the exact pull-request head before testing.
 - Replace mutable `pip install` resolution with `uv sync --locked`, verify lock freshness, and reject any tracked or untracked dirty tree on every Product run.
+- Accept only explicitly typed, signed RS256 Keyverse access tokens with exact issuer, audience, client, role, tenant, workspace, principal-kind, time, token-ID, and action-scope validation.
+- Check required action scopes before consuming an optional one-time-use Keyverse token replay guard.
+- Reject ID-token/access-token confusion, unsigned or alternate-algorithm tokens, unsupported critical headers, unknown or duplicate keys, private/symmetric/encryption JWKs, stale/future tokens, and client/subject confusion.
+- Bound offline Keyverse JWK input to 1 MiB and support reviewed old/new public-key overlap without enabling network discovery or remote GRC traffic.
+- Reject provider refresh clocks whose `tzinfo` exists without a defined UTC offset.
 
 ### ADR
 
 - `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
+- `docs/adr/0003-keyverse-jwt-access-token-profile.md` — closed RFC 9068-style Keyverse access-token profile before route and tenant integration.
+- `docs/adr/0004-keyverse-oidc-provider-loading.md` — bounded pinned-HTTPS loading of Keyverse OIDC metadata and public JWKs before route and tenant integration.
