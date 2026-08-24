@@ -269,7 +269,155 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
         ).scalar_one()
     assert counter == 3
     assert finalized in {True, 1}
-    assert receipt_count == 1
+    assert receipt_count == 3
+
+
+def test_catalog_migration_adds_release_link_to_existing_framework(
+    tmp_path: Path,
+) -> None:
+    """The provenance migration upgrades a pre-provenance framework table."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'catalog-legacy.sqlite'}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE schema_migration ("
+                "migration_key VARCHAR(64) PRIMARY KEY, "
+                "applied_at TIMESTAMP NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO schema_migration VALUES "
+                "('0001_policy_integrity', CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE catalog_release ("
+                "catalog_release_id VARCHAR(64) PRIMARY KEY)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE control_framework ("
+                "framework_code VARCHAR(64) PRIMARY KEY)"
+            )
+        )
+    apply_schema_migrations(engine)
+    apply_schema_migrations(engine)
+    framework_columns = {
+        column["name"]
+        for column in inspect(engine).get_columns("control_framework")
+    }
+    assert "catalog_release_id" in framework_columns
+    with engine.connect() as connection:
+        receipt_count = connection.execute(
+            text("SELECT COUNT(*) FROM schema_migration")
+        ).scalar_one()
+    assert receipt_count == 3
+
+
+def test_policy_migration_skips_partial_schema(tmp_path: Path) -> None:
+    """A partial store does not execute policy updates against missing tables."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'partial.sqlite'}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE schema_migration ("
+                "migration_key VARCHAR(64) PRIMARY KEY, "
+                "applied_at TIMESTAMP NOT NULL)"
+            )
+        )
+        connection.execute(
+            text("CREATE TABLE policy_document (policy_document_id VARCHAR(64) PRIMARY KEY)")
+        )
+    apply_schema_migrations(engine)
+    with engine.connect() as connection:
+        migrations = set(connection.execute(text("SELECT migration_key FROM schema_migration")).scalars())
+    assert "0001_policy_integrity" not in migrations
+    assert {"0002_catalog_provenance", "0003_catalog_release_receipt_link"} <= migrations
+
+
+def test_catalog_release_migration_backfills_latest_successful_receipt(
+    tmp_path: Path,
+) -> None:
+    """The release link migration chooses the newest receipt deterministically."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'catalog-receipt-link.sqlite'}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE schema_migration ("
+                "migration_key VARCHAR(64) PRIMARY KEY, "
+                "applied_at TIMESTAMP NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO schema_migration VALUES "
+                "('0001_policy_integrity', CURRENT_TIMESTAMP), "
+                "('0002_catalog_provenance', CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE catalog_release ("
+                "catalog_release_id VARCHAR(64) PRIMARY KEY, "
+                "source_artifact_version_id VARCHAR(64) NOT NULL, "
+                "release_key VARCHAR(128) NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE catalog_import_run ("
+                "catalog_import_run_id VARCHAR(64) PRIMARY KEY, "
+                "source_artifact_version_id VARCHAR(64) NOT NULL, "
+                "run_status VARCHAR(32) NOT NULL, "
+                "completed_at TIMESTAMP NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE catalog_import_receipt ("
+                "catalog_import_receipt_id VARCHAR(64) PRIMARY KEY, "
+                "catalog_import_run_id VARCHAR(64) NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO catalog_release VALUES "
+                "('release-1', 'version-1', 'edition-1')"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO catalog_import_run VALUES "
+                "('run-old', 'version-1', 'succeeded', '2026-08-20 00:00:00'), "
+                "('run-new', 'version-1', 'succeeded', '2026-08-21 00:00:00')"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO catalog_import_receipt VALUES "
+                "('receipt-old', 'run-old'), ('receipt-new', 'run-new')"
+            )
+        )
+    apply_schema_migrations(engine)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "DELETE FROM schema_migration "
+                "WHERE migration_key = '0003_catalog_release_receipt_link'"
+            )
+        )
+    apply_schema_migrations(engine)
+    with engine.connect() as connection:
+        linked_run = connection.execute(
+            text(
+                "SELECT catalog_import_run_id FROM catalog_release "
+                "WHERE catalog_release_id = 'release-1'"
+            )
+        ).scalar_one()
+    assert linked_run == "run-new"
 
 
 def test_integrity_guard_ddl_covers_supported_and_unknown_dialects() -> None:

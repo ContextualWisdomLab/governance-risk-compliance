@@ -16,6 +16,12 @@ Korea Internet & Security Agency. (2026, July 6). *2026년 클라우드서비스
 
 Open Policy Agent. (n.d.). *Policy language*. https://www.openpolicyagent.org/docs/latest/policy-language/
 
+National Institute of Standards and Technology. (2026, January 29). *OSCAL control mapping model*. https://pages.nist.gov/OSCAL/learn/concepts/layer/control/mapping/
+
+National Institute of Standards and Technology. (n.d.). *OSCAL models*. https://pages.nist.gov/OSCAL-Reference/models/
+
+National Institute of Standards and Technology. (2024, February 26). *National Online Informative References (OLIR) program: Overview, benefits, and use* (NIST Interagency or Internal Report 8278 Rev. 1). https://csrc.nist.gov/Projects/olir/publications
+
 Ross, R., & Pillitteri, V. (2020). *Security and privacy controls for information systems and organizations* (NIST Special Publication 800-53 Rev. 5). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-53r5
 
 Policy authoring in this slice follows ISO/IEC 27001:2022 clause 5.2 (information security policy as documented information) and Annex A control A.5.1 (policies for information security); COSO (2013) Principle 12 and AICPA (2022) SOC 2 CC5.3 (deploy control activities through policies and procedures); KISA (2023) ISMS-P 1.1.5; and KISA (2026) CSAP 1.1.1. Open Policy Agent Rego was reviewed and not adopted: it is an authorization PDP language, not a policy-document or evidence-binding store.

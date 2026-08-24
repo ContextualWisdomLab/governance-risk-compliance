@@ -5,10 +5,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime, timezone
 
-from sqlalchemy import Engine, inspect, text
+from sqlalchemy import Connection, Engine, inspect, text
 
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
+CATALOG_PROVENANCE_MIGRATION = "0002_catalog_provenance"
+CATALOG_RELEASE_RECEIPT_LINK_MIGRATION = "0003_catalog_release_receipt_link"
 
 
 def apply_schema_migrations(engine: Engine) -> None:
@@ -24,67 +26,151 @@ def apply_schema_migrations(engine: Engine) -> None:
                 """
             )
         )
-        applied = connection.execute(
-            text(
-                "SELECT migration_key FROM schema_migration "
-                "WHERE migration_key = :migration_key"
-            ),
-            {"migration_key": POLICY_INTEGRITY_MIGRATION},
-        ).scalar_one_or_none()
-        if applied is not None:
-            return
+        applied = {
+            row[0]
+            for row in connection.execute(text("SELECT migration_key FROM schema_migration"))
+        }
+        if POLICY_INTEGRITY_MIGRATION not in applied:
+            _apply_policy_integrity_migration(connection)
+        if CATALOG_PROVENANCE_MIGRATION not in applied:
+            _apply_catalog_provenance_migration(connection)
+            connection.execute(
+                text(
+                    "INSERT INTO schema_migration (migration_key, applied_at) "
+                    "VALUES (:migration_key, :applied_at)"
+                ),
+                {
+                    "migration_key": CATALOG_PROVENANCE_MIGRATION,
+                    "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
+                },
+            )
+        if CATALOG_RELEASE_RECEIPT_LINK_MIGRATION not in applied:
+            _apply_catalog_release_receipt_link_migration(connection)
+            connection.execute(
+                text(
+                    "INSERT INTO schema_migration (migration_key, applied_at) "
+                    "VALUES (:migration_key, :applied_at)"
+                ),
+                {
+                    "migration_key": CATALOG_RELEASE_RECEIPT_LINK_MIGRATION,
+                    "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
+                },
+            )
 
-        inspector = inspect(connection)
-        additions = (
-            (
-                "policy_document",
-                "current_version_number",
-                "ALTER TABLE policy_document ADD COLUMN "
-                "current_version_number INTEGER NOT NULL DEFAULT 0",
-            ),
-            (
-                "policy_version",
-                "is_finalized",
-                "ALTER TABLE policy_version ADD COLUMN "
-                "is_finalized BOOLEAN NOT NULL DEFAULT TRUE",
-            ),
+
+def _apply_policy_integrity_migration(connection: Connection) -> None:
+    """Upgrade legacy policy columns and record the first migration receipt."""
+    inspector = inspect(connection)
+    if not {"policy_document", "policy_version"}.issubset(inspector.get_table_names()):
+        return
+    additions = (
+        (
+            "policy_document",
+            "current_version_number",
+            "ALTER TABLE policy_document ADD COLUMN "
+            "current_version_number INTEGER NOT NULL DEFAULT 0",
+        ),
+        (
+            "policy_version",
+            "is_finalized",
+            "ALTER TABLE policy_version ADD COLUMN "
+            "is_finalized BOOLEAN NOT NULL DEFAULT TRUE",
+        ),
+    )
+    for table_name, column_name, statement in additions:
+        columns = {column["name"] for column in inspector.get_columns(table_name)}
+        if column_name not in columns:
+            connection.execute(text(statement))
+            inspector = inspect(connection)
+
+    connection.execute(
+        text(
+            """
+            UPDATE policy_document
+            SET current_version_number = COALESCE(
+                (
+                    SELECT MAX(policy_version.version_number)
+                    FROM policy_version
+                    WHERE policy_version.policy_document_id =
+                          policy_document.policy_document_id
+                ),
+                0
+            )
+            WHERE current_version_number = 0
+            """
         )
-        for table_name, column_name, statement in additions:
-            columns = {column["name"] for column in inspector.get_columns(table_name)}
-            if column_name not in columns:
-                connection.execute(text(statement))
-                inspector = inspect(connection)
+    )
+    connection.execute(
+        text("UPDATE policy_version SET is_finalized = TRUE WHERE is_finalized IS NULL")
+    )
+    connection.execute(
+        text(
+            "INSERT INTO schema_migration (migration_key, applied_at) "
+            "VALUES (:migration_key, :applied_at)"
+        ),
+        {
+            "migration_key": POLICY_INTEGRITY_MIGRATION,
+            "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
+        },
+    )
 
+
+def _apply_catalog_provenance_migration(connection: Connection) -> None:
+    """Upgrade an existing control framework with the optional release link."""
+    inspector = inspect(connection)
+    if "control_framework" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("control_framework")}
+    if "catalog_release_id" not in columns:
         connection.execute(
             text(
-                """
-                UPDATE policy_document
-                SET current_version_number = COALESCE(
-                    (
-                        SELECT MAX(policy_version.version_number)
-                        FROM policy_version
-                        WHERE policy_version.policy_document_id =
-                              policy_document.policy_document_id
-                    ),
-                    0
-                )
-                WHERE current_version_number = 0
-                """
+                "ALTER TABLE control_framework ADD COLUMN catalog_release_id "
+                "VARCHAR(64) REFERENCES catalog_release (catalog_release_id)"
             )
         )
-        connection.execute(
-            text("UPDATE policy_version SET is_finalized = TRUE WHERE is_finalized IS NULL")
-        )
+
+
+def _apply_catalog_release_receipt_link_migration(connection: Connection) -> None:
+    """Bind existing catalog releases to their latest successful receipt when possible."""
+    inspector = inspect(connection)
+    table_names = set(inspector.get_table_names())
+    if "catalog_release" not in table_names:
+        return
+    columns = {column["name"] for column in inspector.get_columns("catalog_release")}
+    if "catalog_import_run_id" not in columns:
         connection.execute(
             text(
-                "INSERT INTO schema_migration (migration_key, applied_at) "
-                "VALUES (:migration_key, :applied_at)"
-            ),
-            {
-                "migration_key": POLICY_INTEGRITY_MIGRATION,
-                "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
-            },
+                "ALTER TABLE catalog_release ADD COLUMN catalog_import_run_id "
+                "VARCHAR(64) REFERENCES catalog_import_run (catalog_import_run_id)"
+            )
         )
+        columns.add("catalog_import_run_id")
+    if not {
+        "catalog_import_run",
+        "catalog_import_receipt",
+    }.issubset(table_names) or "source_artifact_version_id" not in columns:
+        return
+    connection.execute(
+        text(
+            """
+            UPDATE catalog_release
+            SET catalog_import_run_id = (
+                SELECT catalog_import_run.catalog_import_run_id
+                FROM catalog_import_run
+                JOIN catalog_import_receipt
+                  ON catalog_import_receipt.catalog_import_run_id =
+                     catalog_import_run.catalog_import_run_id
+                WHERE catalog_import_run.source_artifact_version_id =
+                      catalog_release.source_artifact_version_id
+                  AND catalog_import_run.run_status = 'succeeded'
+                ORDER BY catalog_import_run.completed_at DESC,
+                         catalog_import_run.catalog_import_run_id DESC
+                LIMIT 1
+            )
+            WHERE catalog_import_run_id IS NULL
+            """
+        )
+    )
 
 
 def install_integrity_guards(engine: Engine) -> None:
@@ -182,6 +268,76 @@ def _sqlite_integrity_guard_statements() -> tuple[str, ...]:
             SELECT RAISE(ABORT, 'cannot add mapping to finalized policy_version');
         END
         """,
+        """
+        CREATE TRIGGER IF NOT EXISTS source_artifact_version_block_update
+        BEFORE UPDATE ON source_artifact_version
+        BEGIN
+            SELECT RAISE(ABORT, 'source_artifact_version is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS source_artifact_version_block_delete
+        BEFORE DELETE ON source_artifact_version
+        BEGIN
+            SELECT RAISE(ABORT, 'source_artifact_version is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS catalog_import_run_block_update
+        BEFORE UPDATE ON catalog_import_run
+        BEGIN
+            SELECT RAISE(ABORT, 'catalog_import_run is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS catalog_import_run_block_delete
+        BEFORE DELETE ON catalog_import_run
+        BEGIN
+            SELECT RAISE(ABORT, 'catalog_import_run is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS catalog_import_receipt_block_update
+        BEFORE UPDATE ON catalog_import_receipt
+        BEGIN
+            SELECT RAISE(ABORT, 'catalog_import_receipt is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS catalog_import_receipt_block_delete
+        BEFORE DELETE ON catalog_import_receipt
+        BEGIN
+            SELECT RAISE(ABORT, 'catalog_import_receipt is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS catalog_release_block_update
+        BEFORE UPDATE ON catalog_release
+        BEGIN
+            SELECT RAISE(ABORT, 'catalog_release is immutable');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS catalog_release_require_matching_import_version
+        BEFORE INSERT ON catalog_release
+        WHEN NEW.catalog_import_run_id IS NOT NULL
+         AND NOT EXISTS (
+            SELECT 1
+            FROM catalog_import_run
+            WHERE catalog_import_run_id = NEW.catalog_import_run_id
+              AND source_artifact_version_id = NEW.source_artifact_version_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'catalog_release import run version mismatch');
+        END
+        """,
+        """
+        CREATE TRIGGER IF NOT EXISTS catalog_release_block_delete
+        BEFORE DELETE ON catalog_release
+        BEGIN
+            SELECT RAISE(ABORT, 'catalog_release is immutable');
+        END
+        """,
     )
 
 
@@ -255,5 +411,60 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
         CREATE TRIGGER policy_control_mapping_immutable
         BEFORE INSERT OR UPDATE OR DELETE ON policy_control_mapping
         FOR EACH ROW EXECUTE FUNCTION prevent_policy_mapping_mutation()
+        """,
+        """
+        CREATE OR REPLACE FUNCTION prevent_catalog_provenance_mutation()
+        RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            RAISE EXCEPTION '% is immutable', TG_TABLE_NAME;
+        END;
+        $$
+        """,
+        "DROP TRIGGER IF EXISTS source_artifact_version_immutable ON source_artifact_version",
+        "DROP TRIGGER IF EXISTS catalog_import_run_immutable ON catalog_import_run",
+        "DROP TRIGGER IF EXISTS catalog_import_receipt_immutable ON catalog_import_receipt",
+        "DROP TRIGGER IF EXISTS catalog_release_immutable ON catalog_release",
+        """
+        CREATE TRIGGER source_artifact_version_immutable
+        BEFORE UPDATE OR DELETE ON source_artifact_version
+        FOR EACH ROW EXECUTE FUNCTION prevent_catalog_provenance_mutation()
+        """,
+        """
+        CREATE TRIGGER catalog_import_run_immutable
+        BEFORE UPDATE OR DELETE ON catalog_import_run
+        FOR EACH ROW EXECUTE FUNCTION prevent_catalog_provenance_mutation()
+        """,
+        """
+        CREATE TRIGGER catalog_import_receipt_immutable
+        BEFORE UPDATE OR DELETE ON catalog_import_receipt
+        FOR EACH ROW EXECUTE FUNCTION prevent_catalog_provenance_mutation()
+        """,
+        """
+        CREATE TRIGGER catalog_release_immutable
+        BEFORE UPDATE OR DELETE ON catalog_release
+        FOR EACH ROW EXECUTE FUNCTION prevent_catalog_provenance_mutation()
+        """,
+        """
+        CREATE OR REPLACE FUNCTION validate_catalog_release_import_version()
+        RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF NEW.catalog_import_run_id IS NOT NULL
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM catalog_import_run
+                   WHERE catalog_import_run_id = NEW.catalog_import_run_id
+                     AND source_artifact_version_id = NEW.source_artifact_version_id
+               ) THEN
+                RAISE EXCEPTION 'catalog_release import run version mismatch';
+            END IF;
+            RETURN NEW;
+        END;
+        $$
+        """,
+        "DROP TRIGGER IF EXISTS catalog_release_import_version_guard ON catalog_release",
+        """
+        CREATE TRIGGER catalog_release_import_version_guard
+        BEFORE INSERT ON catalog_release
+        FOR EACH ROW EXECUTE FUNCTION validate_catalog_release_import_version()
         """,
     )
