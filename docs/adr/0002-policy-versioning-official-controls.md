@@ -23,3 +23,21 @@ Open Policy Agent Rego is a general-purpose authorization language. It does not 
 ## Consequences
 
 Officers can write a policy, see an uncovered mapped control, and attach the next evidence without leaving CWL GRC. Residual risk scoring and audit-workflow bodies remain later work. Peer CWL services still consume control/evidence contracts only.
+
+## Citation alignment
+
+The official COSO 2013 principles poster restates Principle 12 as deploying control activities through policies that establish what is expected and procedures that put those policies into action (Committee of Sponsoring Organizations of the Treadway Commission, 2013). That confirms the already-accepted policy-deployment rule; no new section numbers are added. ISO/IEC 27001:2022 clause 5.2 and Annex A A.5.1 remain as already written and are cited from the official ISO catalogue page for the 2022 edition; the public page does not republish paid clause text, and no RFC is required. AICPA SOC 2 CC5.3, KISA ISMS-P 1.1.5, and CSAP 1.1.1 likewise stay as already written and are cited from the official catalogue or notice pages. Open Policy Agent documents Rego as a declarative policy-evaluation language, not a versioned policy-document or evidence-binding store.
+
+## References
+
+American Institute of Certified Public Accountants. (2022). *2017 trust services criteria for security, availability, processing integrity, confidentiality, and privacy (with revised points of focus—2022)* (TSP Section 100). https://www.aicpa-cima.com/resources/download/2017-trust-services-criteria-with-revised-points-of-focus-2022
+
+Committee of Sponsoring Organizations of the Treadway Commission. (2013). *Internal control—Integrated framework*. https://www.coso.org/guidance-on-ic
+
+International Organization for Standardization. (2022). *Information security, cybersecurity and privacy protection—Information security management systems—Requirements* (ISO/IEC 27001:2022). https://www.iso.org/standard/27001
+
+Korea Internet & Security Agency. (2023, November 23). *정보보호 및 개인정보보호 관리체계(ISMS-P) 인증기준 안내서* [Information security and personal information management system (ISMS-P) certification criteria guide]. https://isms-p.or.kr/ntcn/rcsrm/selectGnrlRcsrmDetail.do?searchRcsrmMngId=RCSRMID_000000010105
+
+Korea Internet & Security Agency. (2026, July 6). *2026년 클라우드서비스 보안인증기준 해설서(2026.07)* [2026 cloud service security certification criteria commentary]. File corrected July 28, 2026. https://isms-p.or.kr/ntcn/rcsrm/selectGnrlVrtlRcsrmList.do?rcsrmMenuCd=1003&searchKeyword=%ED%81%B4%EB%9D%BC%EC%9A%B0%EB%93%9C%EC%84%9C%EB%B9%84%EC%8A%A4+%EB%B3%B4%EC%95%88%EC%9D%B8%EC%A6%9D%EA%B8%B0%EC%A4%80+%ED%95%B4%EC%84%A4%EC%84%9C
+
+Open Policy Agent. (n.d.). *Policy language*. https://www.openpolicyagent.org/docs/latest/policy-language/

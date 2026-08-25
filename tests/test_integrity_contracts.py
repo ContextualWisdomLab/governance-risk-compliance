@@ -86,6 +86,53 @@ def test_csap_source_is_pinned_to_the_2026_07_kisa_notice() -> None:
     assert "/main/csap/intro/" not in source
 
 
+def test_accepted_adrs_cite_verified_official_sources() -> None:
+    """Accepted ADRs must carry APA 7th References using the official locators."""
+    bibliography = (REPOSITORY_ROOT / "docs/doctoring/REFERENCES.md").read_text(
+        encoding="utf-8"
+    )
+    adr_one = (
+        REPOSITORY_ROOT / "docs/adr/0001-control-evidence-first-slice.md"
+    ).read_text(encoding="utf-8")
+    adr_two = (
+        REPOSITORY_ROOT / "docs/adr/0002-policy-versioning-official-controls.md"
+    ).read_text(encoding="utf-8")
+    adr_index = (REPOSITORY_ROOT / "docs/adr/README.md").read_text(encoding="utf-8")
+    shared_locators = (
+        "https://www.aicpa-cima.com/resources/download/"
+        "2017-trust-services-criteria-with-revised-points-of-focus-2022",
+        "https://www.coso.org/guidance-on-ic",
+        "https://www.iso.org/standard/27001",
+        "https://isms-p.or.kr/ntcn/rcsrm/selectGnrlRcsrmDetail.do"
+        "?searchRcsrmMngId=RCSRMID_000000010105",
+        "selectGnrlVrtlRcsrmList.do",
+        "%ED%81%B4%EB%9D%BC%EC%9A%B0%EB%93%9C",
+    )
+    for locator in shared_locators:
+        assert locator in bibliography
+        assert locator in adr_one
+        assert locator in adr_two
+    assert "## References" in adr_one
+    assert "## References" in adr_two
+    assert "https://doi.org/10.6028/NIST.SP.800-53r5" in bibliography
+    assert "https://doi.org/10.6028/NIST.SP.800-53r5" in adr_one
+    assert (
+        "https://www.coso.org/_files/ugd/"
+        "3059fc_61ea5985b03c4293960642fdce408eaa.pdf"
+    ) in adr_one
+    assert (
+        "https://www.openpolicyagent.org/docs/latest/policy-language/"
+    ) in bibliography
+    assert (
+        "https://www.openpolicyagent.org/docs/latest/policy-language/"
+    ) in adr_two
+    assert "isms.kisa.or.kr" not in adr_one
+    assert "isms.kisa.or.kr" not in adr_two
+    assert "0001-control-evidence-first-slice.md" in adr_index
+    assert "0002-policy-versioning-official-controls.md" in adr_index
+    assert "docs/doctoring/REFERENCES.md" in adr_index
+
+
 def test_evidence_cipher_requires_an_explicit_ephemeral_mode() -> None:
     """Missing durable key material fails unless an in-memory test opts in."""
     with pytest.raises(ValueError, match="evidence key"):

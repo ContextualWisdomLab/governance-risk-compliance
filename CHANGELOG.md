@@ -4,6 +4,7 @@
 
 ### Added
 
+- APA 7th References on accepted ADRs 0001–0002, an ADR index at `docs/adr/README.md`, and a citation check that those ADRs reuse the verified official DOI/URLs.
 - Versioned policy authoring: `policy_document`, `policy_version`, and `policy_control_mapping` mapped only to official catalog identifiers.
 - Policy-gap query that reuses `control_evidence_binding` (no second evidence model).
 - Officer home form to author a policy and see uncovered policy requirements.
@@ -31,5 +32,6 @@
 
 ### ADR
 
-- `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
-- `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
+- `docs/adr/README.md` — index of accepted ADRs 0001–0002; points at `docs/doctoring/REFERENCES.md` as the identifier bibliography.
+- `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface; APA 7th References for the official catalogs already named.
+- `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred; APA 7th References and a short citation-alignment note for the already-accepted policy-deployment rule.
