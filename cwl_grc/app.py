@@ -220,6 +220,19 @@ def _begin_idempotent_request(
     return record, None
 
 
+def _require_idempotency_record(record: IdempotencyRecord | None) -> IdempotencyRecord:
+    """Fail closed when a mutation has no durable idempotency reservation."""
+    if record is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The write reservation could not be confirmed. "
+                "Retry the same request with the same Idempotency-Key."
+            ),
+        )
+    return record
+
+
 def _finish_idempotent_request(
     session: Session,
     record: IdempotencyRecord,
@@ -482,7 +495,7 @@ def create_app(
         )
         payload = serialize_policy(session, document)
         etag = _policy_etag(payload)
-        assert record is not None
+        record = _require_idempotency_record(record)
         _finish_idempotent_request(session, record, 201, payload)
         return JSONResponse(status_code=201, content=payload, headers={"ETag": etag})
 
@@ -552,7 +565,7 @@ def create_app(
         )
         payload = serialize_policy(session, revised)
         etag = _policy_etag(payload)
-        assert record is not None
+        record = _require_idempotency_record(record)
         _finish_idempotent_request(session, record, 201, payload)
         return JSONResponse(status_code=201, content=payload, headers={"ETag": etag})
 
