@@ -264,12 +264,13 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
                 "WHERE policy_version_id = 'version-1'"
             )
         ).scalar_one()
-        receipt_count = connection.execute(
-            text("SELECT COUNT(*) FROM schema_migration")
-        ).scalar_one()
+        migration_keys = connection.execute(
+            text("SELECT migration_key FROM schema_migration ORDER BY migration_key")
+        ).scalars().all()
     assert counter == 3
     assert finalized in {True, 1}
-    assert receipt_count == 1
+    assert migration_keys == ["0001_policy_integrity", "0005_api_idempotency"]
+    assert "idempotency_record" in inspect(engine).get_table_names()
 
 
 def test_integrity_guard_ddl_covers_supported_and_unknown_dialects() -> None:

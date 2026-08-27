@@ -16,6 +16,8 @@
 - Product CI for lint, docstring coverage, and 100% statement/branch test coverage.
 - Hash-locked `uv.lock` dependency graph for runtime and development dependencies.
 - Versioned schema-upgrade receipts for existing first-slice stores.
+- Strict `/v1` policy/control API with bounded cursor pages, durable idempotency keys, strong ETags, If-Match revision preconditions, and RFC 9457 problem details; legacy policy routes are marked deprecated in OpenAPI.
+- Hardened version-one retries against concurrent key races and cross-policy key reuse; batched paged reads and bounded non-reflective validation errors.
 
 ### Security
 
@@ -33,3 +35,4 @@
 
 - `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
+- `docs/adr/0003-version-one-policy-api-contract.md` — strict, replay-safe, paginated version-one policy API with an explicit local-preview security boundary.
