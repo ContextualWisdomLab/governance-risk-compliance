@@ -13,7 +13,7 @@ This repository is the ContextualWisdomLab home for policy, control, risk, evide
 5. Read the policy-gap list and attach the next evidence on an uncovered mapped control.
 6. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
 
-The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. The command-line server binds to `127.0.0.1`, and the app always rejects proxy-forwarded or non-loopback traffic. No runtime bypass exists. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
+The HTTP surface is an **unauthenticated developer preview** unless `create_app(access_token_verifier=...)` is supplied. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. When a Keyverse verifier is configured, policy and evidence routes require a Bearer access token, use the verified subject as the actor, stamp the Keyverse `org` on owned rows, and return only that officer's policies and tenant-owned policy gaps. One tenant's CSAP evidence cannot close another tenant's gap. `/openapi.json` publishes that Keyverse Bearer contract; catalog and `/healthz` stay public. The command-line server binds to `127.0.0.1`, and the app always rejects proxy-forwarded or non-loopback traffic. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
 
 ## Operator CLI
 

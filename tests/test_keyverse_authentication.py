@@ -12,6 +12,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from cwl_grc.keyverse_authentication import (
+    AccessTokenScopeError,
     AccessTokenValidationError,
     AuthenticatedPrincipal,
     KeyverseAccessTokenSettings,
@@ -127,7 +128,7 @@ def test_scope_gate_fails_closed_for_missing_or_empty_scope() -> None:
     private_key, jwk = _new_signing_material("key-1")
     verifier = _verifier(jwk)
     principal = verifier.verify(_token(private_key))
-    with pytest.raises(AccessTokenValidationError, match="required scope"):
+    with pytest.raises(AccessTokenScopeError, match="required scope"):
         require_access_scopes(principal, {"grc.evidence.read"})
     with pytest.raises(AccessTokenValidationError, match="scope"):
         verifier.verify(_token(private_key, claims=_claims(scope="")))

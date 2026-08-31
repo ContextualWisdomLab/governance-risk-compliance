@@ -18,6 +18,13 @@
 - Versioned schema-upgrade receipts for existing first-slice stores.
 - Provider-neutral Keyverse JWT access-token verification kernel and typed authenticated-principal contract.
 - Bounded pinned-HTTPS Keyverse OIDC metadata and public-JWK loading through the provider-loader boundary, retaining exact source-byte digests and atomic last-known-good snapshots.
+- HTTP route adapter that verifies Keyverse Bearer access tokens, rejects actor-header impersonation, matches declared tenant to the `org` claim, and returns only the verified officer's policies and gaps.
+- Keyverse-enabled `GET /` now serves only a data-free browser bootstrap; protected policy-gap state loads through the Bearer-authorized `/policy-gaps` API, while officer form posts require the same Keyverse Bearer token.
+- Tenant-owned persistence: `policy_document`, `evidence_record`, and `audit_event` store `tenant_identifier`, migrate existing rows to `local_preview`, and isolate reads/writes by Keyverse `org`.
+- OpenAPI `/openapi.json` publishes `KeyverseBearer` (`at+jwt`) on protected policy, evidence, policy-gap, and officer form operations with `grc.policy.read`, `grc.policy.write`, and `grc.evidence.write`; the data-free browser bootstrap, catalog, and `/healthz` stay unmarked.
+- Officer home browser forms store the Keyverse access token in `sessionStorage`, send it as an `Authorization: Bearer` header, and refresh protected state through the authorized API after a successful mutation. Local preview without a verifier posts `X-Actor-Id` from the officer identifier instead of requiring a token.
+- Officer evidence form authenticates before validating `control_ref`, so unauthenticated callers receive 401 rather than a 400 that leaked catalog well-formedness.
+- Keyverse policy-gap queries count only the verified tenant's evidence bindings, so one organization's CSAP mapping cannot hide another organization's uncovered control.
 
 ### Security
 
@@ -34,7 +41,9 @@
 - Check required action scopes before consuming an optional one-time-use Keyverse token replay guard.
 - Reject ID-token/access-token confusion, unsigned or alternate-algorithm tokens, unsupported critical headers, unknown or duplicate keys, private/symmetric/encryption JWKs, stale/future tokens, and client/subject confusion.
 - Bound offline Keyverse JWK input to 1 MiB and support reviewed old/new public-key overlap without enabling network discovery or remote GRC traffic.
+- Map a verified token that lacks an action scope to HTTP 403 through `AccessTokenScopeError` (RFC 6750 `insufficient_scope`) instead of matching exception text for `"required scope"`.
 - Reject provider refresh clocks whose `tzinfo` exists without a defined UTC offset.
+- Never embed officer-, tenant-, policy-gap-, or evidence-coverage state in the unauthenticated Keyverse browser bootstrap; protected state is fetched only after Bearer authorization.
 
 ### ADR
 
@@ -42,3 +51,6 @@
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
 - `docs/adr/0003-keyverse-jwt-access-token-profile.md` — closed RFC 9068-style Keyverse access-token profile before route and tenant integration.
 - `docs/adr/0004-keyverse-oidc-provider-loading.md` — bounded pinned-HTTPS loading of Keyverse OIDC metadata and public JWKs before route and tenant integration.
+- `docs/adr/0005-keyverse-http-route-enforcement.md` — Bearer access-token route enforcement using the Keyverse principal as actor, with local preview preserved when no verifier is configured.
+- `docs/adr/0006-keyverse-tenant-owned-persistence.md` — persist Keyverse `org` on policy, evidence, and audit rows and isolate reads/writes by tenant.
+- `docs/adr/0007-keyverse-openapi-security.md` — publish Keyverse Bearer security on protected officer policy/evidence operations while keeping `GET /` as a data-free browser bootstrap.

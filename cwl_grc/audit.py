@@ -21,6 +21,7 @@ def record_audit_event(
     """Append one audit event for an authorized action."""
     event = AuditEvent(
         audit_event_id=uuid4().hex,
+        tenant_identifier=decision.tenant_identifier,
         actor_identifier=decision.actor_identifier,
         purpose_code=decision.purpose_code.value,
         action_name=action_name,

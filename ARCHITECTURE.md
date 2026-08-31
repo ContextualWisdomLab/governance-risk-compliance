@@ -25,7 +25,7 @@ flowchart LR
 
 ## Runtime layers
 
-1. **Officer home**: buyer-oriented HTML that authors a policy, lists policy gaps, and attaches the next evidence in a local preview.
+1. **Officer home**: officer-facing HTML that authors a policy, lists policy gaps, and attaches the next evidence in a local preview.
 2. **HTTP API**: policy author/revise/list, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, `/healthz`.
 3. **Preview network boundary**: always rejects proxy-forwarded and non-loopback traffic; no runtime override exists before Keyverse authentication.
 4. **CLI tools**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and the local Uvicorn `cwl-grc serve`.
@@ -36,18 +36,18 @@ flowchart LR
 
 | Object | Role |
 | --- | --- |
-| `policy_document` | Stable policy identity, title, and optimistic current-version counter |
+| `policy_document` | Stable policy identity, title, Keyverse tenant identifier, and optimistic current-version counter |
 | `policy_version` | Edition finalized exactly once; database triggers reject later update/delete |
 | `policy_control_mapping` | Edition → official `control_item`; insert only before finalization and never update/delete |
 | `control_framework` | One official catalog edition |
 | `control_item` | One official identifier and statement |
 | `authorization_purpose` | Declared purpose attached to policy or evidence work; not actor authentication |
-| `evidence_record` | Encrypted-at-rest artifact; exact values remain usable in an authorized workflow |
+| `evidence_record` | Encrypted-at-rest artifact scoped to a tenant identifier; exact values remain usable in an authorized workflow |
 | `control_evidence_binding` | Many-to-many bind of artifact to control |
-| `audit_event` | Append-only action record protected at the database boundary |
+| `audit_event` | Append-only action record scoped to a tenant identifier and protected at the database boundary |
 | `schema_migration` | Applied schema-upgrade receipt |
 
-A policy gap is a latest finalized-edition mapping whose control has zero `control_evidence_binding` rows. There is no second evidence-binding table.
+A policy gap is a latest finalized-edition mapping whose control has zero tenant-owned `control_evidence_binding` rows. Keyverse gap queries join bindings to `evidence_record.tenant_identifier` so one tenant cannot close another tenant's official-control gap. There is no second evidence-binding table.
 
 Cross-service reads use published HTTP contracts after an authenticated service boundary exists. Peer products do not query these tables.
 
@@ -59,9 +59,9 @@ Policy creation writes an unfinalized `policy_version`, writes its official-cont
 
 ## Security posture
 
-The current HTTP surface is an unauthenticated developer preview. `X-Actor-Id` and `X-Purpose` are audit and purpose declarations, not proof of identity. The application binds its command-line server to loopback and always denies non-loopback or proxy-forwarded traffic. There is no unauthenticated remote-preview override.
+The current HTTP surface is an unauthenticated developer preview unless a Keyverse access-token verifier is injected. `X-Actor-Id` and `X-Purpose` are audit and purpose declarations, not proof of identity. When the verifier is present, policy and evidence routes require a signed Keyverse Bearer token; the verified subject is the actor and policy reads are limited to that officer. `/openapi.json` publishes the same Bearer scheme and scopes. The application binds its command-line server to loopback and always denies non-loopback or proxy-forwarded traffic. There is no unauthenticated remote-preview override.
 
-Production exposure requires Keyverse-backed OIDC signature, issuer, audience, token-type, tenant, actor, and purpose authorization, plus encrypted transport and deployment controls. Evidence payloads remain encrypted at rest. Every persistent store requires explicit Fernet key material; ephemeral keys exist only for explicitly selected in-memory tests. The product does not destructively mask operational evidence; authenticated views and exports must select only the fields required for the approved purpose and omit unrelated fields. SAST remains a CWL Security lane. OPA/Rego is not part of this kernel.
+Production exposure still requires encrypted transport and deployment controls in addition to this adapter. Evidence payloads remain encrypted at rest. Every persistent store requires explicit Fernet key material; ephemeral keys exist only for explicitly selected in-memory tests. The product does not destructively mask operational evidence; authenticated views and exports must select only the fields required for the approved purpose and omit unrelated fields. SAST remains a CWL Security lane. OPA/Rego is not part of this kernel.
 
 ## Service extraction
 

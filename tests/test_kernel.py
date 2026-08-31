@@ -5,7 +5,9 @@ from __future__ import annotations
 from cryptography.fernet import Fernet
 import pytest
 
+import cwl_grc.officer_console as officer_console
 from cwl_grc import create_app
+from cwl_grc.app import officer_declared_actor, officer_declared_purpose
 from cwl_grc.authorization import (
     PurposeCode,
     purpose_label,
@@ -16,7 +18,11 @@ from cwl_grc.catalog import FrameworkCode, framework_label, seed_control_catalog
 from cwl_grc.database import create_session_factory
 from cwl_grc.encryption import EvidenceCipher
 from cwl_grc.models import AuthorizationPurpose, ControlItem
-from cwl_grc.officer_console import parse_control_ref, render_officer_home
+from cwl_grc.officer_console import (
+    _OFFICER_FRAMEWORKS,
+    parse_control_ref,
+    render_officer_home,
+)
 
 
 def test_module_factory_returns_app() -> None:
@@ -76,6 +82,14 @@ def test_require_purpose_accepts_only_declared_codes() -> None:
     )
     assert allowed.actor_identifier == "officer-ahn"
     assert allowed.purpose_code is PurposeCode.EVIDENCE_BINDING
+    assert allowed.tenant_identifier == "local_preview"
+    named = require_purpose(
+        "officer-ahn",
+        PurposeCode.EVIDENCE_BINDING.value,
+        PurposeCode.EVIDENCE_BINDING,
+        tenant_identifier=" tenant-acme ",
+    )
+    assert named.tenant_identifier == "tenant-acme"
 
 
 def test_require_purpose_rejects_blank_actor() -> None:
@@ -98,12 +112,47 @@ def test_purpose_labels_and_empty_officer_home() -> None:
     )
     html = render_officer_home([])
     assert "Every seeded control in this catalog has evidence" in html
+    assert "Buyer" not in (officer_console.__doc__ or "")
+    assert "officer home" in (officer_console.__doc__ or "").casefold()
+    assert not hasattr(officer_console, "_BUYER_FRAMEWORKS")
+    assert _OFFICER_FRAMEWORKS
+    assert 'id="keyverse-access-token"' in html
+    assert 'type="password"' in html
+    assert "sessionStorage" in html
+    assert 'headers.Authorization = "Bearer " + token' in html
+    assert 'headers["X-Actor-Id"] = actor' in html
+    assert "required" not in html.split('id="keyverse-access-token"')[1].split(">")[0]
+    assert "policy_authoring" in html
+    assert "evidence_binding" in html
+    assert "fetch(form.action" in html
+    assert "console.log" not in html
     try:
         parse_control_ref("soc2_tsc_2017")
     except ValueError:
         pass
     else:
         raise AssertionError("incomplete control_ref must fail")
+
+
+def test_officer_declared_actor_ignores_form_identity_when_bearer_present() -> None:
+    assert officer_declared_actor("Bearer token", None, "spoofed-officer") is None
+    assert (
+        officer_declared_actor("Bearer token", "officer-park", "spoofed-officer")
+        == "officer-park"
+    )
+    assert officer_declared_actor(None, "  ", "officer-ahn") == "officer-ahn"
+    assert officer_declared_actor("", None, "  ") is None
+    assert officer_declared_actor(None, "officer-header", "officer-form") == (
+        "officer-header"
+    )
+    assert officer_declared_actor(None, None, None) is None
+    assert officer_declared_purpose(None, PurposeCode.POLICY_AUTHORING) == (
+        PurposeCode.POLICY_AUTHORING.value
+    )
+    assert officer_declared_purpose(
+        PurposeCode.EVIDENCE_BINDING.value,
+        PurposeCode.EVIDENCE_BINDING,
+    ) == PurposeCode.EVIDENCE_BINDING.value
 
 
 def test_main_binds_only_loopback(monkeypatch) -> None:  # noqa: ANN001

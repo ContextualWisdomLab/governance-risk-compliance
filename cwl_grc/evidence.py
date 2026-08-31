@@ -31,6 +31,7 @@ def create_evidence_record(
     record = EvidenceRecord(
         evidence_record_id=uuid4().hex,
         evidence_title=title,
+        tenant_identifier=decision.tenant_identifier,
         collector_actor=decision.actor_identifier,
         purpose_code=decision.purpose_code.value,
         ciphertext_payload=cipher.encrypt(payload),
@@ -60,7 +61,7 @@ def bind_control_evidence(
     if control is None:
         raise HTTPException(status_code=404, detail="That official control is not in the catalog.")
     evidence = session.get(EvidenceRecord, evidence_record_id)
-    if evidence is None:
+    if evidence is None or evidence.tenant_identifier != decision.tenant_identifier:
         raise HTTPException(status_code=404, detail="That evidence artifact is not on file.")
     binding = ControlEvidenceBinding(
         binding_id=uuid4().hex,
