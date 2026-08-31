@@ -422,21 +422,19 @@ def create_app(
         x_actor_id: str | None = Header(default=None),
         x_tenant_id: str | None = Header(default=None),
     ) -> str:
-        """Show policy authoring, policy gaps, and the next evidence action."""
-        if access_token_verifier is not None:
-            principal = authorized_principal(
-                authorization=authorization,
-                declared_actor=x_actor_id,
-                declared_tenant=x_tenant_id,
-                required_scopes=POLICY_READ_SCOPES,
-            )
-            gaps = officer_owned_gaps(session, principal)
+        """Show a browser shell; load protected officer gaps through the Bearer API."""
+        keyverse_required = access_token_verifier is not None
+        if keyverse_required:
+            gaps: list[PolicyGap] = []
+            uncovered: list[ControlItem] = []
         else:
             gaps = list_policy_gaps(session, None)
+            uncovered = list_uncovered_controls(session, None)
         return render_officer_home(
-            list_uncovered_controls(session, None),
+            uncovered,
             policy_gaps=gaps,
             catalog_items=list_control_items(session, None),
+            keyverse_required=keyverse_required,
         )
 
     @app.post("/officer/policy")
