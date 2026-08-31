@@ -25,17 +25,133 @@ _OFFICER_HOME_SCRIPT = """
 (function () {
   var tokenKey = "cwlGrcKeyverseAccessToken";
   var tokenInput = document.getElementById("keyverse-access-token");
+  var loadButton = document.getElementById("load-keyverse-policy-gaps");
+  var gapList = document.getElementById("policy-gap-list");
+  var evidenceSelect = document.getElementById("officer-evidence-control");
+  var authState = document.getElementById("keyverse-auth-state");
+  var actionState = document.getElementById("officer-action-status");
+  var requiresKeyverse = document.body.dataset.keyverseRequired === "true";
   var stored = sessionStorage.getItem(tokenKey);
+
   if (stored && tokenInput) {
     tokenInput.value = stored;
   }
+
+  function accessToken() {
+    return tokenInput ? tokenInput.value.trim() : "";
+  }
+
+  function setState(target, message) {
+    if (target) {
+      target.textContent = message;
+    }
+  }
+
+  function clearChildren(target) {
+    if (!target) {
+      return;
+    }
+    while (target.firstChild) {
+      target.removeChild(target.firstChild);
+    }
+  }
+
+  function renderPolicyGaps(gaps) {
+    clearChildren(gapList);
+    clearChildren(evidenceSelect);
+    var seenControls = Object.create(null);
+
+    if (!gaps.length) {
+      if (gapList) {
+        var emptyItem = document.createElement("li");
+        emptyItem.textContent =
+          "No uncovered policy requirements. Author the next policy or review existing evidence.";
+        gapList.appendChild(emptyItem);
+      }
+      if (evidenceSelect) {
+        var emptyOption = document.createElement("option");
+        emptyOption.value = "";
+        emptyOption.textContent = "No uncovered policy controls";
+        evidenceSelect.appendChild(emptyOption);
+        evidenceSelect.disabled = true;
+      }
+      return;
+    }
+
+    gaps.forEach(function (gap) {
+      if (gapList) {
+        var item = document.createElement("li");
+        item.textContent =
+          gap.policy_title + " maps " + gap.catalog_identifier + " " +
+          gap.control_title + " — Attach the next evidence on this uncovered policy control.";
+        gapList.appendChild(item);
+      }
+      if (evidenceSelect) {
+        var controlRef = gap.framework + "|" + gap.catalog_identifier;
+        if (!seenControls[controlRef]) {
+          seenControls[controlRef] = true;
+          var option = document.createElement("option");
+          option.value = controlRef;
+          option.textContent =
+            gap.framework + " " + gap.catalog_identifier + " — " + gap.control_title;
+          evidenceSelect.appendChild(option);
+        }
+      }
+    });
+    if (evidenceSelect) {
+      evidenceSelect.disabled = false;
+    }
+  }
+
+  function loadOfficerGaps() {
+    if (!requiresKeyverse) {
+      return;
+    }
+    var token = accessToken();
+    if (!token) {
+      setState(
+        authState,
+        "Enter a Keyverse access token, then load your policy gaps."
+      );
+      if (tokenInput) {
+        tokenInput.focus();
+      }
+      return;
+    }
+    sessionStorage.setItem(tokenKey, token);
+    setState(authState, "Loading policy gaps from your authorized organization…");
+    fetch("/policy-gaps", {
+      headers: { Authorization: "Bearer " + token }
+    }).then(function (response) {
+      if (!response.ok) {
+        throw new Error("keyverse-policy-gaps");
+      }
+      return response.json();
+    }).then(function (payload) {
+      renderPolicyGaps(payload.gaps || []);
+      setState(
+        authState,
+        "Policy gaps loaded. Author a policy or attach evidence to an uncovered control."
+      );
+    }).catch(function () {
+      setState(
+        authState,
+        "Keyverse could not authorize this request. Verify the access token and load your policy gaps again."
+      );
+    });
+  }
+
+  if (loadButton) {
+    loadButton.addEventListener("click", loadOfficerGaps);
+  }
+
   function submitOfficerForm(form, purpose) {
     if (!form) {
       return;
     }
     form.addEventListener("submit", function (event) {
       event.preventDefault();
-      var token = tokenInput ? tokenInput.value.trim() : "";
+      var token = accessToken();
       var actorField = form.querySelector('[name="actor_identifier"]');
       var actor = actorField ? actorField.value.trim() : "";
       if (token) {
@@ -56,6 +172,7 @@ _OFFICER_HOME_SCRIPT = """
       } else {
         headers["X-Actor-Id"] = actor;
       }
+      setState(actionState, "Submitting the officer action…");
       fetch(form.action, {
         method: "POST",
         headers: headers,
@@ -65,18 +182,30 @@ _OFFICER_HOME_SCRIPT = """
           if (token) {
             sessionStorage.setItem(tokenKey, token);
           }
+          if (requiresKeyverse) {
+            setState(
+              actionState,
+              "Action recorded. Reloading your authorized policy gaps."
+            );
+            loadOfficerGaps();
+            return;
+          }
           window.location.assign("/");
           return;
         }
-        return response.text().then(function () {
-          document.body.insertAdjacentHTML(
-            "afterbegin",
-            "<p>The officer action could not be completed.</p>"
-          );
-        });
+        setState(
+          actionState,
+          "The officer action could not be completed. Check the fields and authorization, then try again."
+        );
+      }).catch(function () {
+        setState(
+          actionState,
+          "The officer action could not reach the local service. Check the service and try again."
+        );
       });
     });
   }
+
   submitOfficerForm(
     document.getElementById("officer-policy-form"),
     "policy_authoring"
@@ -85,6 +214,10 @@ _OFFICER_HOME_SCRIPT = """
     document.getElementById("officer-evidence-form"),
     "evidence_binding"
   );
+
+  if (requiresKeyverse && stored) {
+    loadOfficerGaps();
+  }
 })();
 """.strip()
 
@@ -93,6 +226,8 @@ def render_officer_home(
     uncovered: list[ControlItem],
     policy_gaps: list[PolicyGap] | None = None,
     catalog_items: list[ControlItem] | None = None,
+    *,
+    keyverse_required: bool = False,
 ) -> str:
     """Render the officer home with policy authoring and the next evidence action."""
     gaps = policy_gaps or []
@@ -106,16 +241,34 @@ def render_officer_home(
         sections.append(
             f"<section><h2>{escape(framework_label(code))}</h2><ul>{items}</ul></section>"
         )
-    gap_items = "".join(_policy_gap_row(gap) for gap in gaps) or (
-        "<li>No uncovered policy requirements. Author the next policy or attach another artifact.</li>"
-    )
-    evidence_options = "".join(
-        f'<option value="{escape(item.framework_key)}|{escape(item.catalog_identifier)}">'
-        f"{escape(item.framework_key)} {escape(item.catalog_identifier)} — {escape(item.control_title)}"
-        "</option>"
-        for item in uncovered
-        if item.framework_key in {code.value for code in _OFFICER_FRAMEWORKS}
-    )
+    if keyverse_required:
+        gap_items = (
+            '<li id="policy-gap-auth-required">'
+            "Enter a Keyverse access token, then load your policy gaps."
+            "</li>"
+        )
+        evidence_options = '<option value="">Load your policy gaps first</option>'
+        coverage_sections = ""
+        evidence_disabled = " disabled"
+        keyverse_action = """
+  <button type="button" id="load-keyverse-policy-gaps">Load my policy gaps</button>
+  <p id="keyverse-auth-state" role="status" aria-live="polite">
+    Enter a Keyverse access token, then load your policy gaps.
+  </p>"""
+    else:
+        gap_items = "".join(_policy_gap_row(gap) for gap in gaps) or (
+            "<li>No uncovered policy requirements. Author the next policy or attach another artifact.</li>"
+        )
+        evidence_options = "".join(
+            f'<option value="{escape(item.framework_key)}|{escape(item.catalog_identifier)}">'
+            f"{escape(item.framework_key)} {escape(item.catalog_identifier)} — {escape(item.control_title)}"
+            "</option>"
+            for item in uncovered
+            if item.framework_key in {code.value for code in _OFFICER_FRAMEWORKS}
+        )
+        coverage_sections = "".join(sections)
+        evidence_disabled = ""
+        keyverse_action = ""
     mapping_source = catalog or uncovered
     policy_options = "".join(
         f'<option value="{escape(item.framework_key)}|{escape(item.catalog_identifier)}">'
@@ -124,6 +277,7 @@ def render_officer_home(
         for item in mapping_source
         if item.framework_key in {code.value for code in _POLICY_FRAMEWORKS}
     )
+    keyverse_flag = "true" if keyverse_required else "false"
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -136,13 +290,15 @@ def render_officer_home(
     select[multiple] {{ min-height: 10rem; }}
   </style>
 </head>
-<body>
+<body data-keyverse-required="{keyverse_flag}">
   <h1>Author the next policy, then attach evidence on uncovered controls</h1>
   <p>Map each policy to official CSAP / SOC 2 / ISMS-P / ISO 27001 identifiers. Officer contact details stay usable; they are not masked.</p>
   <label>Keyverse access token
     <input id="keyverse-access-token" type="password" autocomplete="off">
   </label>
   <p>Present a Keyverse access token when Keyverse is configured. Local preview uses the officer identifier instead.</p>
+{keyverse_action}
+  <p id="officer-action-status" role="status" aria-live="polite"></p>
   <h2>Author the next policy</h2>
   <form id="officer-policy-form" method="post" action="/officer/policy">
     <label>Policy title
@@ -160,12 +316,12 @@ def render_officer_home(
     <button type="submit">Author the next policy</button>
   </form>
   <h2>Policy requirements that still lack evidence</h2>
-  <ul>{gap_items}</ul>
-  {''.join(sections)}
+  <ul id="policy-gap-list">{gap_items}</ul>
+  {coverage_sections}
   <h2>Attach the next evidence</h2>
   <form id="officer-evidence-form" method="post" action="/officer/evidence">
     <label>Uncovered control
-      <select name="control_ref" required>{evidence_options}</select>
+      <select id="officer-evidence-control" name="control_ref" required{evidence_disabled}>{evidence_options}</select>
     </label>
     <label>Officer identifier
       <input name="actor_identifier" placeholder="officer-ahn">

@@ -385,11 +385,11 @@ def test_keyverse_gap_coverage_does_not_use_another_tenant_binding() -> None:
     assert "10.2.1" in other_catalogs
     other_home = client.get("/", headers={"Authorization": f"Bearer {other_token}"})
     assert other_home.status_code == 200
-    assert "10.2.1" in other_home.text
+    assert "Other Logical Access Policy" not in other_home.text
 
 
-def test_officer_home_hides_other_officers_policy_title_under_keyverse() -> None:
-    """officer-kim must not see officer-park's CSAP 10.2.1 policy title on GET /."""
+def test_officer_home_keeps_policy_state_behind_bearer_api() -> None:
+    """The browser bootstrap is public, while each officer's policy state stays protected."""
     private_key, jwk = _signing_material("key-1")
     client = _client(_verifier(jwk))
     park_token = _token(private_key)
@@ -412,18 +412,32 @@ def test_officer_home_hides_other_officers_policy_title_under_keyverse() -> None
     )
     assert created.status_code == 201
 
-    denied = client.get("/")
-    assert denied.status_code == 401
+    bootstrap = client.get("/")
+    assert bootstrap.status_code == 200
+    assert "Park Logical Access Policy" not in bootstrap.text
+    assert "Load my policy gaps" in bootstrap.text
 
     park_home = client.get("/", headers={"Authorization": f"Bearer {park_token}"})
     assert park_home.status_code == 200
-    assert "Park Logical Access Policy" in park_home.text
-    assert "10.2.1" in park_home.text
+    assert "Park Logical Access Policy" not in park_home.text
+    park_gaps = client.get(
+        "/policy-gaps",
+        headers={"Authorization": f"Bearer {park_token}"},
+    )
+    assert park_gaps.status_code == 200
+    assert [gap["policy_title"] for gap in park_gaps.json()["gaps"]] == [
+        "Park Logical Access Policy"
+    ]
 
     kim_token = _token(private_key, sub="officer-kim", jti="token-kim-home")
-    kim_home = client.get("/", headers={"Authorization": f"Bearer {kim_token}"})
-    assert kim_home.status_code == 200
-    assert "Park Logical Access Policy" not in kim_home.text
+    kim_gaps = client.get(
+        "/policy-gaps",
+        headers={"Authorization": f"Bearer {kim_token}"},
+    )
+    assert kim_gaps.status_code == 200
+    assert "Park Logical Access Policy" not in {
+        gap["policy_title"] for gap in kim_gaps.json()["gaps"]
+    }
 
     kim_form = client.post(
         "/officer/policy",
@@ -437,9 +451,13 @@ def test_officer_home_hides_other_officers_policy_title_under_keyverse() -> None
         follow_redirects=False,
     )
     assert kim_form.status_code == 303
-    follow = client.get("/", headers={"Authorization": f"Bearer {kim_token}"})
-    assert "Kim Access Policy" in follow.text
-    assert "Park Logical Access Policy" not in follow.text
+    kim_gaps = client.get(
+        "/policy-gaps",
+        headers={"Authorization": f"Bearer {kim_token}"},
+    )
+    kim_titles = {gap["policy_title"] for gap in kim_gaps.json()["gaps"]}
+    assert "Kim Access Policy" in kim_titles
+    assert "Park Logical Access Policy" not in kim_titles
 
     evidence = client.post(
         "/officer/evidence",
@@ -509,6 +527,7 @@ def test_openapi_publishes_keyverse_bearer_on_officer_routes() -> None:
     assert "grc.policy.read" in scheme["description"]
     assert "grc.policy.write" in scheme["description"]
     assert "grc.evidence.write" in scheme["description"]
+    assert "data-free officer bootstrap" in scheme["description"]
     assert spec["paths"]["/policy-documents"]["post"]["security"] == [
         {"KeyverseBearer": ["grc.policy.write"]}
     ]
@@ -518,8 +537,6 @@ def test_openapi_publishes_keyverse_bearer_on_officer_routes() -> None:
     assert spec["paths"]["/evidence-records"]["post"]["security"] == [
         {"KeyverseBearer": ["grc.evidence.write"]}
     ]
-    assert spec["paths"]["/"]["get"]["security"] == [
-        {"KeyverseBearer": ["grc.policy.read"]}
-    ]
+    assert "security" not in spec["paths"]["/"]["get"]
     assert "security" not in spec["paths"]["/healthz"]["get"]
     assert "security" not in spec["paths"]["/controls"]["get"]
