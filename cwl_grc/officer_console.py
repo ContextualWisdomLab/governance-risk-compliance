@@ -103,6 +103,32 @@ _OFFICER_HOME_SCRIPT = """
     }
   }
 
+  function resetProtectedState() {
+    sessionStorage.removeItem(tokenKey);
+    if (tokenInput) {
+      tokenInput.value = "";
+    }
+    clearChildren(gapList);
+    if (gapList) {
+      var hidden = document.createElement("li");
+      hidden.textContent =
+        "Policy gaps are hidden until Keyverse authorizes this token.";
+      gapList.appendChild(hidden);
+    }
+    clearChildren(evidenceSelect);
+    if (evidenceSelect) {
+      var emptyOption = document.createElement("option");
+      emptyOption.value = "";
+      emptyOption.textContent = "Load your policy gaps first";
+      evidenceSelect.appendChild(emptyOption);
+      evidenceSelect.disabled = true;
+    }
+    setState(
+      authState,
+      "Policy gaps are hidden until Keyverse authorizes this token."
+    );
+  }
+
   function loadOfficerGaps() {
     if (!requiresKeyverse) {
       return;
@@ -134,10 +160,7 @@ _OFFICER_HOME_SCRIPT = """
         "Policy gaps loaded. Author a policy or attach evidence to an uncovered control."
       );
     }).catch(function () {
-      setState(
-        authState,
-        "Keyverse could not authorize this request. Verify the access token and load your policy gaps again."
-      );
+      resetProtectedState();
     });
   }
 
