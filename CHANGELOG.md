@@ -28,6 +28,7 @@
 - Keyverse audit attribution: `audit_event` stores issuer, OAuth client, request correlation, and `allow` without copying the access token; migration `0003_audit_attribution` backfills legacy rows as `local_preview` / `legacy_unattributed`.
 - Deployment-hardening runbook for local-preview migration, rollback, JWKS rotation, issuer outage, clock skew, and emergency read-only.
 - Hardened local start: `CWL_GRC_REQUIRE_KEYVERSE` refuses header-identity boots and admits only loopback TLS (`CWL_GRC_TLS_CERTFILE` / `CWL_GRC_TLS_KEYFILE` must be readable files). `cwl-grc serve` and `python -m cwl_grc` load a reviewed offline JWKS from `CWL_GRC_KEYVERSE_JWKS_PATH`. Invalid flag values fail closed. Proxy headers cannot rewrite TLS. Hardened-start and preview errors both name `CWL_GRC_EVIDENCE_KEY` for persistent stores. This is not remote production exposure.
+- Hardened CLI: `policy author|revise`, `bind`, `policy list`, and `gaps` require `CWL_GRC_ACCESS_TOKEN`. `--actor` cannot impersonate the Keyverse subject. Reads return only the verified officer's tenant-owned policies and gaps. Non-numeric `PORT` fails closed and names a numeric PORT in the next action. This is not remote production exposure.
 
 ### Security
 
@@ -59,3 +60,4 @@
 - `docs/adr/0007-keyverse-openapi-security.md` — publish Keyverse Bearer security on protected officer policy/evidence operations while keeping `GET /` as a data-free browser bootstrap.
 - `docs/adr/0008-keyverse-audit-event-attribution.md` — persist Keyverse issuer, client, and request correlation on audit events without storing bearer tokens.
 - `docs/adr/0009-keyverse-required-tls-admission.md` — require an injected Keyverse verifier and loopback TLS before a hardened local start.
+- `docs/adr/0010-keyverse-cli-actor-fail-closed.md` — require `CWL_GRC_ACCESS_TOKEN` for CLI writes and tenant-scoped CLI reads when Keyverse is required.

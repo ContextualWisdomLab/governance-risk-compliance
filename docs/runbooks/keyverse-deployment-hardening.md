@@ -83,11 +83,15 @@ admission.
    Empty paths and missing files fail closed before Uvicorn starts.
 3. Set `CWL_GRC_EVIDENCE_KEY` for any persistent store.
 4. Keep the bind on `127.0.0.1`. HTTP, including `/healthz`, returns 503.
-5. Do not trust `X-Forwarded-Proto` or actor headers as identity.
+5. Do not trust `X-Forwarded-Proto`, actor headers, or CLI `--actor` as identity.
+6. For `cwl-grc policy author|revise`, `bind`, `policy list`, and `gaps`, set
+   `CWL_GRC_ACCESS_TOKEN` to a Keyverse access token. CLI reads return only that
+   officer's tenant-owned rows.
 
-If the verifier, certificate, key, or evidence key is missing, `cwl-grc serve`
-exits 2 and states that next action. Unset `CWL_GRC_REQUIRE_KEYVERSE` remains
-the unauthenticated developer preview.
+If the verifier, certificate, key, evidence key, or a numeric PORT is missing,
+`cwl-grc serve` exits 2 and states that next action. CLI writes without
+`CWL_GRC_ACCESS_TOKEN` exit 1 and name that variable. Unset
+`CWL_GRC_REQUIRE_KEYVERSE` remains the unauthenticated developer preview.
 
 ## What remains before production
 

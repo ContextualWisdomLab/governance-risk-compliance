@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from cwl_grc import create_app
 from cwl_grc.remote_access import (
     keyverse_start_is_required,
+    loopback_port,
     loopback_server_bind,
     request_is_local,
     request_uses_encrypted_transport,
@@ -137,6 +138,12 @@ def test_loopback_bind_requires_tls_files_when_keyverse_is_required(
     assert request_uses_encrypted_transport(None) is False
     preview = loopback_server_bind()
     assert preview == {"host": "127.0.0.1", "port": 8080, "proxy_headers": False}
+    monkeypatch.setenv("PORT", "not-a-port")
+    with pytest.raises(ValueError, match="numeric TCP port"):
+        loopback_port()
+    with pytest.raises(ValueError, match="numeric TCP port"):
+        loopback_server_bind()
+    monkeypatch.delenv("PORT", raising=False)
     monkeypatch.setenv("CWL_GRC_REQUIRE_KEYVERSE", "yes")
     monkeypatch.setenv("PORT", "8443")
     with pytest.raises(ValueError, match="TLS certificate"):
@@ -208,6 +215,20 @@ def test_invalid_keyverse_flag_fails_closed_instead_of_header_preview(
     payload = json.loads(capsys.readouterr().out)
     assert "CWL_GRC_REQUIRE_KEYVERSE" in payload["error"]
     assert "0, false, no, or unset" in payload["next_action"]
+
+
+def test_invalid_port_fails_closed_with_numeric_port_next_action(
+    monkeypatch, capsys
+) -> None:  # noqa: ANN001
+    """A non-numeric PORT must not start the preview or hide the remediation."""
+    from cwl_grc.cli import serve_http
+
+    monkeypatch.delenv("CWL_GRC_REQUIRE_KEYVERSE", raising=False)
+    monkeypatch.setenv("PORT", "abc")
+    assert serve_http() == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert "PORT" in payload["error"]
+    assert "numeric PORT" in payload["next_action"]
 
 
 def test_preview_startup_error_mentions_evidence_key_not_keyverse(

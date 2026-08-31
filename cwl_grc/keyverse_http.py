@@ -80,6 +80,32 @@ def apply_keyverse_openapi_security(schema: dict[str, Any]) -> dict[str, Any]:
     return schema
 
 
+def cli_bearer_authorization() -> str | None:
+    """Return a Bearer header from ``CWL_GRC_ACCESS_TOKEN`` without copying it elsewhere."""
+    token = os.environ.get("CWL_GRC_ACCESS_TOKEN", "").strip()
+    if not token:
+        return None
+    return f"Bearer {token}"
+
+
+def authenticate_cli_principal(
+    *,
+    declared_actor: str | None,
+    required_scopes: Collection[str],
+) -> RequestPrincipal:
+    """Resolve the CLI actor from Keyverse when required, else from ``--actor``.
+
+    ``--actor`` is not identity under ``CWL_GRC_REQUIRE_KEYVERSE``. A matching
+    value is tolerated; a mismatch is impersonation and fails closed.
+    """
+    return authenticate_keyverse_request(
+        process_access_token_verifier(),
+        authorization=cli_bearer_authorization(),
+        declared_actor=declared_actor,
+        required_scopes=required_scopes,
+    )
+
+
 def process_access_token_verifier() -> KeyverseAccessTokenVerifier | None:
     """Load a reviewed offline JWKS verifier when a hardened start is required."""
     if not keyverse_start_is_required():
