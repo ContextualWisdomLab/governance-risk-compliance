@@ -31,7 +31,6 @@ KEYVERSE_PROTECTED_OPERATIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("/policy-gaps", "get", POLICY_READ_SCOPES),
     ("/evidence-records", "post", EVIDENCE_WRITE_SCOPES),
     ("/control-evidence-bindings", "post", EVIDENCE_WRITE_SCOPES),
-    ("/", "get", POLICY_READ_SCOPES),
     ("/officer/policy", "post", POLICY_WRITE_SCOPES),
     ("/officer/evidence", "post", EVIDENCE_WRITE_SCOPES),
 )
@@ -46,9 +45,11 @@ def keyverse_bearer_security_scheme() -> dict[str, Any]:
         "description": (
             "Keyverse RFC 9068 access token. Officer policy reads need "
             f"{POLICY_READ_SCOPES[0]}; policy writes need {POLICY_WRITE_SCOPES[0]}; "
-            f"evidence writes need {EVIDENCE_WRITE_SCOPES[0]}. Catalog and "
-            "/healthz remain public. Local preview without a verifier still "
-            "accepts declared actor headers and is not a production deployment."
+            f"evidence writes need {EVIDENCE_WRITE_SCOPES[0]}. Catalog, /healthz, "
+            "and the data-free officer bootstrap at / remain public. Protected "
+            "officer state is loaded only through Bearer-authorized APIs. Local "
+            "preview without a verifier still accepts declared actor headers and "
+            "is not a production deployment."
         ),
     }
 
