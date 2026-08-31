@@ -25,6 +25,8 @@
 - Officer home browser forms store the Keyverse access token in `sessionStorage`, send it as an `Authorization: Bearer` header, and refresh protected state through the authorized API after a successful mutation. Local preview without a verifier posts `X-Actor-Id` from the officer identifier instead of requiring a token.
 - Officer evidence form authenticates before validating `control_ref`, so unauthenticated callers receive 401 rather than a 400 that leaked catalog well-formedness.
 - Keyverse policy-gap queries count only the verified tenant's evidence bindings, so one organization's CSAP mapping cannot hide another organization's uncovered control.
+- Keyverse audit attribution: `audit_event` stores issuer, OAuth client, request correlation, and `allow` without copying the access token; migration `0003_audit_attribution` backfills legacy rows as `local_preview` / `legacy_unattributed`.
+- Deployment-hardening runbook for local-preview migration, rollback, JWKS rotation, issuer outage, clock skew, and emergency read-only.
 
 ### Security
 
@@ -54,3 +56,4 @@
 - `docs/adr/0005-keyverse-http-route-enforcement.md` — Bearer access-token route enforcement using the Keyverse principal as actor, with local preview preserved when no verifier is configured.
 - `docs/adr/0006-keyverse-tenant-owned-persistence.md` — persist Keyverse `org` on policy, evidence, and audit rows and isolate reads/writes by tenant.
 - `docs/adr/0007-keyverse-openapi-security.md` — publish Keyverse Bearer security on protected officer policy/evidence operations while keeping `GET /` as a data-free browser bootstrap.
+- `docs/adr/0008-keyverse-audit-event-attribution.md` — persist Keyverse issuer, client, and request correlation on audit events without storing bearer tokens.

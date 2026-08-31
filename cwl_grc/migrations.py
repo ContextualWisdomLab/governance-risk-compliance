@@ -11,7 +11,12 @@ from sqlalchemy import Engine, inspect, text
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
 TENANT_OWNERSHIP_MIGRATION = "0002_tenant_ownership"
+AUDIT_ATTRIBUTION_MIGRATION = "0003_audit_attribution"
 LOCAL_PREVIEW_TENANT = "local_preview"
+LOCAL_PREVIEW_ISSUER = "local_preview"
+LOCAL_PREVIEW_CLIENT = "local_preview"
+LEGACY_UNATTRIBUTED_CORRELATION = "legacy_unattributed"
+DECISION_ALLOW = "allow"
 
 
 def apply_schema_migrations(engine: Engine) -> None:
@@ -36,6 +41,11 @@ def apply_schema_migrations(engine: Engine) -> None:
             connection,
             TENANT_OWNERSHIP_MIGRATION,
             _upgrade_tenant_ownership,
+        )
+        _apply_named_migration(
+            connection,
+            AUDIT_ATTRIBUTION_MIGRATION,
+            _upgrade_audit_attribution,
         )
 
 
@@ -148,6 +158,49 @@ def _upgrade_tenant_ownership(connection: Any) -> None:
             tables = set(inspector.get_table_names())
         if index_sql:
             connection.execute(text(index_sql))
+
+
+def _upgrade_audit_attribution(connection: Any) -> None:
+    """Add issuer, client, correlation, and decision fields to existing audit rows."""
+    inspector = inspect(connection)
+    tables = set(inspector.get_table_names())
+    if "audit_event" not in tables:
+        return
+    columns = {column["name"] for column in inspector.get_columns("audit_event")}
+    additions = (
+        (
+            "issuer_identifier",
+            "ALTER TABLE audit_event ADD COLUMN "
+            f"issuer_identifier VARCHAR(1024) NOT NULL DEFAULT '{LOCAL_PREVIEW_ISSUER}'",
+        ),
+        (
+            "client_identifier",
+            "ALTER TABLE audit_event ADD COLUMN "
+            f"client_identifier VARCHAR(128) NOT NULL DEFAULT '{LOCAL_PREVIEW_CLIENT}'",
+        ),
+        (
+            "correlation_reference",
+            "ALTER TABLE audit_event ADD COLUMN "
+            "correlation_reference VARCHAR(128) NOT NULL "
+            f"DEFAULT '{LEGACY_UNATTRIBUTED_CORRELATION}'",
+        ),
+        (
+            "decision_outcome",
+            "ALTER TABLE audit_event ADD COLUMN "
+            f"decision_outcome VARCHAR(32) NOT NULL DEFAULT '{DECISION_ALLOW}'",
+        ),
+    )
+    for column_name, alter_sql in additions:
+        if column_name not in columns:
+            connection.execute(text(alter_sql))
+            inspector = inspect(connection)
+            columns = {column["name"] for column in inspector.get_columns("audit_event")}
+    connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS audit_event_tenant_correlation "
+            "ON audit_event (tenant_identifier, correlation_reference)"
+        )
+    )
 
 
 def install_integrity_guards(engine: Engine) -> None:
