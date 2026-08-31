@@ -37,14 +37,14 @@ from cwl_grc.policy import (
 def main(argv: list[str] | None = None) -> int:
     """Dispatch ``cwl-grc`` tool commands; no arguments still serves HTTP."""
     args = sys.argv[1:] if argv is None else list(argv)
-    if not args or args == ["serve"]:
-        return serve_http()
-    parser = _parser()
     try:
-        namespace = parser.parse_args(args)
-    except SystemExit as exc:
-        return int(exc.code or 2)
-    try:
+        if not args or args == ["serve"]:
+            return serve_http()
+        parser = _parser()
+        try:
+            namespace = parser.parse_args(args)
+        except SystemExit as exc:
+            return int(exc.code or 2)
         return _dispatch(namespace)
     except HTTPException as exc:
         print(
