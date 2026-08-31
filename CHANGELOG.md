@@ -25,6 +25,7 @@
 
 ### Changed
 
+- `cwl-grc serve` now reports schema or runtime-configuration startup failures as actionable JSON instead of exposing an uncaught traceback.
 - Shared `control_framework`, `control_item`, and `authorization_purpose` reference data is now bootstrapped only by a schema-owning path; runtime refuses missing or incompatible vocabulary instead of silently repairing it.
 - Production application replicas no longer create tables, apply migrations, install triggers, or seed reference data during startup.
 - PostgreSQL support is scoped to major version 18 and exercised on 18.4; other majors are unsupported until they receive a separate compatibility decision and exact CI lane.
