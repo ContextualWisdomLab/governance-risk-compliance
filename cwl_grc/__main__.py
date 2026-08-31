@@ -2,17 +2,33 @@
 
 from __future__ import annotations
 
-import os
+import json
 
 import uvicorn
 
 from cwl_grc.app import create_app
+from cwl_grc.keyverse_http import process_access_token_verifier
+from cwl_grc.remote_access import loopback_server_bind, startup_next_action
 
 
 def main() -> None:
-    """Serve the unauthenticated developer preview on loopback and $PORT."""
-    port = int(os.environ.get("PORT", "8080"))
-    uvicorn.run(create_app(), host="127.0.0.1", port=port)
+    """Serve the local preview on loopback, requiring TLS when Keyverse is required."""
+    try:
+        settings = loopback_server_bind()
+        uvicorn.run(
+            create_app(access_token_verifier=process_access_token_verifier()),
+            **settings,
+        )
+    except ValueError as exc:
+        print(
+            json.dumps(
+                {
+                    "error": str(exc),
+                    "next_action": startup_next_action(),
+                }
+            )
+        )
+        raise SystemExit(2) from exc
 
 
 if __name__ == "__main__":  # pragma: no cover

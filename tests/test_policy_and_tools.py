@@ -388,10 +388,11 @@ def test_cli_serve_and_error_paths(tmp_path: Path, capsys, monkeypatch) -> None:
 
     captured: dict[str, object] = {}
 
-    def fake_run(app, host, port):  # noqa: ANN001
+    def fake_run(app, host, port, **kwargs):  # noqa: ANN001
         captured["host"] = host
         captured["port"] = port
         captured["title"] = app.title
+        captured["proxy_headers"] = kwargs.get("proxy_headers")
 
     monkeypatch.setenv(
         "CWL_GRC_EVIDENCE_KEY",
@@ -399,7 +400,12 @@ def test_cli_serve_and_error_paths(tmp_path: Path, capsys, monkeypatch) -> None:
     )
     monkeypatch.setattr("cwl_grc.cli.uvicorn.run", fake_run)
     assert cli_main(["serve"]) == 0
-    assert captured == {"host": "127.0.0.1", "port": 8080, "title": "CWL GRC"}
+    assert captured == {
+        "host": "127.0.0.1",
+        "port": 8080,
+        "title": "CWL GRC",
+        "proxy_headers": False,
+    }
     monkeypatch.setenv("PORT", "9098")
     assert cli_main([]) == 0
     assert captured["port"] == 9098
