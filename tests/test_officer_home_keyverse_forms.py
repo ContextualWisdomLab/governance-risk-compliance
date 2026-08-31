@@ -225,3 +225,37 @@ def test_local_preview_officer_forms_send_declared_actor_without_bearer() -> Non
         },
     )
     assert dummy_bearer.status_code == 401
+
+
+def test_keyverse_home_bootstraps_without_disclosing_officer_policy_state() -> None:
+    """Browser navigation loads only a shell until Keyverse authorizes the gap query."""
+    private_key, jwk = _signing_material("key-1")
+    client = _client(_verifier(jwk))
+    token = _token(private_key)
+    authored = client.post(
+        "/officer/policy",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "X-Purpose": "policy_authoring",
+        },
+        data={
+            "policy_title": "Browser Bootstrap Policy",
+            "policy_body": "Protected policy state must not be server-rendered before auth.",
+            "control_refs": [f"{FrameworkCode.CSAP_2026.value}|10.2.1"],
+        },
+        follow_redirects=False,
+    )
+    assert authored.status_code == 303
+
+    bootstrap = client.get("/")
+    assert bootstrap.status_code == 200
+    assert 'data-keyverse-required="true"' in bootstrap.text
+    assert 'id="load-keyverse-policy-gaps"' in bootstrap.text
+    assert 'id="policy-gap-list"' in bootstrap.text
+    assert 'id="officer-evidence-control"' in bootstrap.text
+    assert 'fetch("/policy-gaps"' in bootstrap.text
+    assert "Browser Bootstrap Policy" not in bootstrap.text
+    assert "Load my policy gaps" in bootstrap.text
+
+    protected = client.get("/policy-gaps")
+    assert protected.status_code == 401
