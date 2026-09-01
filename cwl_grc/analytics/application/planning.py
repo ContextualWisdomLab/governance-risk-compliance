@@ -1,6 +1,6 @@
 """Deterministically validate analytics intent and build a read-only query plan."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 import re
 
 from cwl_grc.analytics.domain.query_contract import (
@@ -52,7 +52,7 @@ def _validate_time_range(value: AnalyticsTimeRange | None) -> str | None:
         return "unsupported_time_axis"
     if not _is_aware(value.start) or not _is_aware(value.end):
         return "timezone_required"
-    if value.start >= value.end:
+    if value.start.astimezone(UTC) >= value.end.astimezone(UTC):
         return "invalid_time_range"
     return None
 
