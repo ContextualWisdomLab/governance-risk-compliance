@@ -56,18 +56,29 @@ class SemanticModelClientPort(Protocol):
 
 
 def require_published_release(release: SemanticReleaseRef) -> SemanticReleaseRef:
-    """Fail closed unless a semantic release is published and SHA-256 addressed.
+    """Fail closed unless a semantic release has complete immutable coordinates.
 
     This is deliberately narrower than a future concrete ConceptWeave adapter.
     It prevents proposed or superseded semantic artifacts from being treated as
-    authoritative in GRC and ensures the release has an immutable content
-    coordinate.  Schema compatibility, signature/provenance policy, tenant and
-    purpose authorization remain separate consumer/application responsibilities.
+    authoritative in GRC and rejects incomplete release identity, schema, or
+    digest coordinates.  Schema compatibility, signature/provenance policy,
+    tenant and purpose authorization remain separate consumer/application
+    responsibilities.
     """
 
     if release.publication_state is not SemanticReleaseState.PUBLISHED:
         raise SemanticReleaseValidationError(
             "authoritative GRC analysis requires a published semantic release"
+        )
+    release_id = release.release_id
+    if type(release_id) is not str or not release_id.strip():
+        raise SemanticReleaseValidationError(
+            "semantic release identifier must be a non-empty string"
+        )
+    schema_version = release.schema_version
+    if type(schema_version) is not str or not schema_version.strip():
+        raise SemanticReleaseValidationError(
+            "semantic release schema version must be a non-empty string"
         )
     digest = release.content_digest_sha256
     if type(digest) is not str or len(digest) != 64 or _SHA256_HEX.fullmatch(digest) is None:
