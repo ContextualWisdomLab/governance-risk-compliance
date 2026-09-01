@@ -33,10 +33,23 @@ def _abstain(code: AbstentionCode, reason: str) -> AnalyticsAbstention:
     return AnalyticsAbstention(code=code, reason=reason)
 
 
-def _is_safe_identifier(value: str) -> bool:
+def _is_safe_identifier(value: object) -> bool:
     """Return whether a receipt identifier is bounded and safe to persist."""
 
+    if not isinstance(value, str):
+        return False
     return bool(_SAFE_IDENTIFIER.fullmatch(value))
+
+
+def _is_string_tuple(value: object) -> bool:
+    """Return whether a value is a tuple containing only strings."""
+
+    if not isinstance(value, tuple):
+        return False
+    for item in value:
+        if not isinstance(item, str):
+            return False
+    return True
 
 
 def _instant_microseconds(value: datetime, offset: timedelta) -> int:
@@ -64,6 +77,12 @@ def _validate_time_range(value: AnalyticsTimeRange | None) -> str | None:
 
     if value is None:
         return None
+    if not isinstance(value.axis, str):
+        return "invalid_time_range_shape"
+    if not isinstance(value.start, datetime):
+        return "invalid_time_range_shape"
+    if not isinstance(value.end, datetime):
+        return "invalid_time_range_shape"
     if value.axis not in {axis.value for axis in TimeAxis}:
         return "unsupported_time_axis"
     start_offset = value.start.utcoffset()
@@ -80,6 +99,12 @@ def _validate_time_range(value: AnalyticsTimeRange | None) -> str | None:
 def _validate_filter(value: AnalyticsFilter) -> str | None:
     """Return a stable validation code for an invalid semantic filter, if any."""
 
+    if not isinstance(value.field, str):
+        return "invalid_filter_shape"
+    if not isinstance(value.operator, str):
+        return "invalid_filter_shape"
+    if not _is_string_tuple(value.values):
+        return "invalid_filter_shape"
     if value.field not in DIMENSION_CODES:
         return "unsupported_filter_field"
     if value.operator not in {operator.value for operator in FilterOperator}:
@@ -90,6 +115,29 @@ def _validate_filter(value: AnalyticsFilter) -> str | None:
         return "invalid_equals_cardinality"
     if value.operator == FilterOperator.IN and len(value.values) > 100:
         return "filter_cardinality_exceeded"
+    return None
+
+
+def _validate_intent_shape(draft: AnalyticsIntentDraft) -> str | None:
+    """Validate runtime shapes before operations that assume typed intent fields."""
+
+    if not isinstance(draft.question_hash, str):
+        return "invalid_intent_shape"
+    if not _is_string_tuple(draft.dimensions):
+        return "invalid_intent_shape"
+    if not _is_string_tuple(draft.measures):
+        return "invalid_intent_shape"
+    if not isinstance(draft.filters, tuple):
+        return "invalid_intent_shape"
+    for semantic_filter in draft.filters:
+        if not isinstance(semantic_filter, AnalyticsFilter):
+            return "invalid_intent_shape"
+    if draft.time_range is not None and not isinstance(draft.time_range, AnalyticsTimeRange):
+        return "invalid_intent_shape"
+    if not isinstance(draft.row_limit, int):
+        return "invalid_intent_shape"
+    if isinstance(draft.row_limit, bool):
+        return "invalid_intent_shape"
     return None
 
 
@@ -111,6 +159,10 @@ def build_query_plan(
         return _abstain(AbstentionCode.UNSUPPORTED_ANALYSIS, "invalid_receipt_identifier")
     if draft.schema_version != INTENT_SCHEMA_VERSION:
         return _abstain(AbstentionCode.UNSUPPORTED_ANALYSIS, "unsupported_intent_schema")
+
+    shape_error = _validate_intent_shape(draft)
+    if shape_error:
+        return _abstain(AbstentionCode.UNSUPPORTED_ANALYSIS, shape_error)
     if not _SHA256_HEX.fullmatch(draft.question_hash):
         return _abstain(AbstentionCode.UNSUPPORTED_ANALYSIS, "invalid_question_hash")
     if not draft.measures:
