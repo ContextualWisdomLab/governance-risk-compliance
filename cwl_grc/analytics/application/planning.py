@@ -43,11 +43,9 @@ def _is_safe_identifier(value: object) -> bool:
     return bool(_SAFE_IDENTIFIER.fullmatch(value))
 
 
-def _is_string_tuple(value: object) -> bool:
-    """Return whether a value is a tuple containing only strings."""
+def _is_string_tuple(value: tuple[object, ...]) -> bool:
+    """Return whether a previously shape-checked tuple contains only strings."""
 
-    if not isinstance(value, tuple):
-        return False
     for item in value:
         if not isinstance(item, str):
             return False
