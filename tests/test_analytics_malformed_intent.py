@@ -25,6 +25,20 @@ from cwl_grc.analytics.domain.query_contract import (
 QUESTION_HASH = "b" * 64
 
 
+class _HashExplodes(str):
+    """Detect whether an oversized untrusted string is hashed before rejection."""
+
+    def __hash__(self):
+        raise AssertionError("oversized semantic string was hashed before its length gate")
+
+
+class _StripExplodes(str):
+    """Detect whether an oversized untrusted filter value is copied by strip()."""
+
+    def strip(self, chars=None):
+        raise AssertionError("oversized filter value was stripped before its length gate")
+
+
 def _draft() -> AnalyticsIntentDraft:
     return AnalyticsIntentDraft(
         schema_version=INTENT_SCHEMA_VERSION,
@@ -125,6 +139,27 @@ def test_malformed_time_range_shapes_abstain_instead_of_raising(time_range):
     assert isinstance(outcome, AnalyticsAbstention)
     assert outcome.code is AbstentionCode.UNSUPPORTED_ANALYSIS
     assert outcome.reason == "invalid_time_range_shape"
+
+
+def test_oversized_semantic_string_is_rejected_before_hashing():
+    oversized = _HashExplodes("x" * 257)
+
+    outcome = build_query_plan(replace(_draft(), dimensions=(oversized,)), _context())
+
+    assert isinstance(outcome, AnalyticsAbstention)
+    assert outcome.code is AbstentionCode.UNSUPPORTED_ANALYSIS
+    assert outcome.reason == "unsupported_semantic_field"
+
+
+def test_oversized_filter_value_is_rejected_before_strip_copy():
+    oversized = _StripExplodes("x" * 257)
+    semantic_filter = AnalyticsFilter("framework", "eq", (oversized,))
+
+    outcome = build_query_plan(replace(_draft(), filters=(semantic_filter,)), _context())
+
+    assert isinstance(outcome, AnalyticsAbstention)
+    assert outcome.code is AbstentionCode.UNSUPPORTED_ANALYSIS
+    assert outcome.reason == "invalid_filter_value"
 
 
 def test_read_only_flag_is_not_a_query_plan_constructor_argument():
