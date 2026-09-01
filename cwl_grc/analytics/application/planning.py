@@ -97,7 +97,7 @@ def _validate_time_range(value: AnalyticsTimeRange | None) -> str | None:
 
     if value is None:
         return None
-    if type(value.axis) is not str:
+    if type(value.axis) not in (str, TimeAxis):
         return "invalid_time_range_shape"
     if not isinstance(value.start, datetime):
         return "invalid_time_range_shape"
@@ -121,7 +121,7 @@ def _validate_filter(value: AnalyticsFilter) -> str | None:
 
     if type(value.field) is not str:
         return "invalid_filter_shape"
-    if type(value.operator) is not str:
+    if type(value.operator) not in (str, FilterOperator):
         return "invalid_filter_shape"
     if not isinstance(value.values, tuple):
         return "invalid_filter_shape"
