@@ -1,5 +1,7 @@
 """ConceptWeave semantic-release boundary tests for GRC Analytics."""
 
+from dataclasses import replace
+
 import pytest
 
 from cwl_grc.analytics.application.semantic_model import (
@@ -53,6 +55,30 @@ def test_malformed_release_digest_fails_with_typed_validation_error() -> None:
 
     with pytest.raises(SemanticReleaseValidationError, match="SHA-256"):
         require_published_release(release)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value", "message"),
+    [
+        ("release_id", "", "release identifier"),
+        ("release_id", "   ", "release identifier"),
+        ("release_id", None, "release identifier"),
+        ("schema_version", "", "schema version"),
+        ("schema_version", "   ", "schema version"),
+        ("schema_version", None, "schema version"),
+    ],
+)
+def test_malformed_release_identity_and_schema_fail_with_typed_error(
+    field_name: str,
+    invalid_value: object,
+    message: str,
+) -> None:
+    """Reject incomplete release coordinates before a supplier adapter is invoked."""
+
+    malformed = replace(_release(), **{field_name: invalid_value})
+
+    with pytest.raises(SemanticReleaseValidationError, match=message):
+        require_published_release(malformed)
 
 
 def test_semantic_model_client_port_is_structural_and_provider_neutral() -> None:
