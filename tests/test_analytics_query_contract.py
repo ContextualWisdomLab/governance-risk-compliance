@@ -1,6 +1,7 @@
 """Tests for the versioned GRC Analytics semantic query contract."""
 
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -266,3 +267,28 @@ def test_query_plan_can_omit_time_range_without_widening_other_scope():
 
     assert isinstance(outcome, AnalyticsQueryPlan)
     assert outcome.time_range is None
+
+
+def test_time_range_accepts_utc_forward_interval_across_repeated_local_hour():
+    new_york = ZoneInfo("America/New_York")
+    start = datetime(2026, 11, 1, 1, 50, tzinfo=new_york, fold=0)
+    end = datetime(2026, 11, 1, 1, 10, tzinfo=new_york, fold=1)
+    draft = _draft(time_range=AnalyticsTimeRange("effective_time", start, end))
+
+    outcome = build_query_plan(draft, _context())
+
+    assert isinstance(outcome, AnalyticsQueryPlan)
+    assert outcome.time_range == draft.time_range
+
+
+def test_time_range_rejects_utc_reverse_interval_across_repeated_local_hour():
+    new_york = ZoneInfo("America/New_York")
+    start = datetime(2026, 11, 1, 1, 10, tzinfo=new_york, fold=1)
+    end = datetime(2026, 11, 1, 1, 50, tzinfo=new_york, fold=0)
+    draft = _draft(time_range=AnalyticsTimeRange("effective_time", start, end))
+
+    outcome = build_query_plan(draft, _context())
+
+    assert isinstance(outcome, AnalyticsAbstention)
+    assert outcome.code is AbstentionCode.UNSUPPORTED_ANALYSIS
+    assert outcome.reason == "invalid_time_range"
