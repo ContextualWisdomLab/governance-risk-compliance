@@ -26,13 +26,16 @@ def _absolute_imports(path: Path) -> set[str]:
 
 
 def _domain_imports_respect_boundary(path: Path) -> bool:
-    """Allow domain modules to use stdlib or their own domain package, never the facade."""
+    """Allow only stdlib or own-domain dependencies inside domain modules."""
 
     for module in _absolute_imports(path):
         if module == _RELATIVE_IMPORT:
             return False
-        if module.split(".", 1)[0] != "cwl_grc":
-            continue
+        root = module.split(".", 1)[0]
+        if root != "cwl_grc":
+            if root in sys.stdlib_module_names:
+                continue
+            return False
         if module == "cwl_grc.analytics.domain":
             continue
         if module.startswith("cwl_grc.analytics.domain."):
