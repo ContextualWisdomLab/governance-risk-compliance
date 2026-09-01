@@ -6,16 +6,19 @@ import tarfile
 import zipfile
 
 
-def _contains_license(paths: list[str]) -> bool:
-    """Return whether an archive exposes the canonical root LICENSE payload."""
+def _license_member(paths: list[str]) -> str:
+    """Return the unique archive member that carries the canonical root LICENSE."""
 
-    return any(PurePosixPath(path).name == "LICENSE" for path in paths)
+    matches = [path for path in paths if PurePosixPath(path).name == "LICENSE"]
+    assert len(matches) == 1, f"distribution must contain exactly one LICENSE, found {matches}"
+    return matches[0]
 
 
-def test_built_distributions_include_license(tmp_path: Path) -> None:
-    """Require both wheel and sdist buyers to receive the declared LICENSE file."""
+def test_built_distributions_include_canonical_license(tmp_path: Path) -> None:
+    """Require wheel and sdist buyers to receive the exact repository LICENSE payload."""
 
     repository_root = Path(__file__).resolve().parents[1]
+    expected_license = (repository_root / "LICENSE").read_bytes()
     output_directory = tmp_path / "dist"
     subprocess.run(
         ["uv", "build", "--out-dir", str(output_directory)],
@@ -29,7 +32,11 @@ def test_built_distributions_include_license(tmp_path: Path) -> None:
     source_distribution = next(output_directory.glob("*.tar.gz"))
 
     with zipfile.ZipFile(wheel) as archive:
-        assert _contains_license(archive.namelist()), "wheel must contain LICENSE"
+        license_member = _license_member(archive.namelist())
+        assert archive.read(license_member) == expected_license
 
     with tarfile.open(source_distribution, mode="r:gz") as archive:
-        assert _contains_license(archive.getnames()), "sdist must contain LICENSE"
+        license_member = _license_member(archive.getnames())
+        extracted = archive.extractfile(license_member)
+        assert extracted is not None
+        assert extracted.read() == expected_license
