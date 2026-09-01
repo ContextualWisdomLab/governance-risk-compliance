@@ -20,6 +20,9 @@
 - Wave 1 legacy-binding projection identity: `binding_id` plus `control_item_id`, tenant-scoped through the bound evidence record, with `unassessed` fan-out only after an authorized `control_requirement_mapping` exists.
 - `docs/product/grc-domain-completion-roadmap.md` defining the closed obligation → requirement → policy → internal control → implementation → test/evidence → risk/audit → remediation → controlled-reporting loop and its release gates.
 - Current doctoring references for ISO 37301:2021 and Amendment 1:2024, ISO 19011:2026 Edition 4, OSCAL 1.2.3, and the NIST OLIR Program without claiming certification or source-text redistribution rights.
+- `cwl_grc.analytics` as a read-only Supporting Bounded Context with explicit domain/application layers, versioned `cwl.grc.analytics.intent.v1` and `cwl.grc.analytics.query-plan.v1` contracts, bounded semantic fields/filters/time axes, verified principal/tenant/workspace/purpose coordinates, and typed `not_authorized`, `insufficient_evidence`, and `unsupported_analysis` outcomes.
+- GRC Analytics architectural fitness tests that reject direct model-provider/database-adapter dependencies and new generic `utils`/`helpers`/`services` buckets inside the bounded context.
+- ADR 0012 and the GRC Analytics product contract documenting the contextual-orchestrator Anti-Corruption Layer, no-raw-SQL rule, deterministic read-model boundary, provenance/query-receipt direction, and buyer/evaluation follow-up slices.
 
 ### Security
 
@@ -32,9 +35,11 @@
 - Pin the CSAP 2026.07 catalog provenance to the official KISA resource notice rather than a generic product page.
 - Pin every Product workflow action to an immutable commit and verify the exact pull-request head before testing.
 - Replace mutable `pip install` resolution with `uv sync --locked`, verify lock freshness, and reject any tracked or untracked dirty tree on every Product run.
+- Keep GRC Analytics free of direct provider credentials and executable model-produced SQL; field policy and projection availability fail closed before any future read execution.
 
 ### ADR
 
 - `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
 - `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — preserve external catalogs while adding distinct internal-control definitions, implementations, reviewed mappings, tests, effectiveness results, deficiencies, and purpose-bound evidence usage before risk and audit depend on the model.
+- `docs/adr/0012-grc-analytics-supporting-bounded-context.md` — keep natural-language analytics read-only, deterministic, tenant/purpose-bound, and isolated from provider/database authority through a versioned semantic contract and contextual-orchestrator ACL.
