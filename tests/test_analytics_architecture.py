@@ -1,3 +1,5 @@
+"""Architectural fitness tests for the GRC Analytics bounded context."""
+
 import ast
 from pathlib import Path
 
@@ -9,7 +11,8 @@ GENERIC_DOMAIN_BUCKETS = {"common.py", "helpers.py", "misc.py", "services.py", "
 def test_analytics_is_a_named_bounded_context_with_explicit_layers():
     assert (ANALYTICS_ROOT / "domain" / "query_contract.py").is_file()
     assert (ANALYTICS_ROOT / "application" / "planning.py").is_file()
-    assert not GENERIC_DOMAIN_BUCKETS.intersection(path.name for path in ANALYTICS_ROOT.rglob("*.py"))
+    python_paths = (path.name for path in ANALYTICS_ROOT.rglob("*.py"))
+    assert not GENERIC_DOMAIN_BUCKETS.intersection(python_paths)
 
 
 def test_analytics_domain_and_application_do_not_own_provider_or_database_adapters():
@@ -33,7 +36,9 @@ def test_domain_has_no_dependency_on_application_or_existing_flat_kernel_modules
             for node in ast.walk(tree)
             if isinstance(node, ast.ImportFrom) and node.module is not None
         }
-        assert not any(module.startswith("cwl_grc.analytics.application") for module in imported_modules)
+        assert not any(
+            module.startswith("cwl_grc.analytics.application") for module in imported_modules
+        )
         assert not any(
             module.startswith(("cwl_grc.app", "cwl_grc.models", "cwl_grc.database"))
             for module in imported_modules
