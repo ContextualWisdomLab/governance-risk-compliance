@@ -16,7 +16,7 @@ Create `cwl_grc.analytics` as a **Supporting Bounded Context** with explicit `do
 
 The Analytics context owns only versioned semantic intent, deterministic query-plan, result, provenance, and query-receipt contracts. It does not own policy/control/evidence/risk/audit source tables, provider credentials, model clients, or authoritative GRC commands.
 
-The first slice implements `cwl.grc.analytics.intent.v1` and `cwl.grc.analytics.query-plan.v1`. A plan contains allowlisted dimensions, measures, filters, verified principal/tenant/workspace/purpose coordinates, an authorization-decision reference, and a bounded result limit. A time range is optional; when supplied, it must carry an explicit business/effective or system-recorded time axis and timezone-aware endpoints. The plan contains no raw SQL field.
+The first slice implements `cwl.grc.analytics.intent.v1` and `cwl.grc.analytics.query-plan.v1`. A plan contains allowlisted dimensions, measures, filters, verified principal/tenant/workspace/purpose coordinates, an authorization-decision reference, and a bounded result limit. An intent is limited to 64 filters and each filter to 100 values; dimension and measure collections are bounded by their versioned allowlists before element scans. These limits are part of the security/reliability contract, not merely UI validation. A time range is optional; when supplied, it must carry an explicit business/effective or system-recorded time axis and timezone-aware endpoints. The plan contains no raw SQL field.
 
 Natural-language processing and grounded answer synthesis must cross an Anti-Corruption Layer to `contextual-orchestrator`. The GRC repository must not directly call OpenAI, Anthropic, NVIDIA NIM, OpenRouter, Bytez, or another provider API for interactive analytics. The orchestration boundary may propose a structured intent; GRC validates and authorizes that intent before any read execution.
 
@@ -32,7 +32,7 @@ A framework requirement row, evidence record, or evidence binding is never equiv
 
 ## DDD boundary
 
-`cwl_grc.analytics.domain` may not depend on the existing flat application/kernel modules, database adapters, SQLAlchemy, or model-provider libraries. `cwl_grc.analytics.application` may depend on the Analytics domain but still does not own persistence or provider adapters. Architectural fitness tests enforce these dependency directions and reject generic `utils`, `helpers`, `services`, `common`, or `misc` buckets inside the Analytics context.
+`cwl_grc.analytics.domain` may not depend on the existing flat application/kernel modules, database adapters, SQLAlchemy, or model-provider libraries. `cwl_grc.analytics.application` may depend on the Analytics domain but still does not own persistence or provider adapters. Until a separately justified port/adapter is introduced, Analytics production modules may import only the Python standard library and their own `cwl_grc.analytics` context. Architectural fitness tests inspect both `import x` and `from x import y` syntax so the boundary cannot be bypassed by changing import form, and they reject generic `utils`, `helpers`, `services`, `common`, or `misc` buckets inside the Analytics context.
 
 The current flat `cwl_grc` kernel remains legacy structure outside this bounded slice; this ADR does not justify copying that layout into new GRC contexts. Later DDD migrations must be coherent, compatibility-preserving moves rather than cosmetic churn.
 
