@@ -58,6 +58,7 @@ def _context() -> AnalyticsPlanningContext:
         {"dimensions": None},
         {"dimensions": ("framework", None)},
         {"measures": None},
+        {"measures": ("record_count", None)},
         {"filters": None},
         {"filters": (object(),)},
         {"time_range": object()},
