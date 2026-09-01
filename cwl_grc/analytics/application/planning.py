@@ -1,6 +1,6 @@
 """Deterministically validate analytics intent and build a read-only query plan."""
 
-from datetime import UTC, datetime
+from datetime import datetime, timedelta
 import re
 
 from cwl_grc.analytics.domain.query_contract import (
@@ -23,6 +23,8 @@ from cwl_grc.analytics.domain.query_contract import (
 
 _SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 _SAFE_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$")
+_MICROSECONDS_PER_SECOND = 1_000_000
+_SECONDS_PER_DAY = 86_400
 
 
 def _abstain(code: AbstentionCode, reason: str) -> AnalyticsAbstention:
@@ -37,10 +39,24 @@ def _is_safe_identifier(value: str) -> bool:
     return bool(_SAFE_IDENTIFIER.fullmatch(value))
 
 
-def _is_aware(value: datetime) -> bool:
-    """Return whether a datetime has a concrete UTC offset."""
+def _instant_microseconds(value: datetime, offset: timedelta) -> int:
+    """Normalize an aware datetime to an unbounded scalar UTC-instant coordinate."""
 
-    return value.tzinfo is not None and value.utcoffset() is not None
+    local_seconds = (
+        value.toordinal() * _SECONDS_PER_DAY
+        + value.hour * 3_600
+        + value.minute * 60
+        + value.second
+    )
+    offset_microseconds = (
+        (offset.days * _SECONDS_PER_DAY + offset.seconds) * _MICROSECONDS_PER_SECOND
+        + offset.microseconds
+    )
+    return (
+        local_seconds * _MICROSECONDS_PER_SECOND
+        + value.microsecond
+        - offset_microseconds
+    )
 
 
 def _validate_time_range(value: AnalyticsTimeRange | None) -> str | None:
@@ -50,9 +66,13 @@ def _validate_time_range(value: AnalyticsTimeRange | None) -> str | None:
         return None
     if value.axis not in {axis.value for axis in TimeAxis}:
         return "unsupported_time_axis"
-    if not _is_aware(value.start) or not _is_aware(value.end):
+    start_offset = value.start.utcoffset()
+    end_offset = value.end.utcoffset()
+    if start_offset is None or end_offset is None:
         return "timezone_required"
-    if value.start.astimezone(UTC) >= value.end.astimezone(UTC):
+    if _instant_microseconds(value.start, start_offset) >= _instant_microseconds(
+        value.end, end_offset
+    ):
         return "invalid_time_range"
     return None
 
