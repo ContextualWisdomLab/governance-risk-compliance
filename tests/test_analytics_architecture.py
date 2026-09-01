@@ -70,3 +70,15 @@ def test_domain_import_policy_rejects_package_facade(tmp_path):
     )
 
     assert not _domain_imports_respect_boundary(probe)
+
+
+def test_domain_import_policy_rejects_relative_escape(tmp_path):
+    """Relative imports must not bypass the Analytics bounded-context dependency gate."""
+
+    probe = tmp_path / "relative_bypass.py"
+    probe.write_text(
+        "from ...kernel import compliance_truth\n",
+        encoding="utf-8",
+    )
+
+    assert not _domain_imports_respect_boundary(probe)
