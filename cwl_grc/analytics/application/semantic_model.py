@@ -69,7 +69,8 @@ def require_published_release(release: SemanticReleaseRef) -> SemanticReleaseRef
         raise SemanticReleaseValidationError(
             "authoritative GRC analysis requires a published semantic release"
         )
-    if _SHA256_HEX.fullmatch(release.content_digest_sha256) is None:
+    digest = release.content_digest_sha256
+    if type(digest) is not str or len(digest) != 64 or _SHA256_HEX.fullmatch(digest) is None:
         raise SemanticReleaseValidationError(
             "semantic release content digest must be lowercase SHA-256 hexadecimal"
         )
