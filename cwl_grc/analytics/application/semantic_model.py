@@ -12,6 +12,7 @@ from enum import StrEnum
 import re
 from typing import Protocol, runtime_checkable
 
+_MAX_RELEASE_COORDINATE_LENGTH = 1024
 _SHA256_HEX = re.compile(r"[0-9a-f]{64}\Z")
 
 
@@ -60,10 +61,10 @@ def require_published_release(release: SemanticReleaseRef) -> SemanticReleaseRef
 
     This is deliberately narrower than a future concrete ConceptWeave adapter.
     It prevents proposed or superseded semantic artifacts from being treated as
-    authoritative in GRC and rejects incomplete release identity, schema, or
-    digest coordinates.  Schema compatibility, signature/provenance policy,
-    tenant and purpose authorization remain separate consumer/application
-    responsibilities.
+    authoritative in GRC and rejects incomplete or oversized release identity,
+    schema, or digest coordinates before normalization work. Schema
+    compatibility, signature/provenance policy, tenant and purpose authorization
+    remain separate consumer/application responsibilities.
     """
 
     if release.publication_state is not SemanticReleaseState.PUBLISHED:
@@ -71,14 +72,22 @@ def require_published_release(release: SemanticReleaseRef) -> SemanticReleaseRef
             "authoritative GRC analysis requires a published semantic release"
         )
     release_id = release.release_id
-    if type(release_id) is not str or not release_id.strip():
+    if (
+        type(release_id) is not str
+        or len(release_id) > _MAX_RELEASE_COORDINATE_LENGTH
+        or not release_id.strip()
+    ):
         raise SemanticReleaseValidationError(
-            "semantic release identifier must be a non-empty string"
+            "semantic release identifier must be a non-empty string of at most 1024 characters"
         )
     schema_version = release.schema_version
-    if type(schema_version) is not str or not schema_version.strip():
+    if (
+        type(schema_version) is not str
+        or len(schema_version) > _MAX_RELEASE_COORDINATE_LENGTH
+        or not schema_version.strip()
+    ):
         raise SemanticReleaseValidationError(
-            "semantic release schema version must be a non-empty string"
+            "semantic release schema version must be a non-empty string of at most 1024 characters"
         )
     digest = release.content_digest_sha256
     if type(digest) is not str or len(digest) != 64 or _SHA256_HEX.fullmatch(digest) is None:
