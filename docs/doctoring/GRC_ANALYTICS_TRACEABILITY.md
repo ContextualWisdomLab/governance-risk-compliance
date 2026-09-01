@@ -21,10 +21,13 @@ Snapshot date: 2026-08-31
 | GRC owns no interactive model-provider credential/client in this context | ADR 0012 and AGENTS Analytics rules; no provider adapter exists in the slice | architectural import rejection for `openai`, `anthropic`, `httpx`, `requests` |
 | Natural-language orchestration goes through contextual-orchestrator ACL | ADR 0012 and `ARCHITECTURE.md` context map | no direct provider integration is present in the first slice |
 | Raw model SQL is not an execution contract | `AnalyticsQueryPlan` has semantic fields only; product contract defines future safe executor | `test_build_query_plan_preserves_verified_scope_without_sql` |
+| Query-plan read-only authority cannot be caller-overridden | `AnalyticsQueryPlan.read_only` is a frozen `init=False` field | constructor-signature and plan-value regression in `test_analytics_malformed_intent.py` |
 | Tenant/workspace/principal/purpose scope is explicit | `AnalyticsPlanningContext` and immutable `AnalyticsQueryPlan` | query-plan contract tests assert exact verified coordinates |
+| Untrusted runtime intent shapes fail closed before typed operations | `_validate_intent_shape`, filter/time-range shape checks, safe identifier validation | malformed `None`, collection, filter, time-range, row-limit, and identifier regressions |
 | Question content is not required in deterministic planning | intent carries bounded SHA-256 `question_hash` | invalid hashes fail closed in contract tests |
 | Semantic dimensions/measures are allowlisted and versioned | `DIMENSION_CODES`, `MEASURE_CODES`, schema-version constants | unsupported and duplicate fields fail `unsupported_analysis` |
-| Effective/business time and system-recorded time stay distinct | `TimeAxis`, `AnalyticsTimeRange` | timezone, axis, interval, and DST-fold instant-order regressions |
+| Effective/business time and system-recorded time stay distinct | `TimeAxis`, `AnalyticsTimeRange` | optional-range, timezone, axis, interval, DST-fold, and extreme-offset regressions |
+| Temporal ordering does not overflow at representable datetime boundaries | unbounded integer instant key derived from ordinal/time minus UTC offset | `datetime.min +14:00` and `datetime.max -14:00` regressions |
 | Unauthorized fields fail closed | permitted-field subset check | `not_authorized / field_policy_denied` regression |
 | Authorized but unavailable facts do not become guesses | available-field subset check | `insufficient_evidence / projection_field_unavailable` regression |
 | Query work is bounded before execution | max 500 result rows; bounded filter operators/value cardinality | row/filter bound regressions |
@@ -39,7 +42,7 @@ Framework requirements, evidence existence, and evidence bindings are not automa
 
 ## Verification performed for this slice
 
-A clean replicated slice run passed the Analytics contract and architecture test suite with 100% statement and branch coverage over the new `cwl_grc.analytics` production package. Review-driven regression coverage also verifies that time ranges are ordered by UTC instant across a repeated daylight-saving local hour, rather than by ambiguous wall time. Repository-hosted Product and central required workflows remain authoritative for integration, dependency, SAST, security, and independent-review evidence on each exact pull-request head.
+The Analytics contract and architecture suites maintain the repository's 100% owned-production statement and branch coverage gate. Review-driven regression coverage verifies DST-fold ordering by actual instant, valid extreme-offset boundary dates without UTC-conversion overflow, malformed runtime intents as typed abstentions instead of exceptions, and the non-overridable read-only plan invariant. Repository-hosted Product and central required workflows remain authoritative for integration, dependency, SAST, security, and independent-review evidence on each exact pull-request head.
 
 ## Deferred acceptance evidence
 
