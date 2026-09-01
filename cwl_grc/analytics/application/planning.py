@@ -6,6 +6,8 @@ import re
 from cwl_grc.analytics.domain.query_contract import (
     DIMENSION_CODES,
     INTENT_SCHEMA_VERSION,
+    MAX_FILTER_COUNT,
+    MAX_FILTER_VALUES,
     MAX_RESULT_ROWS,
     MEASURE_CODES,
     QUERY_PLAN_SCHEMA_VERSION,
@@ -103,6 +105,10 @@ def _validate_filter(value: AnalyticsFilter) -> str | None:
         return "invalid_filter_shape"
     if not isinstance(value.operator, str):
         return "invalid_filter_shape"
+    if not isinstance(value.values, tuple):
+        return "invalid_filter_shape"
+    if len(value.values) > MAX_FILTER_VALUES:
+        return "filter_cardinality_exceeded"
     if not _is_string_tuple(value.values):
         return "invalid_filter_shape"
     if value.field not in DIMENSION_CODES:
@@ -113,22 +119,30 @@ def _validate_filter(value: AnalyticsFilter) -> str | None:
         return "invalid_filter_value"
     if value.operator == FilterOperator.EQUALS and len(value.values) != 1:
         return "invalid_equals_cardinality"
-    if value.operator == FilterOperator.IN and len(value.values) > 100:
-        return "filter_cardinality_exceeded"
     return None
 
 
 def _validate_intent_shape(draft: AnalyticsIntentDraft) -> str | None:
-    """Validate runtime shapes before operations that assume typed intent fields."""
+    """Validate and bound runtime shapes before iterating over untrusted collections."""
 
     if not isinstance(draft.question_hash, str):
         return "invalid_intent_shape"
+    if not isinstance(draft.dimensions, tuple):
+        return "invalid_intent_shape"
+    if len(draft.dimensions) > len(DIMENSION_CODES):
+        return "semantic_field_count_exceeded"
     if not _is_string_tuple(draft.dimensions):
         return "invalid_intent_shape"
+    if not isinstance(draft.measures, tuple):
+        return "invalid_intent_shape"
+    if len(draft.measures) > len(MEASURE_CODES):
+        return "semantic_field_count_exceeded"
     if not _is_string_tuple(draft.measures):
         return "invalid_intent_shape"
     if not isinstance(draft.filters, tuple):
         return "invalid_intent_shape"
+    if len(draft.filters) > MAX_FILTER_COUNT:
+        return "filter_count_exceeded"
     for semantic_filter in draft.filters:
         if not isinstance(semantic_filter, AnalyticsFilter):
             return "invalid_intent_shape"
