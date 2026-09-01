@@ -45,10 +45,10 @@ def _is_safe_identifier(value: object) -> bool:
 
 
 def _is_string_tuple(value: tuple[object, ...]) -> bool:
-    """Return whether a previously shape-checked tuple contains only strings."""
+    """Return whether a previously shape-checked tuple contains exact strings."""
 
     for item in value:
-        if not isinstance(item, str):
+        if type(item) is not str:
             return False
     return True
 
@@ -97,7 +97,7 @@ def _validate_time_range(value: AnalyticsTimeRange | None) -> str | None:
 
     if value is None:
         return None
-    if not isinstance(value.axis, str):
+    if type(value.axis) is not str:
         return "invalid_time_range_shape"
     if not isinstance(value.start, datetime):
         return "invalid_time_range_shape"
@@ -119,9 +119,9 @@ def _validate_time_range(value: AnalyticsTimeRange | None) -> str | None:
 def _validate_filter(value: AnalyticsFilter) -> str | None:
     """Return a stable validation code for an invalid semantic filter, if any."""
 
-    if not isinstance(value.field, str):
+    if type(value.field) is not str:
         return "invalid_filter_shape"
-    if not isinstance(value.operator, str):
+    if type(value.operator) is not str:
         return "invalid_filter_shape"
     if not isinstance(value.values, tuple):
         return "invalid_filter_shape"

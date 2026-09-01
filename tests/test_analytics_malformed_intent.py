@@ -26,7 +26,7 @@ QUESTION_HASH = "b" * 64
 
 
 class _HashProbe(str):
-    """Record whether an oversized untrusted string reaches hashing."""
+    """Record whether a behavior-bearing semantic string reaches hashing."""
 
     def __new__(cls, value):
         instance = super().__new__(cls, value)
@@ -41,11 +41,26 @@ class _HashProbe(str):
         return str.__hash__(self)
 
 
+class _EqualityProbe(str):
+    """Record whether a behavior-bearing string reaches semantic equality checks."""
+
+    def __new__(cls, value):
+        instance = super().__new__(cls, value)
+        instance.equality_called = False
+        return instance
+
+    def __eq__(self, other):
+        self.equality_called = True
+        return str.__eq__(self, other)
+
+    __hash__ = str.__hash__
+
+
 class _StripExplodes(str):
-    """Detect whether an oversized untrusted filter value is copied by strip()."""
+    """Detect whether a behavior-bearing filter value reaches strip()."""
 
     def strip(self, chars=None):
-        raise AssertionError("oversized filter value was stripped before its length gate")
+        raise AssertionError("behavior-bearing filter value reached strip")
 
 
 def _draft() -> AnalyticsIntentDraft:
@@ -150,20 +165,80 @@ def test_malformed_time_range_shapes_abstain_instead_of_raising(time_range):
     assert outcome.reason == "invalid_time_range_shape"
 
 
-def test_oversized_semantic_string_is_rejected_before_hashing():
-    oversized = _HashProbe("x" * 257)
+def test_behavior_bearing_dimension_string_is_rejected_before_equality():
+    dimension = _EqualityProbe("framework")
 
-    outcome = build_query_plan(replace(_draft(), dimensions=(oversized,)), _context())
+    outcome = build_query_plan(replace(_draft(), dimensions=(dimension,)), _context())
 
     assert isinstance(outcome, AnalyticsAbstention)
     assert outcome.code is AbstentionCode.UNSUPPORTED_ANALYSIS
-    assert outcome.reason == "unsupported_semantic_field"
-    assert oversized.hash_called is False
+    assert outcome.reason == "invalid_intent_shape"
+    assert dimension.equality_called is False
 
 
-def test_oversized_filter_value_is_rejected_before_strip_copy():
-    oversized = _StripExplodes("x" * 257)
-    semantic_filter = AnalyticsFilter("framework", "eq", (oversized,))
+def test_behavior_bearing_filter_field_is_rejected_before_equality():
+    field = _EqualityProbe("framework")
+    semantic_filter = AnalyticsFilter(field, "eq", ("ISO-27001",))
+
+    outcome = build_query_plan(replace(_draft(), filters=(semantic_filter,)), _context())
+
+    assert isinstance(outcome, AnalyticsAbstention)
+    assert outcome.code is AbstentionCode.UNSUPPORTED_ANALYSIS
+    assert outcome.reason == "invalid_filter_shape"
+    assert field.equality_called is False
+
+
+def test_behavior_bearing_filter_operator_is_rejected_before_equality():
+    operator = _EqualityProbe("eq")
+    semantic_filter = AnalyticsFilter("framework", operator, ("ISO-27001",))
+
+    outcome = build_query_plan(replace(_draft(), filters=(semantic_filter,)), _context())
+
+    assert isinstance(outcome, AnalyticsAbstention)
+    assert outcome.code is AbstentionCode.UNSUPPORTED_ANALYSIS
+    assert outcome.reason == "invalid_filter_shape"
+    assert operator.equality_called is False
+
+
+def test_behavior_bearing_time_axis_is_rejected_before_equality():
+    axis = _EqualityProbe("effective_time")
+    time_range = AnalyticsTimeRange(
+        axis,
+        datetime(2026, 1, 1, tzinfo=UTC),
+        datetime(2026, 2, 1, tzinfo=UTC),
+    )
+
+    outcome = build_query_plan(replace(_draft(), time_range=time_range), _context())
+
+    assert isinstance(outcome, AnalyticsAbstention)
+    assert outcome.code is AbstentionCode.UNSUPPORTED_ANALYSIS
+    assert outcome.reason == "invalid_time_range_shape"
+    assert axis.equality_called is False
+
+
+def test_behavior_bearing_semantic_string_is_rejected_before_hashing():
+    semantic_value = _HashProbe("x" * 257)
+
+    outcome = build_query_plan(replace(_draft(), dimensions=(semantic_value,)), _context())
+
+    assert isinstance(outcome, AnalyticsAbstention)
+    assert outcome.code is AbstentionCode.UNSUPPORTED_ANALYSIS
+    assert outcome.reason == "invalid_intent_shape"
+    assert semantic_value.hash_called is False
+
+
+def test_behavior_bearing_filter_value_is_rejected_before_strip():
+    semantic_filter = AnalyticsFilter("framework", "eq", (_StripExplodes("ISO-27001"),))
+
+    outcome = build_query_plan(replace(_draft(), filters=(semantic_filter,)), _context())
+
+    assert isinstance(outcome, AnalyticsAbstention)
+    assert outcome.code is AbstentionCode.UNSUPPORTED_ANALYSIS
+    assert outcome.reason == "invalid_filter_shape"
+
+
+def test_oversized_exact_filter_value_is_rejected():
+    semantic_filter = AnalyticsFilter("framework", "eq", ("x" * 257,))
 
     outcome = build_query_plan(replace(_draft(), filters=(semantic_filter,)), _context())
 

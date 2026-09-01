@@ -26,13 +26,16 @@ def _absolute_imports(path: Path) -> set[str]:
 
 
 def _domain_imports_respect_boundary(path: Path) -> bool:
-    """Allow domain modules to use stdlib or their own domain package, never the facade."""
+    """Allow only stdlib or own-domain dependencies inside domain modules."""
 
     for module in _absolute_imports(path):
         if module == _RELATIVE_IMPORT:
             return False
-        if module.split(".", 1)[0] != "cwl_grc":
-            continue
+        root = module.split(".", 1)[0]
+        if root != "cwl_grc":
+            if root in sys.stdlib_module_names:
+                continue
+            return False
         if module == "cwl_grc.analytics.domain":
             continue
         if module.startswith("cwl_grc.analytics.domain."):
@@ -86,5 +89,14 @@ def test_domain_import_policy_rejects_relative_escape(tmp_path):
         "from ...kernel import compliance_truth\n",
         encoding="utf-8",
     )
+
+    assert not _domain_imports_respect_boundary(probe)
+
+
+def test_domain_import_policy_rejects_third_party_dependency(tmp_path):
+    """A domain module must not smuggle an undeclared third-party runtime dependency."""
+
+    probe = tmp_path / "third_party_bypass.py"
+    probe.write_text("import requests\n", encoding="utf-8")
 
     assert not _domain_imports_respect_boundary(probe)
