@@ -23,6 +23,7 @@
 - `cwl_grc.analytics` as a read-only Supporting Bounded Context with explicit domain/application layers, versioned `cwl.grc.analytics.intent.v1` and `cwl.grc.analytics.query-plan.v1` contracts, bounded semantic fields/filters/time axes, verified principal/tenant/workspace/purpose coordinates, and typed `not_authorized`, `insufficient_evidence`, and `unsupported_analysis` outcomes.
 - GRC Analytics architectural fitness tests that reject direct model-provider/database-adapter dependencies and new generic `utils`/`helpers`/`services` buckets inside the bounded context.
 - ADR 0012 and the GRC Analytics product contract documenting the contextual-orchestrator Anti-Corruption Layer, no-raw-SQL rule, deterministic read-model boundary, provenance/query-receipt direction, and buyer/evaluation follow-up slices.
+- Provider-neutral `SemanticModelClientPort` and immutable semantic-release coordinates for the ConceptWeave reference-client boundary, without importing ConceptWeave generator internals or inventing a supplier endpoint before its public contract is released.
 
 ### Security
 
@@ -36,6 +37,7 @@
 - Pin every Product workflow action to an immutable commit and verify the exact pull-request head before testing.
 - Replace mutable `pip install` resolution with `uv sync --locked`, verify lock freshness, and reject any tracked or untracked dirty tree on every Product run.
 - Keep GRC Analytics free of direct provider credentials and executable model-produced SQL; field policy and projection availability fail closed before any future read execution.
+- Fail closed on non-published, malformed, incomplete, or oversized semantic-release coordinates; bound `release_id` and `schema_version` to 1024 characters before whitespace normalization so supplier-controlled strings cannot force unbounded consumer-side normalization work.
 
 ### ADR
 
@@ -43,3 +45,4 @@
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
 - `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — preserve external catalogs while adding distinct internal-control definitions, implementations, reviewed mappings, tests, effectiveness results, deficiencies, and purpose-bound evidence usage before risk and audit depend on the model.
 - `docs/adr/0012-grc-analytics-supporting-bounded-context.md` — keep natural-language analytics read-only, deterministic, tenant/purpose-bound, and isolated from provider/database authority through a versioned semantic contract and contextual-orchestrator ACL.
+- `docs/adr/0013-conceptweave-semantic-release-client.md` — consume only governed ConceptWeave semantic releases through a provider-neutral GRC application port, preserve GRC authority, and fail semantic analysis closed on unsafe release coordinates without fabricating supplier internals or fallback ontologies.
