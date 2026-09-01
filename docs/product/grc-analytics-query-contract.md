@@ -22,7 +22,7 @@ Stable dimensions currently admitted by the planning contract cover framework/ed
 
 Stable measures currently admitted are `record_count`, `evidence_age_days`, `evidence_record_count`, `control_test_count`, `inherent_risk`, `residual_risk`, `kri_value`, `open_finding_count`, and `remediation_item_count`. Admitting a code to the semantic contract does not make a value available: the planner returns `insufficient_evidence` until an authorized deterministic projection supplies that field.
 
-Version one accepts equality and bounded membership filters only. It requires at least one measure, rejects duplicate or unknown semantic fields, rejects more than 500 result rows, and requires timezone-aware intervals on either effective/business time or system-recorded time. Question text is represented by a SHA-256 hash in the planning contract; raw question or evidence text does not need to enter deterministic query planning.
+Version one accepts equality and bounded membership filters only. It requires at least one measure, rejects duplicate or unknown semantic fields, and rejects more than 500 result rows. A time range is optional. When one is supplied, its endpoints must be timezone-aware and its axis must be either effective/business time or system-recorded time. Question text is represented by a SHA-256 hash in the planning contract; raw question or evidence text does not need to enter deterministic query planning.
 
 ## Authorization and abstention
 
@@ -32,7 +32,7 @@ Typed fail-closed outcomes are:
 
 - `not_authorized`: requested fields exceed the verified field policy;
 - `insufficient_evidence`: requested fields are authorized but unavailable in the current read projection;
-- `unsupported_analysis`: schema, identifier, hash, semantic field, filter, time axis, or request bound is unsupported.
+- `unsupported_analysis`: schema, runtime intent shape, identifier, hash, semantic field, filter, time axis, or request bound is unsupported.
 
 These outcomes are part of the product contract. A later contextual-orchestrator synthesis adapter must preserve them rather than converting them into guessed answers.
 
