@@ -1,6 +1,6 @@
 """Versioned semantic-query contracts for the GRC Analytics bounded context."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
@@ -147,7 +147,7 @@ class AnalyticsQueryPlan:
     filters: tuple[AnalyticsFilter, ...]
     time_range: AnalyticsTimeRange | None
     row_limit: int
-    read_only: bool = True
+    read_only: bool = field(init=False, default=True)
 
 
 @dataclass(frozen=True, slots=True)
