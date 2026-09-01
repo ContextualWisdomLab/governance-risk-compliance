@@ -1,6 +1,9 @@
 """Resource-bound regressions for untrusted GRC Analytics intents."""
 
+from dataclasses import replace
 from hashlib import sha256
+
+import pytest
 
 from cwl_grc.analytics import (
     AbstentionCode,
@@ -18,7 +21,7 @@ from cwl_grc.analytics.domain.query_contract import (
 )
 
 
-def _draft(filter_count: int) -> AnalyticsIntentDraft:
+def _draft(filter_count: int = 1) -> AnalyticsIntentDraft:
     """Build an intent whose filters are individually valid but numerous."""
 
     return AnalyticsIntentDraft(
@@ -67,3 +70,20 @@ def test_query_plan_accepts_the_sixty_four_filter_boundary():
 
     assert isinstance(outcome, AnalyticsQueryPlan)
     assert len(outcome.filters) == 64
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"dimensions": ("framework",) * (len(DIMENSION_CODES) + 1)},
+        {"measures": ("record_count",) * (len(MEASURE_CODES) + 1)},
+    ],
+)
+def test_query_plan_bounds_semantic_field_collections_before_iteration(changes):
+    """Oversized semantic-field tuples fail before duplicate or membership scans."""
+
+    outcome = build_query_plan(replace(_draft(), **changes), _context())
+
+    assert isinstance(outcome, AnalyticsAbstention)
+    assert outcome.code is AbstentionCode.UNSUPPORTED_ANALYSIS
+    assert outcome.reason == "semantic_field_count_exceeded"
