@@ -25,11 +25,20 @@ from cwl_grc.analytics.domain.query_contract import (
 QUESTION_HASH = "b" * 64
 
 
-class _HashExplodes(str):
-    """Detect whether an oversized untrusted string is hashed before rejection."""
+class _HashProbe(str):
+    """Record whether an oversized untrusted string reaches hashing."""
+
+    def __new__(cls, value):
+        instance = super().__new__(cls, value)
+        instance.hash_called = False
+        return instance
+
+    def __eq__(self, other):
+        return str.__eq__(self, other)
 
     def __hash__(self):
-        raise AssertionError("oversized semantic string was hashed before its length gate")
+        self.hash_called = True
+        return str.__hash__(self)
 
 
 class _StripExplodes(str):
@@ -142,13 +151,14 @@ def test_malformed_time_range_shapes_abstain_instead_of_raising(time_range):
 
 
 def test_oversized_semantic_string_is_rejected_before_hashing():
-    oversized = _HashExplodes("x" * 257)
+    oversized = _HashProbe("x" * 257)
 
     outcome = build_query_plan(replace(_draft(), dimensions=(oversized,)), _context())
 
     assert isinstance(outcome, AnalyticsAbstention)
     assert outcome.code is AbstentionCode.UNSUPPORTED_ANALYSIS
     assert outcome.reason == "unsupported_semantic_field"
+    assert oversized.hash_called is False
 
 
 def test_oversized_filter_value_is_rejected_before_strip_copy():
