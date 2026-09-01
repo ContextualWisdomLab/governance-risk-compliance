@@ -21,6 +21,20 @@ def _absolute_imports(path: Path) -> set[str]:
     return imported_modules
 
 
+def _domain_imports_respect_boundary(path: Path) -> bool:
+    """Allow domain modules to use stdlib or their own domain package, never the facade."""
+
+    for module in _absolute_imports(path):
+        if module.split(".", 1)[0] != "cwl_grc":
+            continue
+        if module == "cwl_grc.analytics.domain":
+            continue
+        if module.startswith("cwl_grc.analytics.domain."):
+            continue
+        return False
+    return True
+
+
 def test_analytics_is_a_named_bounded_context_with_explicit_layers():
     assert (ANALYTICS_ROOT / "domain" / "query_contract.py").is_file()
     assert (ANALYTICS_ROOT / "application" / "planning.py").is_file()
@@ -43,7 +57,16 @@ def test_analytics_domain_and_application_only_depend_on_stdlib_or_their_own_con
 def test_domain_has_no_dependency_on_application_layer():
     domain_root = ANALYTICS_ROOT / "domain"
     for path in domain_root.rglob("*.py"):
-        assert not any(
-            module.startswith("cwl_grc.analytics.application")
-            for module in _absolute_imports(path)
-        )
+        assert _domain_imports_respect_boundary(path), path
+
+
+def test_domain_import_policy_rejects_package_facade(tmp_path):
+    """The package facade exports application symbols and must not enter the domain layer."""
+
+    probe = tmp_path / "facade_bypass.py"
+    probe.write_text(
+        "from cwl_grc.analytics import build_query_plan\n",
+        encoding="utf-8",
+    )
+
+    assert not _domain_imports_respect_boundary(probe)
