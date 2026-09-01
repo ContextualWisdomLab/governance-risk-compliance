@@ -25,6 +25,7 @@ from cwl_grc.analytics.domain.query_contract import (
 
 _SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 _SAFE_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$")
+_MAX_FILTER_VALUE_LENGTH = 256
 _MICROSECONDS_PER_SECOND = 1_000_000
 _SECONDS_PER_DAY = 86_400
 
@@ -50,6 +51,25 @@ def _is_string_tuple(value: tuple[object, ...]) -> bool:
         if not isinstance(item, str):
             return False
     return True
+
+
+def _contains_only_supported(values: tuple[str, ...], allowed: frozenset[str]) -> bool:
+    """Check a bounded semantic tuple without hashing untrusted strings."""
+
+    for value in values:
+        if not any(value == candidate for candidate in allowed):
+            return False
+    return True
+
+
+def _has_duplicate_strings(values: tuple[str, ...]) -> bool:
+    """Detect duplicates in a bounded tuple without hashing untrusted strings."""
+
+    for index, value in enumerate(values):
+        for previous in values[:index]:
+            if value == previous:
+                return True
+    return False
 
 
 def _instant_microseconds(value: datetime, offset: timedelta) -> int:
@@ -83,7 +103,7 @@ def _validate_time_range(value: AnalyticsTimeRange | None) -> str | None:
         return "invalid_time_range_shape"
     if not isinstance(value.end, datetime):
         return "invalid_time_range_shape"
-    if value.axis not in {axis.value for axis in TimeAxis}:
+    if not any(value.axis == axis.value for axis in TimeAxis):
         return "unsupported_time_axis"
     start_offset = value.start.utcoffset()
     end_offset = value.end.utcoffset()
@@ -109,12 +129,17 @@ def _validate_filter(value: AnalyticsFilter) -> str | None:
         return "filter_cardinality_exceeded"
     if not _is_string_tuple(value.values):
         return "invalid_filter_shape"
-    if value.field not in DIMENSION_CODES:
+    if not any(value.field == field for field in DIMENSION_CODES):
         return "unsupported_filter_field"
-    if value.operator not in {operator.value for operator in FilterOperator}:
+    if not any(value.operator == operator.value for operator in FilterOperator):
         return "unsupported_filter_operator"
-    if not value.values or any(not item.strip() or len(item) > 256 for item in value.values):
+    if not value.values:
         return "invalid_filter_value"
+    for item in value.values:
+        if len(item) > _MAX_FILTER_VALUE_LENGTH:
+            return "invalid_filter_value"
+        if not str.strip(item):
+            return "invalid_filter_value"
     if value.operator == FilterOperator.EQUALS and len(value.values) != 1:
         return "invalid_equals_cardinality"
     return None
@@ -179,14 +204,11 @@ def build_query_plan(
         return _abstain(AbstentionCode.UNSUPPORTED_ANALYSIS, "invalid_question_hash")
     if not draft.measures:
         return _abstain(AbstentionCode.UNSUPPORTED_ANALYSIS, "measure_required")
-    if len(set(draft.dimensions)) != len(draft.dimensions) or len(set(draft.measures)) != len(
-        draft.measures
-    ):
+    if _has_duplicate_strings(draft.dimensions) or _has_duplicate_strings(draft.measures):
         return _abstain(AbstentionCode.UNSUPPORTED_ANALYSIS, "duplicate_semantic_field")
-
-    unsupported_dimensions = set(draft.dimensions) - DIMENSION_CODES
-    unsupported_measures = set(draft.measures) - MEASURE_CODES
-    if unsupported_dimensions or unsupported_measures:
+    if not _contains_only_supported(draft.dimensions, DIMENSION_CODES):
+        return _abstain(AbstentionCode.UNSUPPORTED_ANALYSIS, "unsupported_semantic_field")
+    if not _contains_only_supported(draft.measures, MEASURE_CODES):
         return _abstain(AbstentionCode.UNSUPPORTED_ANALYSIS, "unsupported_semantic_field")
     if not 1 <= draft.row_limit <= MAX_RESULT_ROWS:
         return _abstain(AbstentionCode.UNSUPPORTED_ANALYSIS, "row_limit_out_of_bounds")

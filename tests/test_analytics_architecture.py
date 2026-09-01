@@ -6,18 +6,22 @@ import sys
 
 ANALYTICS_ROOT = Path(__file__).parents[1] / "cwl_grc" / "analytics"
 GENERIC_DOMAIN_BUCKETS = {"common.py", "helpers.py", "misc.py", "services.py", "utils.py"}
+_RELATIVE_IMPORT = "<relative-import>"
 
 
 def _absolute_imports(path: Path) -> set[str]:
-    """Return absolute module imports so dependency-boundary assertions cannot be bypassed."""
+    """Return dependency imports and mark relative imports as boundary violations."""
 
     tree = ast.parse(path.read_text(encoding="utf-8"))
     imported_modules: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             imported_modules.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            imported_modules.add(node.module)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                imported_modules.add(_RELATIVE_IMPORT)
+            elif node.module:
+                imported_modules.add(node.module)
     return imported_modules
 
 
@@ -25,6 +29,8 @@ def _domain_imports_respect_boundary(path: Path) -> bool:
     """Allow domain modules to use stdlib or their own domain package, never the facade."""
 
     for module in _absolute_imports(path):
+        if module == _RELATIVE_IMPORT:
+            return False
         if module.split(".", 1)[0] != "cwl_grc":
             continue
         if module == "cwl_grc.analytics.domain":
@@ -66,6 +72,18 @@ def test_domain_import_policy_rejects_package_facade(tmp_path):
     probe = tmp_path / "facade_bypass.py"
     probe.write_text(
         "from cwl_grc.analytics import build_query_plan\n",
+        encoding="utf-8",
+    )
+
+    assert not _domain_imports_respect_boundary(probe)
+
+
+def test_domain_import_policy_rejects_relative_escape(tmp_path):
+    """Relative imports must not bypass the Analytics bounded-context dependency gate."""
+
+    probe = tmp_path / "relative_bypass.py"
+    probe.write_text(
+        "from ...kernel import compliance_truth\n",
         encoding="utf-8",
     )
 
