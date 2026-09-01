@@ -10,11 +10,11 @@ The current repository includes a developer-preview surface and active productio
 
 ## Start here
 
-- [Repository README](../README.md) — current product workflow, integrity guarantees, and developer-preview boundary.
-- [Product and technical gap baseline](product-technical-gap-baseline.md) — current readiness gaps and evidence state.
-- [Architecture decisions](adr/) — accepted product, control, and integration decisions.
-- [Standards and source references](doctoring/REFERENCES.md) — official catalog and standards references.
-- [GitHub Releases](https://github.com/ContextualWisdomLab/governance-risk-compliance/releases) — immutable release artifacts when available.
+- [Repository README](https://github.com/ContextualWisdomLab/governance-risk-compliance/blob/develop/README.md) — current product workflow, integrity guarantees, and developer-preview boundary.
+- [Product and technical gap baseline](product-technical-gap-baseline.html) — current readiness gaps and evidence state.
+- [Architecture decisions](https://github.com/ContextualWisdomLab/governance-risk-compliance/tree/develop/docs/adr) — accepted product, control, and integration decisions.
+- [Standards and source references](doctoring/REFERENCES.html) — official catalog and standards references.
+- [GitHub Releases](https://github.com/ContextualWisdomLab/governance-risk-compliance/releases) — release discovery; a release is treated as immutable only when release immutability is enabled and the release is published, and only a verifiable attestation or digest qualifies as integrity evidence.
 - [Ask DeepWiki](https://deepwiki.com/ContextualWisdomLab/governance-risk-compliance) — repository-aware navigation and questions.
 
 ## Authority and ecosystem boundary
