@@ -43,6 +43,18 @@ def test_release_digest_must_be_lowercase_sha256_hex() -> None:
         require_published_release(release)
 
 
+def test_malformed_release_digest_fails_with_typed_validation_error() -> None:
+    release = SemanticReleaseRef(
+        release_id="conceptweave-grc-2026-09-01",
+        schema_version="cwl.conceptweave.semantic-release.v1",
+        content_digest_sha256=None,
+        publication_state=SemanticReleaseState.PUBLISHED,
+    )
+
+    with pytest.raises(SemanticReleaseValidationError, match="SHA-256"):
+        require_published_release(release)
+
+
 def test_semantic_model_client_port_is_structural_and_provider_neutral() -> None:
     class FakeClient:
         def validate_release(self, release: SemanticReleaseRef) -> SemanticReleaseRef:
