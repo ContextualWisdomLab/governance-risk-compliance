@@ -167,6 +167,18 @@ def test_build_query_plan_preserves_verified_scope_without_sql():
             _draft(
                 time_range=AnalyticsTimeRange(
                     "effective_time",
+                    datetime(2026, 1, 1, tzinfo=UTC),
+                    datetime(2026, 2, 1),
+                )
+            ),
+            _context(),
+            AbstentionCode.UNSUPPORTED_ANALYSIS,
+            "timezone_required",
+        ),
+        (
+            _draft(
+                time_range=AnalyticsTimeRange(
+                    "effective_time",
                     datetime(2026, 2, 1, tzinfo=UTC),
                     datetime(2026, 1, 1, tzinfo=UTC),
                 )
