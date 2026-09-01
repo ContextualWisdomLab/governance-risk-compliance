@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "CWL GRC home: versioned policies, official controls, evidence, and coverage gaps."
 readme = "README.md"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 authors = [{ name = "ContextualWisdomLab" }]
 dependencies = [
