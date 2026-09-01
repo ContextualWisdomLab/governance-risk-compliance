@@ -1,3 +1,5 @@
+"""Tests for the versioned GRC Analytics semantic query contract."""
+
 from datetime import UTC, datetime
 
 import pytest
@@ -141,7 +143,11 @@ def test_build_query_plan_preserves_verified_scope_without_sql():
             "row_limit_out_of_bounds",
         ),
         (
-            _draft(time_range=AnalyticsTimeRange("created_at", datetime.now(UTC), datetime.now(UTC))),
+            _draft(
+                time_range=AnalyticsTimeRange(
+                    "created_at", datetime.now(UTC), datetime.now(UTC)
+                )
+            ),
             _context(),
             AbstentionCode.UNSUPPORTED_ANALYSIS,
             "unsupported_time_axis",
@@ -205,7 +211,11 @@ def test_build_query_plan_preserves_verified_scope_without_sql():
             "invalid_equals_cardinality",
         ),
         (
-            _draft(filters=(AnalyticsFilter("policy_status", "in", tuple(str(i) for i in range(101))),)),
+            _draft(
+                filters=(
+                    AnalyticsFilter("policy_status", "in", tuple(str(i) for i in range(101))),
+                )
+            ),
             _context(),
             AbstentionCode.UNSUPPORTED_ANALYSIS,
             "filter_cardinality_exceeded",
