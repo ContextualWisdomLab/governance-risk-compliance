@@ -24,7 +24,7 @@ Snapshot date: 2026-08-31
 | Tenant/workspace/principal/purpose scope is explicit | `AnalyticsPlanningContext` and immutable `AnalyticsQueryPlan` | query-plan contract tests assert exact verified coordinates |
 | Question content is not required in deterministic planning | intent carries bounded SHA-256 `question_hash` | invalid hashes fail closed in contract tests |
 | Semantic dimensions/measures are allowlisted and versioned | `DIMENSION_CODES`, `MEASURE_CODES`, schema-version constants | unsupported and duplicate fields fail `unsupported_analysis` |
-| Effective/business time and system-recorded time stay distinct | `TimeAxis`, `AnalyticsTimeRange` | timezone, axis, and interval regressions |
+| Effective/business time and system-recorded time stay distinct | `TimeAxis`, `AnalyticsTimeRange` | timezone, axis, interval, and DST-fold instant-order regressions |
 | Unauthorized fields fail closed | permitted-field subset check | `not_authorized / field_policy_denied` regression |
 | Authorized but unavailable facts do not become guesses | available-field subset check | `insufficient_evidence / projection_field_unavailable` regression |
 | Query work is bounded before execution | max 500 result rows; bounded filter operators/value cardinality | row/filter bound regressions |
@@ -39,7 +39,7 @@ Framework requirements, evidence existence, and evidence bindings are not automa
 
 ## Verification performed for this slice
 
-A clean replicated slice run executed 29 tests and measured 100% statement and branch coverage over the new `cwl_grc.analytics` production package. The slice was also checked for Python lines longer than the repository Ruff limit after the final test edits. Repository-hosted Product and central required workflows remain authoritative for integration, dependency, SAST, security, and independent-review evidence after a pull request is opened.
+A clean replicated slice run passed the Analytics contract and architecture test suite with 100% statement and branch coverage over the new `cwl_grc.analytics` production package. Review-driven regression coverage also verifies that time ranges are ordered by UTC instant across a repeated daylight-saving local hour, rather than by ambiguous wall time. Repository-hosted Product and central required workflows remain authoritative for integration, dependency, SAST, security, and independent-review evidence on each exact pull-request head.
 
 ## Deferred acceptance evidence
 
