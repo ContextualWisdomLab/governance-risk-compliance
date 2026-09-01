@@ -106,7 +106,6 @@ Package metadata is `0.1.0`, but source metadata and passing tests are not certi
 
 - [Public documentation home](docs/index.md)
 - [Architecture](ARCHITECTURE.md)
-- [Security policy and trust boundaries](SECURITY.md)
 - [Product/technical gap baseline](docs/product-technical-gap-baseline.md)
 - [Authoritative catalog references and APA 7th citations](docs/doctoring/REFERENCES.md)
 - [Change history](CHANGELOG.md)
