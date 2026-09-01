@@ -16,7 +16,7 @@ Create `cwl_grc.analytics` as a **Supporting Bounded Context** with explicit `do
 
 The Analytics context owns only versioned semantic intent, deterministic query-plan, result, provenance, and query-receipt contracts. It does not own policy/control/evidence/risk/audit source tables, provider credentials, model clients, or authoritative GRC commands.
 
-The first slice implements `cwl.grc.analytics.intent.v1` and `cwl.grc.analytics.query-plan.v1`. A plan contains allowlisted dimensions, measures, filters, an explicit business/effective or system-recorded time axis, verified principal/tenant/workspace/purpose coordinates, an authorization-decision reference, and a bounded result limit. It contains no raw SQL field.
+The first slice implements `cwl.grc.analytics.intent.v1` and `cwl.grc.analytics.query-plan.v1`. A plan contains allowlisted dimensions, measures, filters, verified principal/tenant/workspace/purpose coordinates, an authorization-decision reference, and a bounded result limit. A time range is optional; when supplied, it must carry an explicit business/effective or system-recorded time axis and timezone-aware endpoints. The plan contains no raw SQL field.
 
 Natural-language processing and grounded answer synthesis must cross an Anti-Corruption Layer to `contextual-orchestrator`. The GRC repository must not directly call OpenAI, Anthropic, NVIDIA NIM, OpenRouter, Bytez, or another provider API for interactive analytics. The orchestration boundary may propose a structured intent; GRC validates and authorizes that intent before any read execution.
 
@@ -26,7 +26,7 @@ The version-one planner fails closed with typed outcomes:
 
 - `not_authorized` when requested semantic fields exceed the verified field policy;
 - `insufficient_evidence` when the authorized projection does not contain the requested fields;
-- `unsupported_analysis` for unsupported schema versions, semantic fields, operators, temporal axes, invalid receipt identifiers, invalid question hashes, or out-of-bounds requests.
+- `unsupported_analysis` for unsupported schema versions, malformed intent shapes, semantic fields, operators, temporal axes, invalid receipt identifiers, invalid question hashes, or out-of-bounds requests.
 
 A framework requirement row, evidence record, or evidence binding is never equivalent to control effectiveness or compliance status. Risk scores, control-effectiveness values, freshness calculations, aggregates, filters, sorting, and temporal selection are deterministic read-model/executor responsibilities rather than LLM calculations.
 
