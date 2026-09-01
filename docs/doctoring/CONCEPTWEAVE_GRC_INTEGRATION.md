@@ -16,20 +16,24 @@ Snapshot date: 2026-09-01
 ## Cross-repository coordinates
 
 - GRC integration issue: `ContextualWisdomLab/governance-risk-compliance#63`
-- GRC Analytics parent: `ContextualWisdomLab/governance-risk-compliance#62`
+- GRC Analytics parent: `ContextualWisdomLab/governance-risk-compliance#62`, current stack coordinate `72e0120085430a269a73c0503bcab307fd2e645c`
 - GRC semantic-client stacked implementation: `ContextualWisdomLab/governance-risk-compliance#64`
 - ConceptWeave Generation vertical: `ContextualWisdomLab/ConceptWeave#2`
 - ConceptWeave Client/release contract: `ContextualWisdomLab/ConceptWeave#3`
 
-These issue and PR numbers are navigation aids, not immutable runtime contract identifiers. Implementations must bind released semantic artifacts to their own version/digest/provenance coordinates.
+These issue, PR, and branch-head coordinates are traceability aids, not immutable runtime contract identifiers. Implementations must bind released semantic artifacts to their own version/digest/provenance coordinates, and live GitHub state must be re-read before integration.
 
 ## TDD evidence
 
 The GRC child started with a test-only specification. Exact head `15162eb4d8bca7fcbe8249524b47c7f6b6729b8a` was checked out by Product workflow run `33481862830`; lint and docstring gates passed, while pytest failed during collection with `ModuleNotFoundError` for the intentionally absent `cwl_grc.analytics.application.semantic_model`. This is the RED evidence for the new boundary.
 
-The production implementation introduced `SemanticModelClientPort`, immutable `SemanticReleaseRef`, publication-state coordinates, and fail-closed `require_published_release`. Exact implementation head `d4bb099ac2f68fa7e0d25904fc9b44717b056095` passed Product workflow run `33482003991`, including exact-source verification, Ruff, Interrogate 100%, tests/branch coverage at repository threshold, compile, lock freshness, and clean-tree verification.
+The initial production implementation introduced `SemanticModelClientPort`, immutable `SemanticReleaseRef`, publication-state coordinates, and fail-closed `require_published_release`.
 
-Any later head movement invalidates those run identities as merge evidence; the current exact head must be revalidated.
+A later degraded-mode regression found that malformed non-string digest input could escape the consumer boundary as a raw Python exception. Test-only exact head `994b7d99627b49391f6a36790fe2ea39d01ab48a` was checked out by Product workflow run `33490857219`, job `99801746540`; lint and docstrings passed, then tests/coverage failed. This is the RED evidence for the typed malformed-release failure contract required by GRC #63 acceptance criterion 6.
+
+The minimal causal repair validates digest type/length/hex shape before regex evaluation and raises `SemanticReleaseValidationError` for malformed release coordinates. Exact source-fix head `e7a97bd406ad97db4a36f6a1746e6bbc6b288374` passed Product workflow run `33491038085`, job `99802333337`, including exact-source verification, runner hardening, hash-locked install, Ruff, docstrings, tests/coverage, compile, lock freshness, and clean-tree verification.
+
+Documentation-only commits after that source-fix head do not transfer its hosted evidence to a later exact PR head. The current exact head must always be revalidated before review or integration.
 
 ## Required end-to-end acceptance
 
@@ -48,4 +52,4 @@ A production-complete integration requires all of the following:
 
 ## Degraded mode
 
-If ConceptWeave or an online matching service is unavailable, GRC may continue core policy/control/evidence transactions and may consume a locally cached release whose version, integrity, authorization applicability, and support window are still valid. It must not silently fall back to an unvalidated ontology, Naive RAG, raw vector similarity, or an LLM-generated semantic model. If no valid semantic release is available, semantic analysis fails closed with an actionable typed outcome while authoritative GRC operations continue.
+If ConceptWeave or an online matching service is unavailable, GRC may continue core policy/control/evidence transactions and may consume a locally cached release whose version, integrity, authorization applicability, and support window are still valid. It must not silently fall back to an unvalidated ontology, Naive RAG, raw vector similarity, or an LLM-generated semantic model. Proposed, superseded, unknown-version, malformed, or integrity-invalid release coordinates must fail semantic analysis closed with an actionable typed outcome while authoritative GRC operations continue.
