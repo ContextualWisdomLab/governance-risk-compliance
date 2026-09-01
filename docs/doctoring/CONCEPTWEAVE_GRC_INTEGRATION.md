@@ -33,7 +33,11 @@ A later degraded-mode regression found that malformed non-string digest input co
 
 The minimal causal repair validates digest type/length/hex shape before regex evaluation and raises `SemanticReleaseValidationError` for malformed release coordinates. Exact source-fix head `e7a97bd406ad97db4a36f6a1746e6bbc6b288374` passed Product workflow run `33491038085`, job `99802333337`, including exact-source verification, runner hardening, hash-locked install, Ruff, docstrings, tests/coverage, compile, lock freshness, and clean-tree verification.
 
-Documentation-only commits after that source-fix head do not transfer its hosted evidence to a later exact PR head. The current exact head must always be revalidated before review or integration.
+A further consumer-boundary defect allowed a published release with empty, whitespace-only, or non-string `release_id` / `schema_version` coordinates to pass local validation. The test-only exact head `5c78844f784cf87f8ec000bdcc9927fa26530923` was checked out by Product workflow run `33495770373`, job `99817487833`; exact-source verification, Ruff, and docstrings passed before the tests/coverage step failed on all six malformed coordinate cases. The causal source repair rejects those incomplete coordinates with `SemanticReleaseValidationError` before any supplier adapter can be invoked. Exact source-fix head `7f617feb8da8c5c5066eaf2027bbfae678eb2664` passed Product workflow run `33495993046`, job `99818202657`, including exact-source verification, runner hardening, hash-locked install, Ruff, docstrings, tests/branch coverage, compile, lock freshness, and clean-tree verification.
+
+These local coordinate-shape checks do not guess ConceptWeave's wire schema. Supported schema versions, release provenance, signature policy, support window, and digest-to-content integrity remain deferred to the concrete adapter against ConceptWeave's published Client P0 contract.
+
+Documentation-only commits after a source-fix head do not transfer its hosted evidence to a later exact PR head. The current exact head must always be revalidated before review or integration.
 
 ## Required end-to-end acceptance
 
