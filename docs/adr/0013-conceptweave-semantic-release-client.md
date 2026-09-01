@@ -15,7 +15,7 @@ GRC is authoritative for policy, obligation, control, implementation, evidence, 
 
 GRC Analytics consumes ConceptWeave through a provider-neutral `SemanticModelClientPort` in the Analytics **application** layer. GRC does not import ConceptWeave generator internals, prompts, provider DTOs, credentials, or persistence models.
 
-The first consumer invariant is deliberately fail-closed: authoritative GRC semantic analysis may consume only a `Published` semantic release with an immutable lowercase SHA-256 content coordinate. Proposed or superseded releases are not authoritative input. A later concrete adapter must additionally validate ConceptWeave's published schema/version, provenance, compatibility, and any signature policy without weakening this invariant.
+The first consumer invariant is deliberately fail-closed: authoritative GRC semantic analysis may consume only a `Published` semantic release with an immutable lowercase SHA-256 content coordinate. Proposed or superseded releases are not authoritative input. Malformed release coordinates must fail with the typed GRC semantic-release validation error instead of leaking provider/library/runtime exception shapes. A later concrete adapter must additionally validate ConceptWeave's published schema/version, provenance, compatibility, and any signature policy without weakening this invariant.
 
 The port does not grant data access. Keyverse-backed tenant/workspace/purpose/resource authorization occurs independently, and a semantic release cannot widen the caller's GRC projection. ConceptWeave concept identifiers and physical mappings describe meaning over GRC-owned facts; they do not replace or mutate those facts.
 
@@ -54,6 +54,8 @@ flowchart LR
 
 ## Verification
 
-PR #64 uses TDD. Its test-only RED head failed because `cwl_grc.analytics.application.semantic_model` did not exist. The subsequent production implementation makes the published-release, SHA-256, and provider-neutral structural-port tests pass while preserving PR #62's Analytics dependency fitness rule.
+PR #64 uses TDD. Its initial test-only RED head `15162eb4d8bca7fcbe8249524b47c7f6b6729b8a` failed because `cwl_grc.analytics.application.semantic_model` did not exist; the subsequent implementation established the provider-neutral port and publication/digest invariants.
+
+A second test-first repair exercised the degraded-mode malformed-release boundary. Exact RED head `994b7d99627b49391f6a36790fe2ea39d01ab48a` ran in Product `33490857219` / job `99801746540`: lint and docstrings passed before tests/coverage failed because a non-string digest escaped as a raw Python error. Exact source-fix head `e7a97bd406ad97db4a36f6a1746e6bbc6b288374` passed Product `33491038085` / job `99802333337`, including exact-source verification, Ruff, docstrings, tests/coverage, compile, lock freshness, and clean-tree verification. Later documentation commits require their own exact-head hosted revalidation; predecessor success is traceability evidence only.
 
 The concrete ConceptWeave adapter is intentionally deferred until ConceptWeave #3 publishes the actual versioned release/client contract; GRC must not invent an endpoint or wire schema first.
