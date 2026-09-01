@@ -47,6 +47,28 @@ Framework requirements, evidence existence, ontology relations, lineage inferenc
 
 Prompt-injection strings contained in internal documents, external pages, search snippets, metadata, or evidence attachments are evidence data only. They cannot change tenant/purpose authorization, query policy, source-validation policy, or tool authority.
 
+## Research traceability
+
+The architecture uses stable standards for provenance and graph validation rather than treating retrieved text as self-authenticating truth. W3C PROV-O is a Recommendation for representing entities, activities, agents, derivations, and provenance relationships. W3C SHACL is a Recommendation for validating RDF graphs against explicit shapes and is therefore the normative baseline for future ontology/Evidence Graph conformance; later SHACL drafts are not silently treated as released requirements. These standards support the product contract's requirement to retain source/origin, relation status, and validation evidence instead of collapsing all retrieved material into one untyped chunk store.
+
+SearXNG's current Search API documentation (`2026.8.29+d226b78bc`) describes a metasearch query interface and configurable result formats. It does not make returned snippets authoritative evidence. The GRC contract therefore treats search output as candidate discovery only and requires a separate source-fetch, validation, provenance, authority, and citation receipt before external material enters the Evidence Graph.
+
+Lewis et al. (2020) introduced retrieval-augmented generation as a combination of parametric and non-parametric memory while explicitly identifying provenance and world-knowledge updating as open problems for knowledge-intensive generation. That research supports using retrieval as an evidence-access mechanism, not as a replacement for deterministic semantic measures, source validation, authorization, or governance truth. NIST AI 600-1 supplies a current cross-sectoral GenAI risk-management profile, while OWASP LLM01:2025 explicitly notes that RAG and fine-tuning do not fully mitigate prompt-injection risk. Accordingly, the GRC design treats external and retrieved instructions as untrusted data, preserves deterministic authorization/tool boundaries, and requires evidence-bound synthesis rather than prompt authority.
+
+### APA 7 references
+
+Autio, C., Schwartz, R., Dunietz, J., Jain, S., Stanley, M., Tabassi, E., Hall, P., & Roberts, K. (2024). *Artificial intelligence risk management framework: Generative artificial intelligence profile* (NIST AI 600-1). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.AI.600-1
+
+Lewis, P., Perez, E., Piktus, A., Petroni, F., Karpukhin, V., Goyal, N., Küttler, H., Lewis, M., Yih, W.-T., Rocktäschel, T., Riedel, S., & Kiela, D. (2020). Retrieval-augmented generation for knowledge-intensive NLP tasks. *Advances in Neural Information Processing Systems, 33*. https://proceedings.neurips.cc/paper/2020/hash/6b493230205f780e1bc26945df7481e5-Abstract.html
+
+OWASP GenAI Security Project. (2025). *LLM01:2025 prompt injection*. https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+SearXNG contributors. (2026). *Search API* (Documentation version 2026.8.29+d226b78bc). Retrieved September 1, 2026, from https://docs.searxng.org/dev/search_api.html
+
+World Wide Web Consortium. (2013). *PROV-O: The PROV ontology*. https://www.w3.org/TR/prov-o/
+
+World Wide Web Consortium. (2017). *Shapes Constraint Language (SHACL)*. https://www.w3.org/TR/shacl/
+
 ## Verification performed for this slice
 
 The Analytics contract and architecture suites preserve the repository's 100% owned-production statement and branch coverage requirement. Review-driven regression coverage verifies DST-fold ordering by actual instant, valid extreme-offset boundary dates without UTC-conversion overflow, malformed runtime intents as typed abstentions instead of exceptions, resource bounds before collection scans, strict Analytics dependency ownership, and the non-overridable read-only plan invariant.
