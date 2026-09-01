@@ -22,12 +22,17 @@ def _absolute_imports(path: Path) -> set[str]:
 
 
 def _domain_imports_respect_boundary(path: Path) -> bool:
-    """Apply the current domain/application separation rule to one Python module."""
+    """Allow domain modules to use stdlib or their own domain package, never the facade."""
 
-    return not any(
-        module.startswith("cwl_grc.analytics.application")
-        for module in _absolute_imports(path)
-    )
+    for module in _absolute_imports(path):
+        if module.split(".", 1)[0] != "cwl_grc":
+            continue
+        if module == "cwl_grc.analytics.domain":
+            continue
+        if module.startswith("cwl_grc.analytics.domain."):
+            continue
+        return False
+    return True
 
 
 def test_analytics_is_a_named_bounded_context_with_explicit_layers():
