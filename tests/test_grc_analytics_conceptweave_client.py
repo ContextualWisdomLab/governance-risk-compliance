@@ -81,6 +81,16 @@ def test_malformed_release_identity_and_schema_fail_with_typed_error(
         require_published_release(malformed)
 
 
+@pytest.mark.parametrize("field_name", ["release_id", "schema_version"])
+def test_release_coordinates_are_bounded_before_string_processing(field_name: str) -> None:
+    """Reject oversized coordinates before supplier-controlled strings are normalized."""
+
+    oversized = replace(_release(), **{field_name: "x" * 1025})
+
+    with pytest.raises(SemanticReleaseValidationError, match="1024"):
+        require_published_release(oversized)
+
+
 def test_semantic_model_client_port_is_structural_and_provider_neutral() -> None:
     class FakeClient:
         def validate_release(self, release: SemanticReleaseRef) -> SemanticReleaseRef:
