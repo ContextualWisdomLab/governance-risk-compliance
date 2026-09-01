@@ -8,6 +8,8 @@ INTENT_SCHEMA_VERSION = "cwl.grc.analytics.intent.v1"
 QUERY_PLAN_SCHEMA_VERSION = "cwl.grc.analytics.query-plan.v1"
 READ_MODEL_VERSION = "cwl.grc.analytics.read-model.v1"
 MAX_RESULT_ROWS = 500
+MAX_FILTER_COUNT = 64
+MAX_FILTER_VALUES = 100
 
 DIMENSION_CODES = frozenset(
     {
