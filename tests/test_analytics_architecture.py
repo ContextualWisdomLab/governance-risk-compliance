@@ -88,3 +88,12 @@ def test_domain_import_policy_rejects_relative_escape(tmp_path):
     )
 
     assert not _domain_imports_respect_boundary(probe)
+
+
+def test_domain_import_policy_rejects_third_party_dependency(tmp_path):
+    """A domain module must not smuggle an undeclared third-party runtime dependency."""
+
+    probe = tmp_path / "third_party_bypass.py"
+    probe.write_text("import requests\n", encoding="utf-8")
+
+    assert not _domain_imports_respect_boundary(probe)
