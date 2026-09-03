@@ -4,11 +4,17 @@ on:
   push:
     paths-ignore:
       - "docs/**"
-      - "*.md"
+      - "AGENTS.md"
+      - "CHANGELOG.md"
+      - "CLAUDE.md"
+      - "README.md"
   pull_request:
     paths-ignore:
       - "docs/**"
-      - "*.md"
+      - "AGENTS.md"
+      - "CHANGELOG.md"
+      - "CLAUDE.md"
+      - "README.md"
   workflow_dispatch:
 
 permissions:
