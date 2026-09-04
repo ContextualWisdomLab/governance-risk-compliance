@@ -4,6 +4,8 @@
 
 ### Added
 
+- Apache License 2.0 for ContextualWisdomLab original source and documentation, with matching package license metadata.
+- Public repository navigation with an Ask DeepWiki entry and a bounded `docs/index.md` landing-page source; Pages publication remains a separate protected-integration and deployment concern.
 - Versioned policy authoring: `policy_document`, `policy_version`, and `policy_control_mapping` mapped only to official catalog identifiers.
 - Policy-gap query that reuses `control_evidence_binding` (no second evidence model).
 - Officer home form to author a policy and see uncovered policy requirements.
