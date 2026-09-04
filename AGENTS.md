@@ -16,6 +16,14 @@ Build ContextualWisdomLab GRC as the system of record for policy, control, risk,
 - Never dummy-commit or force-push.
 - Work only in the authorized cloud environment.
 
+## GRC Analytics rules
+
+- `cwl_grc.analytics` is a read-only Supporting Bounded Context. Policy, control, evidence, risk, audit, and remediation state remain owned by their authoritative GRC contexts.
+- Interactive LLM analysis crosses an Anti-Corruption Layer to `contextual-orchestrator`; this repository does not own provider credentials or call provider APIs directly for analytics.
+- Never execute model-produced raw SQL. Analytics accepts a versioned semantic intent/query-plan contract and later translates it only through an allowlisted, read-only deterministic executor.
+- Risk scores, control effectiveness, compliance status, audit conclusions, freshness, aggregates, and temporal selection are deterministic domain/read-model computations, not LLM calculations.
+- `not_authorized`, `insufficient_evidence`, and `unsupported_analysis` are typed product outcomes. Do not replace them with guessed answers or silent scope widening.
+
 ## Database rules
 
 - Owned objects use two-or-more-word `snake_case` names.
