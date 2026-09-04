@@ -10,8 +10,8 @@ from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Resp
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from cwl_grc.authorization import PurposeCode, require_purpose, seed_authorization_purposes
-from cwl_grc.catalog import FrameworkCode, list_control_items, seed_control_catalog
+from cwl_grc.authorization import PurposeCode, require_purpose
+from cwl_grc.catalog import FrameworkCode, list_control_items
 from cwl_grc.coverage import list_uncovered_controls
 from cwl_grc.database import create_session_factory, session_dependency
 from cwl_grc.encryption import EvidenceCipher
@@ -30,6 +30,9 @@ from cwl_grc.policy import (
     serialize_policy,
 )
 from cwl_grc.remote_access import request_is_local
+
+
+SCHEMA_MODES = frozenset({"development", "runtime"})
 
 
 def parse_framework(value: str | None) -> FrameworkCode | None:
@@ -59,24 +62,25 @@ def create_app(
     *,
     database_url: str | None = None,
     evidence_key: str | None = None,
+    schema_mode: str | None = None,
 ) -> FastAPI:
-    """Build a local-only GRC app with durable-key enforcement."""
+    """Build a loopback-only GRC app under an explicit schema-ownership profile."""
     url = database_url or os.environ.get(
         "CWL_GRC_DATABASE_URL",
         "sqlite:///grc_product.sqlite",
     )
+    mode = schema_mode or os.environ.get("CWL_GRC_SCHEMA_MODE", "development")
+    if mode not in SCHEMA_MODES:
+        allowed = ", ".join(sorted(SCHEMA_MODES))
+        raise ValueError(f"CWL GRC schema mode must be one of: {allowed}.")
     key = evidence_key if evidence_key is not None else os.environ.get(
         "CWL_GRC_EVIDENCE_KEY"
     )
-    factory = create_session_factory(url)
     cipher = EvidenceCipher(
         key,
         allow_ephemeral=url in {"sqlite://", "sqlite:///:memory:"},
     )
-    with factory() as session:
-        seed_control_catalog(session)
-        seed_authorization_purposes(session)
-        session.commit()
+    factory = create_session_factory(url, manage_schema=mode == "development")
 
     def get_session() -> Iterator[Session]:
         """Yield the request session."""
@@ -84,6 +88,7 @@ def create_app(
 
     app = FastAPI(title="CWL GRC", version="0.1.0")
     app.state.evidence_cipher = cipher
+    app.state.schema_mode = mode
 
     @app.middleware("http")
     async def enforce_developer_preview_boundary(

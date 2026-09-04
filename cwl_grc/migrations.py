@@ -5,94 +5,109 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime, timezone
 
-from sqlalchemy import Engine, inspect, text
+from sqlalchemy import Connection, Engine, inspect, text
 
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
 
 
-def apply_schema_migrations(engine: Engine) -> None:
-    """Upgrade an existing first-slice store before installing integrity guards."""
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                """
-                CREATE TABLE IF NOT EXISTS schema_migration (
-                    migration_key VARCHAR(64) PRIMARY KEY,
-                    applied_at TIMESTAMP NOT NULL
-                )
-                """
+def apply_schema_migrations(bind: Engine | Connection) -> None:
+    """Apply first-slice schema upgrades using an engine or existing transaction."""
+    if isinstance(bind, Engine):
+        with bind.begin() as connection:
+            _apply_schema_migrations(connection)
+        return
+    _apply_schema_migrations(bind)
+
+
+def _apply_schema_migrations(connection: Connection) -> None:
+    """Apply missing schema changes on one caller-owned transaction."""
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migration (
+                migration_key VARCHAR(64) PRIMARY KEY,
+                applied_at TIMESTAMP NOT NULL
             )
+            """
         )
-        applied = connection.execute(
-            text(
-                "SELECT migration_key FROM schema_migration "
-                "WHERE migration_key = :migration_key"
-            ),
-            {"migration_key": POLICY_INTEGRITY_MIGRATION},
-        ).scalar_one_or_none()
-        if applied is not None:
-            return
+    )
+    applied = connection.execute(
+        text(
+            "SELECT migration_key FROM schema_migration "
+            "WHERE migration_key = :migration_key"
+        ),
+        {"migration_key": POLICY_INTEGRITY_MIGRATION},
+    ).scalar_one_or_none()
+    if applied is not None:
+        return
 
-        inspector = inspect(connection)
-        additions = (
-            (
-                "policy_document",
-                "current_version_number",
-                "ALTER TABLE policy_document ADD COLUMN "
-                "current_version_number INTEGER NOT NULL DEFAULT 0",
-            ),
-            (
-                "policy_version",
-                "is_finalized",
-                "ALTER TABLE policy_version ADD COLUMN "
-                "is_finalized BOOLEAN NOT NULL DEFAULT TRUE",
-            ),
-        )
-        for table_name, column_name, statement in additions:
-            columns = {column["name"] for column in inspector.get_columns(table_name)}
-            if column_name not in columns:
-                connection.execute(text(statement))
-                inspector = inspect(connection)
-
-        connection.execute(
-            text(
-                """
-                UPDATE policy_document
-                SET current_version_number = COALESCE(
-                    (
-                        SELECT MAX(policy_version.version_number)
-                        FROM policy_version
-                        WHERE policy_version.policy_document_id =
-                              policy_document.policy_document_id
-                    ),
-                    0
-                )
-                WHERE current_version_number = 0
-                """
-            )
-        )
-        connection.execute(
-            text("UPDATE policy_version SET is_finalized = TRUE WHERE is_finalized IS NULL")
-        )
-        connection.execute(
-            text(
-                "INSERT INTO schema_migration (migration_key, applied_at) "
-                "VALUES (:migration_key, :applied_at)"
-            ),
-            {
-                "migration_key": POLICY_INTEGRITY_MIGRATION,
-                "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
-            },
-        )
-
-
-def install_integrity_guards(engine: Engine) -> None:
-    """Install idempotent database triggers for append-only and finalized rows."""
-    statements = integrity_guard_statements(engine.dialect.name)
-    with engine.begin() as connection:
-        for statement in statements:
+    inspector = inspect(connection)
+    additions = (
+        (
+            "policy_document",
+            "current_version_number",
+            "ALTER TABLE policy_document ADD COLUMN "
+            "current_version_number INTEGER NOT NULL DEFAULT 0",
+        ),
+        (
+            "policy_version",
+            "is_finalized",
+            "ALTER TABLE policy_version ADD COLUMN "
+            "is_finalized BOOLEAN NOT NULL DEFAULT TRUE",
+        ),
+    )
+    for table_name, column_name, statement in additions:
+        columns = {column["name"] for column in inspector.get_columns(table_name)}
+        if column_name not in columns:
             connection.execute(text(statement))
+            inspector = inspect(connection)
+
+    connection.execute(
+        text(
+            """
+            UPDATE policy_document
+            SET current_version_number = COALESCE(
+                (
+                    SELECT MAX(policy_version.version_number)
+                    FROM policy_version
+                    WHERE policy_version.policy_document_id =
+                          policy_document.policy_document_id
+                ),
+                0
+            )
+            WHERE current_version_number = 0
+            """
+        )
+    )
+    connection.execute(
+        text("UPDATE policy_version SET is_finalized = TRUE WHERE is_finalized IS NULL")
+    )
+    connection.execute(
+        text(
+            "INSERT INTO schema_migration (migration_key, applied_at) "
+            "VALUES (:migration_key, :applied_at)"
+        ),
+        {
+            "migration_key": POLICY_INTEGRITY_MIGRATION,
+            "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
+        },
+    )
+
+
+def install_integrity_guards(bind: Engine | Connection) -> None:
+    """Install idempotent database triggers on an engine or existing transaction."""
+    if isinstance(bind, Engine):
+        with bind.begin() as connection:
+            _install_integrity_guards(connection)
+        return
+    _install_integrity_guards(bind)
+
+
+def _install_integrity_guards(connection: Connection) -> None:
+    """Install dialect-specific guards on one caller-owned transaction."""
+    for statement in integrity_guard_statements(connection.dialect.name):
+        connection.execute(text(statement))
 
 
 def integrity_guard_statements(dialect_name: str) -> Sequence[str]:

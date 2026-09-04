@@ -33,7 +33,7 @@ def test_framework_labels_are_exhaustive() -> None:
 
 
 def test_seed_is_idempotent_and_keeps_official_identifiers() -> None:
-    factory = create_session_factory("sqlite://")
+    factory = create_session_factory("sqlite://", manage_schema=True)
     with factory() as session:
         seed_control_catalog(session)
         seed_control_catalog(session)
@@ -120,6 +120,7 @@ def test_main_binds_only_loopback(monkeypatch) -> None:  # noqa: ANN001
         "CWL_GRC_EVIDENCE_KEY",
         "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
     )
+    monkeypatch.setenv("CWL_GRC_DATABASE_URL", "sqlite://")
     from cwl_grc.__main__ import main
 
     main()
