@@ -69,6 +69,15 @@ def test_product_workflow_rejects_any_dirty_tree() -> None:
     assert 'test -z "$(git status --porcelain)"' in workflow
 
 
+def test_product_workflow_only_cancels_superseded_pull_request_heads() -> None:
+    workflow = (
+        REPOSITORY_ROOT / ".github/workflows/product.yml"
+    ).read_text(encoding="utf-8")
+    assert "${{ github.workflow }}-${{ github.repository }}" in workflow
+    assert "${{ github.event.pull_request.number || github.run_id }}" in workflow
+    assert "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in workflow
+
+
 def test_architecture_uses_the_registered_health_route() -> None:
     """Architecture diagrams name the exact route registered by FastAPI."""
     architecture = (REPOSITORY_ROOT / "ARCHITECTURE.md").read_text(
