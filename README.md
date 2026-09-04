@@ -83,6 +83,23 @@ app = create_app()
 
 Set `CWL_GRC_EVIDENCE_KEY` for every durable store; startup fails when a persistent database has no key. Ephemeral key generation is limited to explicitly selected in-memory SQLite tests. Set `CWL_GRC_DATABASE_URL` when you are not using the local SQLite file.
 
+## Production readiness evidence
+
+`docs/production/production-readiness.json` is the machine-verifiable register for the
+production work tracked in issue #4 and issues #8 through #15. It is an evidence register,
+not a production certificate: ordinary validation can pass while the emitted
+`production_ready` value remains `false`.
+
+```bash
+uv run python -c \
+  'from cwl_grc.production_readiness import main; raise SystemExit(main())' \
+  docs/production/production-readiness.json
+```
+
+Release promotion must add `--require-ready`; that mode exits non-zero until every gate is
+independently evidenced as ready. See `docs/production/README.md` for the status contract and
+update procedure.
+
 ## Citations
 
 Authoritative identifiers and APA 7th references live in `docs/doctoring/REFERENCES.md`. If a citation and the code disagree, fix the code.

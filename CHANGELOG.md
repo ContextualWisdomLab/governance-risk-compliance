@@ -4,6 +4,9 @@
 
 ### Added
 
+- Machine-verifiable production-readiness manifest for identity, data, recovery, release, operations, API, risk, and audit-product gates.
+- Deterministic readiness validator with ordinary structural validation and fail-closed `--require-ready` release mode.
+- Pinned, least-privilege Production Readiness workflow that checks the exact source revision.
 - Versioned policy authoring: `policy_document`, `policy_version`, and `policy_control_mapping` mapped only to official catalog identifiers.
 - Policy-gap query that reuses `control_evidence_binding` (no second evidence model).
 - Officer home form to author a policy and see uncovered policy requirements.
@@ -23,6 +26,10 @@
 
 ### Security
 
+- Reject malformed or internally inconsistent readiness evidence and prevent release certification while any required gate remains blocked.
+- Recompute readiness-index Git blob coordinates so stale reviewed component references cannot certify a release.
+- Open readiness evidence through a regular-file, no-follow descriptor boundary to prevent final-symlink TOCTOU redirection.
+- Keep structural readiness validation distinct from production certification so green CI cannot erase known blockers.
 - Always deny proxy-forwarded and non-loopback HTTP traffic while the runtime lacks Keyverse-backed identity and tenant authorization; remove the unauthenticated remote-preview bypass entirely.
 - Bind both standalone server entry points to `127.0.0.1`.
 - Require durable Fernet key material for every persistent evidence store; limit ephemeral keys to explicitly selected in-memory tests.
