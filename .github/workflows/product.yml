@@ -2,6 +2,8 @@ name: Product
 
 on:
   push:
+    branches:
+      - develop
     paths-ignore:
       - "docs/**"
       - "AGENTS.md"

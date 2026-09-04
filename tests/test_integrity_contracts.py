@@ -76,6 +76,7 @@ def test_product_workflow_only_cancels_superseded_pull_request_heads() -> None:
     assert "${{ github.workflow }}-${{ github.repository }}" in workflow
     assert "${{ github.event.pull_request.number || github.run_id }}" in workflow
     assert "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in workflow
+    assert "push:\n    branches:\n      - develop" in workflow
 
 
 def test_architecture_uses_the_registered_health_route() -> None:
