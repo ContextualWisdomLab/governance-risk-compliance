@@ -25,7 +25,7 @@ flowchart LR
 
 ## Runtime layers
 
-1. **Officer home**: buyer-oriented HTML that authors a policy, lists policy gaps, and attaches the next evidence in a local preview.
+1. **Officer home**: officer-oriented HTML that authors a policy, lists policy gaps, and attaches the next evidence in a local preview.
 2. **HTTP API**: policy author/revise/list, policy-gap query, catalog list, uncovered query, evidence create, evidence bind, `/healthz`.
 3. **Preview network boundary**: always rejects proxy-forwarded and non-loopback traffic; no runtime override exists before Keyverse authentication.
 4. **CLI tools**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and the local Uvicorn `cwl-grc serve`.
@@ -62,6 +62,12 @@ Policy creation writes an unfinalized `policy_version`, writes its official-cont
 The current HTTP surface is an unauthenticated developer preview. `X-Actor-Id` and `X-Purpose` are audit and purpose declarations, not proof of identity. The application binds its command-line server to loopback and always denies non-loopback or proxy-forwarded traffic. There is no unauthenticated remote-preview override.
 
 Production exposure requires Keyverse-backed OIDC signature, issuer, audience, token-type, tenant, actor, and purpose authorization, plus encrypted transport and deployment controls. Evidence payloads remain encrypted at rest. Every persistent store requires explicit Fernet key material; ephemeral keys exist only for explicitly selected in-memory tests. The product does not destructively mask operational evidence; authenticated views and exports must select only the fields required for the approved purpose and omit unrelated fields. SAST remains a CWL Security lane. OPA/Rego is not part of this kernel.
+
+## Officer-workspace projection boundary
+
+Issue #30 introduces a bounded design authority at `apps/grc-workspace/`, paired with Figma file `ta1jjWSjmADz2BFxka9UPs` and repository Storybook. The fixture is intentionally outside the authoritative domain kernel: it demonstrates how an officer sees `unknown`, `not assessed`, `stale`, `blocked`, and `access denied`, how a posture claim leads to the next action, and how projected summaries expose exact-value tables.
+
+The workspace must consume authenticated GRC contracts when those dependencies integrate; it must not query persistence tables directly or invent a parallel source of truth. Figma/Storybook states are design evidence only. Authentication, tenant/purpose authorization, evidence requests, exports, and data-room grants remain owned by their corresponding GRC/Keyverse contracts. ADR 0012 records the token, accessibility, i18n, component, and ownership decision.
 
 ## Service extraction
 

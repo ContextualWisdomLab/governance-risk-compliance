@@ -1,0 +1,17 @@
+{
+  "name": "cwl-grc-design-authority",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "npm@11.5.2",
+  "scripts": {
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "test:buyer-workspace": "playwright test tests/buyer-workspace.spec.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@storybook/addon-a11y": "10.5.10",
+    "@storybook/web-components-vite": "10.5.10",
+    "storybook": "10.5.10"
+  }
+}

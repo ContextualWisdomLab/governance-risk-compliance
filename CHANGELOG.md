@@ -4,6 +4,16 @@
 
 ### Added
 
+- Storybook CSF `play` functions for the officer workspace covering Accessibility, Touch & Interaction, Performance, Style Selection, Layout & Responsive, Typography & Color, Animation, Forms & Feedback, Navigation, and Charts & Data, with officer/organization language instead of customer-facing “Buyer” copy.
+- Bounded GRC buyer-workspace design slice for issue #30 with a truthful compliance-officer posture projection, explicit `unknown`, `not assessed`, `stale`, `blocked`, and `access denied` states, persistent next actions, and an exact-value table that preserves source version, limitation, and next action.
+- Figma design authority `ta1jjWSjmADz2BFxka9UPs` with desktop/mobile frames, reusable semantic components, and interaction-state contracts paired with repository Storybook.
+- Storybook 10.5.10 Web Components + Vite inventory with accessibility addon coverage for desktop, mobile, stale-evidence, and access-denied states, plus an exact-PR-head build workflow.
+- ADR 0012, buyer-workspace PRD/TRD, and regression tests for design authority, WCAG-oriented keyboard/focus/touch/reduced-motion/responsive/print behavior, and projection/source-of-truth boundaries.
+- Checked-in npm lockfile, Node 24.18.0 pin, and exact-head Chromium interaction checks for keyboard, mobile overflow, print, and truthful preview action edges.
+- Repaired the existing Figma buyer-workspace authority frames after rendered desktop/mobile inspection: the desktop header and panels fill their intended layout, and mobile alert, trace rows, and actions fit the content column without horizontal clipping.
+- Added a dependency-free English/Korean message catalog, locale selector, stable `data-state` identifiers, and browser-tested Storybook/page i18n coverage for the buyer preview.
+- Added the missing exact-value, provenance, limitation, and next-action row for the `Open deficiencies` posture metric.
+- Aligned Storybook with the real workspace markup, added the access-denied request action, clarified the local developer-preview boundary in both locales, repaired CSS lint findings, and added release-specific NIST SP 800-53 Release 5.2.0 sources.
 - Versioned policy authoring: `policy_document`, `policy_version`, and `policy_control_mapping` mapped only to official catalog identifiers.
 - Policy-gap query that reuses `control_evidence_binding` (no second evidence model).
 - Officer home form to author a policy and see uncovered policy requirements.
@@ -35,6 +45,7 @@
 
 ### ADR
 
+- `docs/adr/0012-grc-buyer-workspace-design-authority.md` — Figma and Storybook paired authority, semantic tokens, WCAG 2.2 AA target, exact-value alternatives, i18n contract, and projection ownership boundary.
 - `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
 - `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — preserve external catalogs while adding distinct internal-control definitions, implementations, reviewed mappings, tests, effectiveness results, deficiencies, and purpose-bound evidence usage before risk and audit depend on the model.
