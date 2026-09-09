@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime, timezone
 
-from sqlalchemy import Connection, Engine, inspect, text
+from sqlalchemy import Connection, DateTime, Engine, bindparam, inspect, text
 
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
@@ -87,7 +87,7 @@ def _apply_schema_migrations(connection: Connection) -> None:
         text(
             "INSERT INTO schema_migration (migration_key, applied_at) "
             "VALUES (:migration_key, :applied_at)"
-        ),
+        ).bindparams(bindparam("applied_at", type_=DateTime())),
         {
             "migration_key": POLICY_INTEGRITY_MIGRATION,
             "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
