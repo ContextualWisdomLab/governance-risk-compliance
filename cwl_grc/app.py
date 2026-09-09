@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Awaitable, Callable, Iterator
+from collections.abc import Iterator
 from typing import Any
 
-from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi import Depends, FastAPI, Form, Header, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from cwl_grc.authorization import PurposeCode, require_purpose, seed_authorization_purposes
@@ -29,7 +29,7 @@ from cwl_grc.policy import (
     serialize_gap,
     serialize_policy,
 )
-from cwl_grc.remote_access import request_is_local
+from cwl_grc.remote_access import PreviewBoundaryMiddleware
 
 
 def parse_framework(value: str | None) -> FrameworkCode | None:
@@ -85,29 +85,7 @@ def create_app(
     app = FastAPI(title="CWL GRC", version="0.1.0")
     app.state.evidence_cipher = cipher
 
-    @app.middleware("http")
-    async def enforce_developer_preview_boundary(
-        request: Request,
-        call_next: Callable[[Request], Awaitable[Response]],
-    ) -> Response:
-        """Reject every non-loopback or proxy-forwarded request until real auth exists."""
-        client_host = getattr(request.client, "host", None)
-        local_request = request_is_local(
-            client_host,
-            request.headers.get("x-forwarded-for"),
-            request.headers.get("forwarded"),
-        )
-        if not local_request:
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "detail": (
-                        "Remote preview is disabled. Configure Keyverse-backed identity and "
-                        "tenant authorization before exposing CWL GRC."
-                    )
-                },
-            )
-        return await call_next(request)
+    app.add_middleware(PreviewBoundaryMiddleware)
 
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:

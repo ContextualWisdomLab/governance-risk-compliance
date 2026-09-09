@@ -66,3 +66,22 @@ Production exposure requires Keyverse-backed OIDC signature, issuer, audience, t
 ## Service extraction
 
 The kernel is already a separately importable package. Extracting the process onto its own host must preserve `/healthz`, `/policy-documents`, `/policy-gaps`, `/controls`, `/controls/uncovered`, and the evidence bind contract while replacing the preview boundary with the authenticated Keyverse and tenant-authorization adapter.
+
+## Local HTTP privacy boundary
+
+`PreviewBoundaryMiddleware` in `cwl_grc/remote_access.py` now also binds literal
+local Host and full browser Origin/Referer context before body reads or handler
+execution. Empty forwarding headers and ambiguous sensitive headers fail closed.
+Same-origin forms and intentional non-simple local JSON clients are preserved;
+originless simple mutations are rejected. The middleware does not authenticate
+an actor or tenant. It sends non-cacheable responses with a same-origin referrer
+policy and a restrictive frame/form CSP, preserving exact body frames. The
+same-origin policy is deliberate: no-referrer can null native form Origin under
+the Fetch Standard. No CORS or remote-preview bypass is introduced.
+
+The sequence is `peer -> authority -> browser context -> existing purpose/domain
+handler -> non-cacheable response`. Lifespan passes through; unsupported
+WebSocket sessions close without dispatch. Outer unhandled server errors are
+not claimed to traverse this middleware. The current legacy-language repair,
+Rust replacement conditions, sources and verification limitations are recorded
+in the [Proposed ADR](docs/adr/proposals/privacy_request_boundary.md).

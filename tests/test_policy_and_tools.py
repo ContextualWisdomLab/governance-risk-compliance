@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
 from cwl_grc import create_app
@@ -168,6 +169,7 @@ def test_officer_home_lets_buyer_write_policy_and_see_policy_gaps() -> None:
     assert "Author the next policy" in home.text
     posted = client.post(
         "/officer/policy",
+        headers={"Origin": "http://testserver"},
         data={
             "policy_title": "Account Management Policy",
             "policy_body": "Register and revoke unique accounts.",
@@ -189,7 +191,7 @@ def test_cli_authors_policy_lists_gaps_and_binds_evidence(tmp_path: Path, capsys
     database = tmp_path / "grc_product.sqlite"
     env = {
         "CWL_GRC_DATABASE_URL": f"sqlite:///{database}",
-        "CWL_GRC_EVIDENCE_KEY": "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
+        "CWL_GRC_EVIDENCE_KEY": Fernet.generate_key().decode("ascii"),
     }
     import os
 
@@ -358,6 +360,7 @@ def test_officer_policy_form_rejects_invalid_control_refs() -> None:
     client = _client()
     invalid = client.post(
         "/officer/policy",
+        headers={"Origin": "http://testserver"},
         data={
             "policy_title": "Broken",
             "policy_body": "No",
@@ -368,6 +371,7 @@ def test_officer_policy_form_rejects_invalid_control_refs() -> None:
     assert invalid.status_code == 400
     unknown = client.post(
         "/officer/policy",
+        headers={"Origin": "http://testserver"},
         data={
             "policy_title": "Broken framework",
             "policy_body": "No",
@@ -393,7 +397,7 @@ def test_cli_serve_and_error_paths(tmp_path: Path, capsys, monkeypatch) -> None:
 
     monkeypatch.setenv(
         "CWL_GRC_EVIDENCE_KEY",
-        "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
+        Fernet.generate_key().decode("ascii"),
     )
     monkeypatch.setattr("cwl_grc.cli.uvicorn.run", fake_run)
     assert cli_main(["serve"]) == 0
@@ -406,7 +410,7 @@ def test_cli_serve_and_error_paths(tmp_path: Path, capsys, monkeypatch) -> None:
     assert cli_main(["policy"]) == 2
     database = tmp_path / "grc_errors.sqlite"
     monkeypatch.setenv("CWL_GRC_DATABASE_URL", f"sqlite:///{database}")
-    monkeypatch.setenv("CWL_GRC_EVIDENCE_KEY", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
+    monkeypatch.setenv("CWL_GRC_EVIDENCE_KEY", Fernet.generate_key().decode("ascii"))
     assert (
         cli_main(
             [

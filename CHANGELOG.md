@@ -4,6 +4,11 @@
 
 ### Added
 
+- Privacy obligation/owner/action register and primary-law doctoring, with
+  applicable/current/future rules separated from unverified organizational facts.
+- Privacy boundary and full-route regressions; existing form tests keep their
+  assertions and explicitly supply legitimate same-origin context.
+
 - Versioned policy authoring: `policy_document`, `policy_version`, and `policy_control_mapping` mapped only to official catalog identifiers.
 - Policy-gap query that reuses `control_evidence_binding` (no second evidence model).
 - Officer home form to author a policy and see uncovered policy requirements.
@@ -23,6 +28,15 @@
 
 ### Security
 
+- Replace fixed Fernet literals in the modified operator tests with runtime-generated ephemeral test keys.
+
+- Reject untrusted local HTTP authorities, mismatched/null browser origins,
+  ambiguous headers and present-empty proxy metadata before preview handlers
+  consume a body or mutate policy/evidence state (GRC #69).
+- Preserve exact permitted payloads while setting no-store, same-origin referrer
+  policy, nosniff and restrictive framing/form policies. The same-origin policy
+  avoids nulling legitimate native form Origin; no CORS or identity bypass added.
+
 - Always deny proxy-forwarded and non-loopback HTTP traffic while the runtime lacks Keyverse-backed identity and tenant authorization; remove the unauthenticated remote-preview bypass entirely.
 - Bind both standalone server entry points to `127.0.0.1`.
 - Require durable Fernet key material for every persistent evidence store; limit ephemeral keys to explicitly selected in-memory tests.
@@ -38,3 +52,5 @@
 - `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
 - `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — preserve external catalogs while adding distinct internal-control definitions, implementations, reviewed mappings, tests, effectiveness results, deficiencies, and purpose-bound evidence usage before risk and audit depend on the model.
+- `docs/adr/proposals/privacy_request_boundary.md` — Proposed local request
+  boundary, legacy repair limits, Rust transition conditions and release evidence.
