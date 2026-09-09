@@ -1,6 +1,29 @@
 # Product and technical gap baseline
 
-## Current privacy repair snapshot — 2026-09-09
+## Current continuation — 2026-09-10
+
+PR #70 continuation source: `40af8a09785e8e77181296788eabd939c057198a`.
+The non-reflecting request-validation handler is implemented in the existing
+HTTP boundary; 125 component cases pass with 122 statements and 56 branches
+fully covered in that module. Six actual GRC route cases are added for the
+full locked Product lane. No production or legal-compliance closure is claimed.
+
+The [continuation evidence and historical interpretation](product/privacy_continuation_20260910.md)
+records the two review repairs, live #32/#33 merge metadata and predecessor
+hosted runs. The preserved archive's early #32/#33 paragraphs are historical
+claims with individual observation time not established, not current PR state.
+Its generation date does not establish each paragraph's observation time.
+The original archive blob and all valid deltas remain unchanged.
+
+The [source register](doctoring/privacy_law_sources.md) now records
+`clause_text_verified` separately from `applicability_reviewed`; all
+organization-specific applicability reviews remain unverified. Protective
+controls stay active while unverified automatic interpretations/exemptions
+remain unavailable. Current-head checks and independent review are still
+required. All observations below belong to the older 2026-09-09 snapshot;
+its pending-check descriptions are superseded by the continuation record.
+
+## Historical privacy repair snapshot — 2026-09-09
 
 Repository: `ContextualWisdomLab/governance-risk-compliance`.
 Protected source parent: `develop@529cf321f134e26c0cd379ee53c06ab5297363b6`.

@@ -4,6 +4,10 @@
 
 ### Added
 
+- Selected-clause and organizational-applicability verification states for every privacy-law source, with unknown applicability kept distinct from exemption.
+- Explicit historical interpretation of the preserved #32/#33 snapshots without rewriting the archived source blob.
+- Validation privacy regressions covering arbitrary dictionary keys, invalid values, malformed JSON, forms, bounded errors and actual GRC route registration.
+
 - Privacy obligation/owner/action register and primary-law doctoring, with
   applicable/current/future rules separated from unverified organizational facts.
 - Privacy boundary and full-route regressions; existing form tests keep their
@@ -28,6 +32,7 @@
 
 ### Security
 
+- Replace default request-validation reflection with a bounded HTTP 422 response. Neither rejected values nor caller-supplied dictionary keys, body or exception text are serialized or logged by the handler. Preserve valid payloads and no-store; field-specific Pydantic diagnostics are intentionally no longer public.
 - Replace fixed Fernet literals in the modified operator tests with runtime-generated ephemeral test keys.
 
 - Reject untrusted local HTTP authorities, mismatched/null browser origins,
@@ -54,3 +59,4 @@
 - `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — preserve external catalogs while adding distinct internal-control definitions, implementations, reviewed mappings, tests, effectiveness results, deficiencies, and purpose-bound evidence usage before risk and audit depend on the model.
 - `docs/adr/proposals/privacy_request_boundary.md` — Proposed local request
   boundary, legacy repair limits, Rust transition conditions and release evidence.
+- `docs/adr/proposals/privacy_validation_response.md` — Proposed non-reflecting validation response, compatibility tradeoff, RED/GREEN evidence and release limits.
