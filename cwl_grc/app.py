@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -29,7 +30,7 @@ from cwl_grc.policy import (
     serialize_gap,
     serialize_policy,
 )
-from cwl_grc.remote_access import PreviewBoundaryMiddleware
+from cwl_grc.remote_access import PreviewBoundaryMiddleware, validation_error_response
 
 
 def parse_framework(value: str | None) -> FrameworkCode | None:
@@ -86,6 +87,7 @@ def create_app(
     app.state.evidence_cipher = cipher
 
     app.add_middleware(PreviewBoundaryMiddleware)
+    app.add_exception_handler(RequestValidationError, validation_error_response)
 
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:

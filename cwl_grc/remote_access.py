@@ -5,6 +5,8 @@ from __future__ import annotations
 from ipaddress import ip_address
 from urllib.parse import urlsplit
 
+from fastapi.exceptions import RequestValidationError
+from starlette.requests import Request
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -176,3 +178,23 @@ class PreviewBoundaryMiddleware:
             await rejection_response(request_scope, receive_message, send_private_response)
             return
         await self.application_service(request_scope, receive_message, send_private_response)
+
+
+async def validation_error_response(
+    request_context: Request, validation_error: RequestValidationError,
+) -> JSONResponse:
+    """Return a bounded 422 without reflecting rejected input, keys or exception text."""
+    # Even an error location can contain a caller-supplied dictionary key.
+    # Omitting only the validator's input field does not close that leak.
+    del request_context, validation_error
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": [{
+                "type": "request_validation_failed",
+                "loc": [],
+                "msg": "Check required fields and data types against the API schema.",
+            }],
+        },
+        headers={"Cache-Control": "no-store"},
+    )
