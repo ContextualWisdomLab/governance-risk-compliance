@@ -4,6 +4,7 @@
 
 ### Added
 
+- Timestamped, digest-bound raw component test outputs for the privacy header-retention repair; unarchived historical law and metadata observations remain non-gating.
 - Selected-clause and organizational-applicability verification states for every privacy-law source, with unknown applicability kept distinct from exemption.
 - Explicit historical interpretation of the preserved #32/#33 snapshots without rewriting the archived source blob.
 - Validation privacy regressions covering arbitrary dictionary keys, invalid values, malformed JSON, forms, bounded errors and actual GRC route registration.
@@ -32,6 +33,7 @@
 
 ### Security
 
+- Keep Referer paths/queries and rejected URL credentials out of the shared URL parser cache while preserving exact-origin decisions, valid values and other components' caches. This is not a memory-zeroization or deployment claim.
 - Replace default request-validation reflection with a bounded HTTP 422 response. Neither rejected values nor caller-supplied dictionary keys, body or exception text are serialized or logged by the handler. Preserve valid payloads and no-store; field-specific Pydantic diagnostics are intentionally no longer public.
 - Replace fixed Fernet literals in the modified operator tests with runtime-generated ephemeral test keys.
 
@@ -60,3 +62,4 @@
 - `docs/adr/proposals/privacy_request_boundary.md` — Proposed local request
   boundary, legacy repair limits, Rust transition conditions and release evidence.
 - `docs/adr/proposals/privacy_validation_response.md` — Proposed non-reflecting validation response, compatibility tradeoff, RED/GREEN evidence and release limits.
+- `docs/adr/proposals/privacy_header_retention.md` — Proposed origin-only parsing and source-test evidence retention without invented historical timestamps.

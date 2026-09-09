@@ -1,27 +1,57 @@
 # Product and technical gap baseline
 
-## Current continuation — 2026-09-10
+## Current source repair — header-resource retention
+
+Source parent: PR #70 `72b1f0e4336c73fa0bcd0295a82e942bbaace5dd`.
+The existing local request adapter previously submitted complete Referer URLs
+and rejected userinfo to CPython's process-wide URL parse cache. The repair
+passes only the scheme and authority to the parser, rejecting userinfo and
+resource-bearing Origin values first. It does not alter authorization, valid
+payloads, database retention or the remote-preview prohibition.
+
+The [retained execution receipt](evidence/privacy_header_retention/verification_receipt.json)
+contains actual ISO 8601 UTC start/end times, raw subprocess outputs, exit codes,
+source/test Git OIDs and SHA-256 digests. The original-source negative control
+fails 24 cases with five positive controls passing; the unchanged 29-case set
+passes after repair. Combined with the byte-identical prior component suites,
+154 cases pass and the changed module has 127 statements and 58 branches fully
+covered. These are local source-subset results, not full locked Product, browser,
+release, deployment or organization-wide compliance evidence.
+
+See the [Proposed cache-lifetime decision](adr/proposals/privacy_header_retention.md).
+The source register and earlier continuation now identify unarchived historical
+readings as non-gating. Missing observation instants and raw captures remain
+null; neither midnight nor a commit timestamp is fabricated. Legal applicability,
+interpretation and enacted-rule completeness remain open under #69.
+
+The following records and the separate original archive retain valid historical
+requirements and ancestry; their status words are not fresh observations.
+#18's migration change, Keyverse integration, owner-side CodeQL callbacks,
+httpx2/lock migration, other lifecycle controls and organizational evidence keep
+their independent gates. Nothing below supplies current-head merge admission.
+
+## Historical continuation — 2026-09-10
 
 PR #70 continuation source: `40af8a09785e8e77181296788eabd939c057198a`.
 The non-reflecting request-validation handler is implemented in the existing
-HTTP boundary; 125 component cases pass with 122 statements and 56 branches
-fully covered in that module. Six actual GRC route cases are added for the
-full locked Product lane. No production or legal-compliance closure is claimed.
+HTTP boundary; 125 component cases were reported passing with 122 statements
+and 56 branches fully covered in that module. Six actual GRC route cases were
+added for the full locked Product lane. No production or legal closure is claimed.
 
-The [continuation evidence and historical interpretation](product/privacy_continuation_20260910.md)
-records the two review repairs, live #32/#33 merge metadata and predecessor
+The [continuation narrative and historical interpretation](product/privacy_continuation_20260910.md)
+records the two review repairs, reported #32/#33 merge metadata and predecessor
 hosted runs. The preserved archive's early #32/#33 paragraphs are historical
 claims with individual observation time not established, not current PR state.
 Its generation date does not establish each paragraph's observation time.
 The original archive blob and all valid deltas remain unchanged.
 
-The [source register](doctoring/privacy_law_sources.md) now records
-`clause_text_verified` separately from `applicability_reviewed`; all
-organization-specific applicability reviews remain unverified. Protective
-controls stay active while unverified automatic interpretations/exemptions
-remain unavailable. Current-head checks and independent review are still
-required. All observations below belong to the older 2026-09-09 snapshot;
-its pending-check descriptions are superseded by the continuation record.
+The [source register](doctoring/privacy_law_sources.md) separates source reading,
+retained verification evidence and applicability review. Unarchived readings
+and all organization-specific applicability decisions remain unverified.
+Protective controls stay active while automatic interpretations/exemptions
+remain unavailable. Current-head checks and independent review are required.
+All observations below belong to the older 2026-09-09 snapshot and must not be
+inherited as fresh evidence.
 
 ## Historical privacy repair snapshot — 2026-09-09
 

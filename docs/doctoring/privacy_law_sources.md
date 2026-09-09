@@ -1,37 +1,56 @@
 # Privacy sources and interpretation boundaries
 
-Source and date observations are partial. Selected clause text was re-read on
-2026-09-10; no organization-specific applicability decision or legal approval
-has been established. Advertising is not a source of requirements. Citation
-identifiers below are document-local references, not official control catalog
-identifiers. This is an engineering source register, not an exhaustive legal
-opinion, operational rule engine or certification.
+The 2026-09-09 and 2026-09-10 entries below are historical reading reports.
+Their precise observation instants and archived raw responses were not retained
+in this repository. They are not reproducible verification receipts or fresh
+legal/PR/release/deployment evidence. A reported reading date is neither a
+source publication date nor an effective date. No organization-specific
+applicability decision or legal approval has been established.
 
-## Verification scope
+Advertising is not a source of requirements. Citation identifiers below are
+local references, not official control catalog identifiers. This engineering
+source register is not an exhaustive legal opinion or operational rule engine.
 
-`clause_text_verified=true` applies **only to the named scope**, not the entire
-instrument, subordinate regulations or its applicability to a legal entity.
-`applicability_reviewed=false` means the required entity/processing/deployment
-facts and authorized review have not been established. These are documentary
-states; this change does not implement or activate a legal decision engine.
+## Verification scope and missing observation evidence
 
-| Source | Text scope checked | clause_text_verified | applicability_reviewed | Observation |
-| --- | --- | --- | --- | --- |
-| L1 | Article 29 in the pinned Act No. 20897 edition | true | false | Official clause text read 2026-09-10. |
-| L2 | Article 6 of Notice No. 2026-9; not every notice clause | true | false | Official clause page and effective-date header read 2026-09-10. |
-| L3 | Amendment text and supplementary Articles 1–2 of Act No. 21445 | true | false | Official promulgation text read 2026-09-10; implementing-decree thresholds are not verified here. |
-| L4 | Article 21 in the pinned Act No. 20897 edition | true | false | Official clause text read 2026-09-10. |
-| L5 | Article 28-8 in the official Act No. 20897 page | true | false | Official clause text read 2026-09-10; account contracts and transfer circumstances are not established. |
-| L6 | No complete clause text checked | false | false | Earlier 2026-09-09 listing observation only; not a fresh clause/effective-date verification. |
+For this register, `clause_text_verified=true` requires both a named text scope
+and a retained observation receipt that binds a timezone-qualified ISO 8601
+instant to the actual raw response and its digest. The earlier reading reports
+do not satisfy that evidentiary requirement, so their flags are now false.
+This does not assert that the texts were never read or are incorrect.
+`applicability_reviewed=false` separately means that required entity, processing,
+contract and deployment facts and authorized review remain unestablished.
+These are documentary states, not a newly implemented legal decision engine.
 
-Do not activate an unverified automatic interpretation, exemption or affirmative
-compliance decision. A designated legal/compliance reviewer must establish the
-exact rule and applicable facts first. This does **not** suspend legal duties,
-disable existing safeguards or make unknown applicability equal to exemption.
-Protective controls remain active while uncertain obligations stay open for
-review. Neither a document check nor a test pass grants a legal authorization.
+| Source | Historically reported reading scope | Reported reading date | observed_at | raw_evidence_ref | clause_text_verified | applicability_reviewed |
+| --- | --- | --- | --- | --- | --- | --- |
+| L1 | Article 29 in Act No. 20897 | 2026-09-10 | null | null | false | false |
+| L2 | Article 6 and effective-date header of Notice No. 2026-9 | 2026-09-10 | null | null | false | false |
+| L3 | Amendment and supplementary Articles 1-2 of Act No. 21445 | 2026-09-10 | null | null | false | false |
+| L4 | Article 21 in Act No. 20897 | 2026-09-10 | null | null | false | false |
+| L5 | Article 28-8 in Act No. 20897 | 2026-09-10 | null | null | false | false |
+| L6 | Listing only, no complete clause text | 2026-09-09 | null | null | false | false |
+
+`null` means unavailable, not midnight and not an inferred commit timestamp.
+The date 2026-09-10 remains the reported local reading date; it is not relabeled
+as a future date because its UTC commit was on the preceding calendar day.
+The official URLs below are citations to reacquire, not archived response URLs.
+Before legal activation, a designated reviewer must reacquire the exact edition,
+retain permitted source evidence, and review interpretation and applicability.
+Do not activate unverified interpretations, exemptions or affirmative compliance
+claims. Existing safeguards and legal duties remain in force; unknown is not
+not-applicable.
+
+The same restriction applies to historical T1-T5 access reports below. Their
+`observed_at` and `raw_evidence_ref` are null and their observation-verification
+state is `unverified`. Their citations identify implementation references, not
+proof of a deployed control. A new timestamp must describe a new collection,
+never be backfilled onto the old reading report.
 
 ## Primary legal references (APA 7)
+
+The interpretations below preserve the earlier engineering rationale for review;
+they are not independently verified legal decisions.
 
 - **L1.** 개인정보 보호법, 법률 제20897호 (2025). 시행 2025년 10월 2일.
   [국가법령정보센터 제29조](https://www.law.go.kr/LSW/lsSideInfoP.do?docCls=jo&joBrNo=00&joNo=0029&lsiSeq=270351&urlMode=lsScJoRltInfoR).
@@ -69,21 +88,36 @@ review. Neither a document check nor a test pass grants a legal authorization.
 ## Primary implementation references (APA 7)
 
 - **T1.** OWASP Foundation. (n.d.). *Cross-Site Request Forgery Prevention Cheat
-  Sheet*. Retrieved September 9, 2026, from
+  Sheet*. Reported access date September 9, 2026.
   https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
-- **T2.** Starlette. (n.d.). *Middleware*. Retrieved September 9, 2026, from
+- **T2.** Starlette. (n.d.). *Middleware*. Reported access date September 9, 2026.
   https://www.starlette.io/middleware/
-- **T3.** ASGI. (n.d.). *HTTP & WebSocket ASGI Message Format*. Retrieved
-  September 9, 2026, from https://asgi.readthedocs.io/en/latest/specs/www.html
-- **T4.** WHATWG. (n.d.). *Fetch Standard, section 3.2: Origin header*. Retrieved
-  September 9, 2026, from https://fetch.spec.whatwg.org/#origin-header
-  Native non-CORS POSTs under `no-referrer` receive null Origin; use a compatible
-  same-origin referrer policy instead of weakening null-origin rejection.
-- **T5.** FastAPI. (n.d.). *Handling errors*. Retrieved September 10, 2026, from
-  https://fastapi.tiangolo.com/tutorial/handling-errors/
+- **T3.** ASGI. (n.d.). *HTTP & WebSocket ASGI Message Format*. Reported access
+  date September 9, 2026. https://asgi.readthedocs.io/en/latest/specs/www.html
+- **T4.** WHATWG. (n.d.). *Fetch Standard, section 3.2: Origin header*. Reported
+  access date September 9, 2026. https://fetch.spec.whatwg.org/#origin-header
+  The earlier rationale is that no-referrer may null native form POST Origin;
+  preserve the compatible same-origin policy rather than trust arbitrary null.
+- **T5.** FastAPI. (n.d.). *Handling errors*. Reported access date September 10,
+  2026. https://fastapi.tiangolo.com/tutorial/handling-errors/
   Documents RequestValidationError and the custom-handler extension point.
-  Local regressions separately reproduce rejected values in `input` and
-  caller-supplied dictionary keys in `loc`; removing only `input` is insufficient.
+  The source-subset regressions separately test rejected values and dictionary
+  keys; a citation alone is not execution evidence.
+- **T6.** Python Software Foundation. (n.d.). *urllib.parse: URL parsing security*.
+  https://docs.python.org/3/library/urllib.parse.html#url-parsing-security
+- **T7.** Python Software Foundation. (n.d.). *functools.lru_cache*.
+  https://docs.python.org/3/library/functools.html#functools.lru_cache
+  T6-T7 support defensive parsing and cache-lifetime analysis. Their web-response
+  archives are not retained here; no verified legal-source flag derives from them.
+
+## Reproducible source-test evidence is separate
+
+The new [header-retention execution receipt](../evidence/privacy_header_retention/verification_receipt.json)
+binds actual UTC start/end instants, exact source/test Git OIDs and SHA-256
+values, interpreter/package versions, commands, exit codes and retained raw
+subprocess outputs. It covers component tests, including an original-source
+negative control. It does not stand in for raw legal text, human applicability
+review, full hosted Product, independent review, browser or deployment evidence.
 
 ## Evidence needed before legal or operational closure
 

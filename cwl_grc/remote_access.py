@@ -51,17 +51,24 @@ def normalized_origin(
         return None
     if "\\" in source_value or "#" in source_value:
         return None
+    scheme_name, scheme_separator, remaining_value = source_value.partition("://")
+    if not scheme_separator or scheme_name.lower() not in {"http", "https"}:
+        return None
+    authority_value = remaining_value.split("/", 1)[0].split("?", 1)[0]
+    if "@" in authority_value or "%" in authority_value:
+        return None
+    origin_value = f"{scheme_name}://{authority_value}"
+    if not allow_resource_path and origin_value != source_value:
+        return None
+    # CPython caches urlsplit arguments and results. Never submit Referer
+    # resources or rejected credentials to that process-wide cache.
     try:
-        parsed_value = urlsplit(source_value)
+        parsed_value = urlsplit(origin_value)
         host_name = parsed_value.hostname
         port_number = parsed_value.port
     except ValueError:
         return None
-    if parsed_value.scheme not in {"http", "https"} or not host_name:
-        return None
-    if parsed_value.username is not None or "%" in host_name or parsed_value.netloc.endswith(":"):
-        return None
-    if not allow_resource_path and (parsed_value.path or "?" in source_value):
+    if not host_name or parsed_value.netloc.endswith(":"):
         return None
     if port_number is None:
         port_number = 443 if parsed_value.scheme == "https" else 80
