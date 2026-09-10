@@ -36,6 +36,7 @@
 
 ### Security
 
+- Bind the explicit plaintext PostgreSQL test profile to its validated numeric loopback address; reject alternate query host/hostaddr/port/service selectors. Test-profile `localhost` is explicitly IPv4; IPv6 uses `[::1]`. Verified-TLS production options and normal schema behavior are preserved. Add 27 no-network endpoint contracts with retained original-source RED and fixed-source GREEN evidence; native/hosted verification remains separate.
 - Always deny proxy-forwarded and non-loopback HTTP traffic while the runtime lacks Keyverse-backed identity and tenant authorization; remove the unauthenticated remote-preview bypass entirely.
 - Bind both standalone server entry points to `127.0.0.1`.
 - Require durable Fernet key material for every persistent evidence store; limit ephemeral keys to explicitly selected in-memory tests.
@@ -53,6 +54,7 @@
 
 ### ADR
 
+- `docs/adr/proposals/postgresql_loopback_endpoint.md` — Proposed final-address binding for the plaintext test exception, compatibility, operator guidance, primary sources and verification limits.
 - `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
 - `docs/adr/0006-explicit-postgresql-schema-lifecycle.md` — separate migration ownership from runtime, close the PostgreSQL connection policy, and reject unsupported schema/reference states before traffic.

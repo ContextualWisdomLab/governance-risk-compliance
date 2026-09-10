@@ -1,5 +1,35 @@
 # Product and technical gap baseline
 
+## Current endpoint repair — Proposed
+
+Source parent: PR 18 `56f2399ea2fa97f78afcf4da73aaa67f196a58a9`.
+The opt-in plaintext PostgreSQL test exception checked the URL host, while the
+real SQLAlchemy dialect could select a different query host. The repair rejects
+alternate query endpoint selectors in that exception and binds an explicit
+numeric loopback `hostaddr` in the final driver arguments. Production
+verify-full, ordinary URL ports, stored values and schema behavior remain.
+`localhost` is explicitly IPv4 for the test exception; IPv6 uses `[::1]`.
+
+The [Proposed endpoint decision](adr/proposals/postgresql_loopback_endpoint.md)
+records the causal finding, alternatives, compatibility and operator guidance,
+primary implementation sources and Rust replacement conditions. The
+[execution receipt](evidence/postgresql_endpoint_policy/verification_receipt.json)
+binds actual test instants and source/test hashes: original source 17 failures
+and 10 compatibility passes; fixed source all 27 pass. These are no-network
+unit contracts using actual policy definitions and dialect conversion, not
+native libpq, full locked Product, PostgreSQL integration or deployed evidence.
+The full current-head Product/PostgreSQL/security/review gates remain required.
+
+Only `_build_postgresql_engine` changes in production. The previously blocked
+DB diagnostic candidate remains excluded and unpublished. Neither this repair
+nor the earlier base reconciliation changes permissions, credentials, remote
+access authorization or legal applicability. Program 69 remains open.
+
+The following reconciliation section describes the earlier two-parent commit
+56f2399. Its no-production-change statement applies to that integration only,
+not the separate endpoint repair above. All previous requirements and evidence
+are retained, including the byte-identical historical archive.
+
 ## Schema-lifecycle branch reconciliation — Proposed
 
 This section belongs to the normal integration of protected PR 68 into the

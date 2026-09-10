@@ -1,0 +1,101 @@
+{
+  "schema_version": "1.0",
+  "repository": "ContextualWisdomLab/governance-risk-compliance",
+  "source_parent": "56f2399ea2fa97f78afcf4da73aaa67f196a58a9",
+  "source_path": "cwl_grc/database.py",
+  "test_path": "tests/test_postgresql_endpoint_policy.py",
+  "scope": "27 no-network unit cases execute the actual GRC engine-policy definitions and the real SQLAlchemy psycopg dialect URL conversion. The engine builder alone is captured; no libpq, socket, locked Product or PostgreSQL integration result is asserted.",
+  "environment": {
+    "python_version": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+    "sqlalchemy": "2.0.50",
+    "pytest": "9.0.2",
+    "psycopg_installed": false
+  },
+  "commands": [
+    {
+      "argv": [
+        "/opt/pyvenv/bin/python",
+        "run_endpoint_tests.py",
+        "database_before.py"
+      ],
+      "working_directory": "/mnt/data/grc_endpoint_policy",
+      "started_at": "2026-09-10T00:45:50.993621+00:00",
+      "finished_at": "2026-09-10T00:45:52.908536+00:00",
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "raw_output": "negative_control.log",
+      "raw_output_sha256": "5b63d24e29f62f72edac7ac7481ae0a99e87430221e66c8ad5dd25a5e2758d8e"
+    },
+    {
+      "argv": [
+        "/opt/pyvenv/bin/python",
+        "run_endpoint_tests.py",
+        "database_after.py"
+      ],
+      "working_directory": "/mnt/data/grc_endpoint_policy",
+      "started_at": "2026-09-10T00:45:52.908804+00:00",
+      "finished_at": "2026-09-10T00:45:54.797734+00:00",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "raw_output": "endpoint_contracts.log",
+      "raw_output_sha256": "32d99360871aa7cc85abaff175dba45a6722cbb427a519539bd4d83752b7f7c1"
+    },
+    {
+      "argv": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "compileall",
+        "-q",
+        "database_after.py",
+        "tests/test_postgresql_endpoint_policy.py"
+      ],
+      "working_directory": "/mnt/data/grc_endpoint_policy",
+      "started_at": "2026-09-10T00:45:54.798001+00:00",
+      "finished_at": "2026-09-10T00:45:55.401857+00:00",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "raw_output": "compile_check.log",
+      "raw_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "source_preservation": {
+    "changed_top_level_symbols": [
+      "_build_postgresql_engine"
+    ],
+    "python_3_12_grammar_accepted": true,
+    "all_top_level_production_symbols_documented": true
+  },
+  "files": {
+    "database_before.py": {
+      "git_blob_oid": "9ec92990ee67ee028ffccd7b32dbe798868a42fe",
+      "sha256": "7fd2b056aeea19f224e39173a48c313f2cfc57f25a184a41bbe633e01a665f25",
+      "size_bytes": 17261
+    },
+    "database_after.py": {
+      "git_blob_oid": "8ab3aa77d225e1f4a3808025706740bd74d82b23",
+      "sha256": "aadcec349af325a68b1241dc99ba28490c987c54c18ef66f613e14608f96b6e8",
+      "size_bytes": 17844
+    },
+    "tests/test_postgresql_endpoint_policy.py": {
+      "git_blob_oid": "8b9c73fe749bde0bf85f508fd93517c239cc319d",
+      "sha256": "d3f45570dfc2455b99b419c4db5874ffa7d4996daf8809edbcdbd5ad148dc83d",
+      "size_bytes": 6492
+    },
+    "run_endpoint_tests.py": {
+      "git_blob_oid": "2f1b4f85ef4f2ce23e58f7c5186cc779dc456fe7",
+      "sha256": "1b3dd909b2903def426972b1c97ea4932fa92dcd9f73f04068dfac31d8d063fd",
+      "size_bytes": 1544
+    },
+    "capture_endpoint_verification.py": {
+      "git_blob_oid": "dfc5524712780c6434a5fe099e45876bbbf98f28",
+      "sha256": "66beb079bbf2f4c4c19376b9e223a0ee2b771e9ce869946037a3391df863fde3",
+      "size_bytes": 4540
+    }
+  },
+  "patch": {
+    "path": "source_delta.patch",
+    "git_blob_oid": "98b81223cce8cff22894e594c5001c02c851cd89",
+    "sha256": "16a0deb13b425b652736a885646b2dc43ac821e858041036e6383498e5689a29",
+    "size_bytes": 1348
+  }
+}

@@ -156,14 +156,28 @@ def _build_postgresql_engine(
             ),
         )
     )
+    connection_arguments: dict[str, Any] = {
+        "sslmode": settings.sslmode,
+        "connect_timeout": settings.connect_timeout_seconds,
+        "application_name": settings.application_name,
+        "options": options,
+    }
+    if settings.sslmode == "disable":
+        if any(
+            query_key in url.query
+            for query_key in ("host", "hostaddr", "port", "service")
+        ):
+            raise ValueError(
+                "The loopback test profile forbids query endpoint selectors."
+            )
+        # Bind the validated address; libpq hostaddr defaults can override host.
+        connection_arguments["host"] = host
+        connection_arguments["hostaddr"] = (
+            "127.0.0.1" if host.casefold() == "localhost" else host
+        )
     engine = create_engine(
         url,
-        connect_args={
-            "sslmode": settings.sslmode,
-            "connect_timeout": settings.connect_timeout_seconds,
-            "application_name": settings.application_name,
-            "options": options,
-        },
+        connect_args=connection_arguments,
         pool_pre_ping=True,
         pool_size=settings.pool_size,
         max_overflow=settings.max_overflow,
