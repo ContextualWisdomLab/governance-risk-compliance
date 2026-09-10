@@ -21,6 +21,11 @@ from cwl_grc.health import (
     _evidence_key_check,
     readiness_payload,
 )
+from cwl_grc.migrations import (
+    INTERNAL_CONTROL_MODEL_MIGRATION,
+    OBLIGATION_MODEL_MIGRATION,
+    OBLIGATION_REQUIREMENT_TARGET_MIGRATION,
+)
 from cwl_grc.observability import (
     build_request_context,
     emit_request_log,
@@ -184,6 +189,33 @@ def test_readiness_reports_schema_receipt_seed_guard_and_key_failures() -> None:
     assert _evidence_key_check(WrongRoundTripCipher())["reason_code"] == (
         "evidence_key_round_trip_failed"
     )
+
+
+@pytest.mark.parametrize(
+    "migration_key",
+    (
+        INTERNAL_CONTROL_MODEL_MIGRATION,
+        OBLIGATION_MODEL_MIGRATION,
+        OBLIGATION_REQUIREMENT_TARGET_MIGRATION,
+    ),
+)
+def test_readiness_requires_every_current_schema_receipt(migration_key: str) -> None:
+    """Readiness refuses traffic while any registered migration receipt is absent."""
+    app = _app()
+    with app.state.session_factory.kw["bind"].begin() as connection:
+        connection.execute(
+            text("DELETE FROM schema_migration WHERE migration_key = :migration_key"),
+            {"migration_key": migration_key},
+        )
+    report = readiness_payload(
+        app.state.session_factory,
+        app.state.evidence_cipher,
+        LOCAL_PREVIEW_ENVIRONMENT,
+        None,
+        app.state.lifecycle,
+    )
+    assert report["status"] == "not_ready"
+    assert report["checks"]["schema"]["reason_code"] == "schema_migration_incomplete"
 
 
 def test_readiness_rejects_missing_required_purpose_with_matching_row_count() -> None:
