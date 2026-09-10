@@ -26,7 +26,7 @@ interpretation and enacted-rule completeness remain open under #69.
 
 The following records and the separate original archive retain valid historical
 requirements and ancestry; their status words are not fresh observations.
-#18's migration change, Keyverse integration, owner-side CodeQL callbacks,
+The migration change in PR `#18`, Keyverse integration, owner-side CodeQL callbacks,
 httpx2/lock migration, other lifecycle controls and organizational evidence keep
 their independent gates. Nothing below supplies current-head merge admission.
 
