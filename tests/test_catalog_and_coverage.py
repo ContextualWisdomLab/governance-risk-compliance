@@ -259,6 +259,7 @@ def test_officer_form_accepts_control_ref() -> None:
     client = _client()
     posted = client.post(
         "/officer/evidence",
+        headers={"Origin": "http://testserver"},
         data={
             "control_ref": f"{FrameworkCode.SOC2_TSC_2017.value}|CC7.2",
             "actor_identifier": "officer-han",
@@ -270,6 +271,7 @@ def test_officer_form_accepts_control_ref() -> None:
     assert posted.status_code == 303
     invalid = client.post(
         "/officer/evidence",
+        headers={"Origin": "http://testserver"},
         data={
             "control_ref": "not-a-ref",
             "actor_identifier": "officer-han",
@@ -280,6 +282,7 @@ def test_officer_form_accepts_control_ref() -> None:
     assert invalid.status_code == 400
     missing = client.post(
         "/officer/evidence",
+        headers={"Origin": "http://testserver"},
         data={
             "actor_identifier": "officer-han",
             "evidence_title": "No control",
@@ -293,6 +296,7 @@ def test_officer_can_bind_evidence_from_home_form() -> None:
     client = _client()
     posted = client.post(
         "/officer/evidence",
+        headers={"Origin": "http://testserver"},
         data={
             "framework": FrameworkCode.CSAP_2026.value,
             "catalog_identifier": "12.3.1",

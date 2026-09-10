@@ -1,0 +1,138 @@
+{
+  "receipt_version": "1.0",
+  "recorded_at": "2026-09-09T23:21:19.414553+00:00",
+  "repository_full_name": "ContextualWisdomLab/governance-risk-compliance",
+  "pull_request_number": 70,
+  "source_parent": "72b1f0e4336c73fa0bcd0295a82e942bbaace5dd",
+  "negative_source": {
+    "path": "cwl_grc/remote_access.py",
+    "sha256": "1eed3892acaf1c29c076698d72df4c1aea76520984cf729077b6803bcc5295c3",
+    "git_blob_oid": "8895222337ec2eb4181dbc13f6fd8c027e9a13c1",
+    "byte_count": 8192
+  },
+  "tested_files": [
+    {
+      "path": "cwl_grc/remote_access.py",
+      "sha256": "71481fa4f8ab5b62075cfe35af76284550a3d09308853a8d6579c857adb7f46e",
+      "git_blob_oid": "762ed8a334180f5ffc17d28b13dba1d2a78c1f74",
+      "byte_count": 8575
+    },
+    {
+      "path": "tests/test_header_retention.py",
+      "sha256": "2a5912ef4a49d511f15ec58f8a809901bbb4b1b6cb2a318c1d03a0b20f1857d5",
+      "git_blob_oid": "6fa8de723427d69782982b4f666d381472345bec",
+      "byte_count": 4790
+    },
+    {
+      "path": "tests/test_privacy_boundary.py",
+      "sha256": "30a26cdb3734a2909a1e0a9594422dc99519954dc5b0fbc9780c105e7740892b",
+      "git_blob_oid": "913ccefc4956ddab82d326e98cecd52f9c156248",
+      "byte_count": 10261
+    },
+    {
+      "path": "tests/test_validation_privacy.py",
+      "sha256": "89b52e75cabd6321b3f465c4625a4629a0967b3260b54962e57ced20854bdb22",
+      "git_blob_oid": "2b687d04652def50f5a525566be0e1e25157cb31",
+      "byte_count": 4880
+    }
+  ],
+  "environment": {
+    "python_version": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+    "fastapi_version": "0.128.2",
+    "starlette_version": "0.50.0",
+    "pytest_version": "9.0.2",
+    "coverage_version": "7.13.3"
+  },
+  "executions": [
+    {
+      "started_at": "2026-09-09T23:21:12.960846+00:00",
+      "completed_at": "2026-09-09T23:21:14.738772+00:00",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "pytest",
+        "tests/test_header_retention.py",
+        "-q",
+        "--tb=no",
+        "-rN"
+      ],
+      "workspace_kind": "hash_verified_source_subset",
+      "exit_code": 1,
+      "raw_output_path": "negative_control.log",
+      "sha256": "7973ccd316de02ca2c626c9cef31481b912c6048da8e15d1424e53c6bae6b5e4",
+      "git_blob_oid": "83a7a9b0e369627f0b525fb9a0e77ac4079b19c8",
+      "byte_count": 109
+    },
+    {
+      "started_at": "2026-09-09T23:21:14.739176+00:00",
+      "completed_at": "2026-09-09T23:21:17.623929+00:00",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "coverage",
+        "run",
+        "--branch",
+        "--source=cwl_grc.remote_access",
+        "-m",
+        "pytest",
+        "tests/test_privacy_boundary.py",
+        "tests/test_validation_privacy.py",
+        "tests/test_header_retention.py",
+        "-q"
+      ],
+      "workspace_kind": "hash_verified_source_subset",
+      "exit_code": 0,
+      "raw_output_path": "component_tests.log",
+      "sha256": "ea6ad17279b419a6a9c99e22124275cdf39cfefc306a80e09e7e2619481c6fc2",
+      "git_blob_oid": "65e92b092f04821ad4cd13548902ed38cd38f0a7",
+      "byte_count": 260
+    },
+    {
+      "started_at": "2026-09-09T23:21:17.624561+00:00",
+      "completed_at": "2026-09-09T23:21:18.662153+00:00",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "coverage",
+        "report",
+        "--fail-under=100"
+      ],
+      "workspace_kind": "hash_verified_source_subset",
+      "exit_code": 0,
+      "raw_output_path": "component_coverage.log",
+      "sha256": "6395af14bc66f9e968f6cea41c0fb055a7f0f6a32df7b6b16ec80029511b092c",
+      "git_blob_oid": "0a1974a224a4d3b8fede3d1ba87fd5704ab4ae6b",
+      "byte_count": 305
+    },
+    {
+      "started_at": "2026-09-09T23:21:18.662741+00:00",
+      "completed_at": "2026-09-09T23:21:19.411316+00:00",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "compileall",
+        "-q",
+        "cwl_grc",
+        "tests"
+      ],
+      "workspace_kind": "hash_verified_source_subset",
+      "exit_code": 0,
+      "raw_output_path": "component_compile.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob_oid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "byte_count": 0
+    }
+  ],
+  "static_checks": {
+    "python_312_grammar": "passed",
+    "documented_source_symbols": 10,
+    "missing_source_docstrings": 0
+  },
+  "limits": [
+    "Component subset, not full-product checkout or locked installation.",
+    "No independent review, browser, deployed or statutory compliance assertion.",
+    "No raw legal-source response or historic observation timestamp is reconstructed here.",
+    "Synthetic payloads occur only in unit tests and their generated verification outputs.",
+    "No secure memory zeroization or whole-server cache purge is claimed."
+  ]
+}

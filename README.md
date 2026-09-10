@@ -59,6 +59,29 @@ Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `n
 
 Evidence may need exact officer names, contact details, or other PII to remain operationally useful. This product does not destructively mask stored evidence. Instead, the production boundary must enforce authenticated identity, tenant and purpose authorization, encrypted storage and transport, immutable audit, retention, and purpose-specific field selection. Views and exports should omit unrelated fields rather than alter values that an authorized workflow needs. The current local preview does not yet satisfy that production boundary.
 
+### Local requests and validation failures
+
+Open native forms from the same local origin. Origin, Referer, Host and proxy
+metadata are checked before handlers run; an originless simple form submission
+is rejected. A non-browser local form client can declare request intent with
+`X-CWL-Preview-Request: 1`, but that marker is not authentication or a secret and
+does not override a hostile Origin. Local JSON requests retain the existing
+purpose-declaration contract. Do not enable CORS as a workaround.
+
+Invalid JSON/body/form inputs return HTTP 422 with a bounded `detail` list whose
+`type` is `request_validation_failed`, `loc` is empty and `msg` directs the
+caller to check required fields and types against the API schema. Rejected
+values, arbitrary dictionary keys and validator exception content are not
+returned or logged by this handler. Per-field Pydantic diagnostics are no longer
+part of the public response. Valid evidence values remain unchanged.
+Responses traversing the privacy boundary are non-cacheable; this does not
+claim control of external proxy logs or outer unhandled server errors.
+
+[Privacy obligation work](docs/product/privacy_obligations.md),
+[verification scope](docs/doctoring/privacy_law_sources.md) and
+[the current gap baseline](docs/product-technical-gap-baseline.md) separate
+implemented source controls from unverified legal applicability and deployment.
+
 ## Product boundary
 
 | This repo owns | Other CWL homes consume only |

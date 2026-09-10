@@ -32,3 +32,13 @@ Keep README, AGENTS, CLAUDE, ARCHITECTURE, CHANGELOG, ADRs, and doctoring refere
 - Production statement and branch coverage must remain 100% where tooling exposes it.
 - Tests use real catalog identifiers and realistic officer workflows.
 - Product CI lives in `.github/workflows/product.yml`; organization-wide review and security lanes remain centrally owned.
+
+## Privacy repair and closure
+
+Follow `docs/product/privacy_obligations.md` and GRC #69. Preserve the local
+Host/Origin/Fetch Metadata boundary and source-level RED/GREEN evidence when
+integrating identity stacks. A request-intent marker is not authentication.
+Keep applicability, control effectiveness, deployment evidence and legal approval
+separate. Unverified rules or missing evidence cannot become compliant. Never
+turn immutable evidence into unlimited PII retention. Local component coverage
+is not whole-product coverage; do not mark the privacy program closed from it.
