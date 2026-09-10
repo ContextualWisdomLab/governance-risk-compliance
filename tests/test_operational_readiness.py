@@ -218,6 +218,32 @@ def test_readiness_requires_every_current_schema_receipt(migration_key: str) -> 
     assert report["checks"]["schema"]["reason_code"] == "schema_migration_incomplete"
 
 
+@pytest.mark.parametrize(
+    "guard_name",
+    (
+        "compliance_obligation_block_update",
+        "evidence_usage_block_delete",
+        "control_test_result_block_update",
+    ),
+)
+def test_readiness_requires_every_installed_integrity_guard(guard_name: str) -> None:
+    """Readiness refuses traffic when any migration-installed integrity guard is absent."""
+    app = _app()
+    with app.state.session_factory.kw["bind"].begin() as connection:
+        connection.execute(text(f"DROP TRIGGER {guard_name}"))
+    report = readiness_payload(
+        app.state.session_factory,
+        app.state.evidence_cipher,
+        LOCAL_PREVIEW_ENVIRONMENT,
+        None,
+        app.state.lifecycle,
+    )
+    assert report["status"] == "not_ready"
+    assert report["checks"]["integrity_guards"]["reason_code"] == (
+        "integrity_guards_incomplete"
+    )
+
+
 def test_readiness_rejects_missing_required_purpose_with_matching_row_count() -> None:
     """Readiness verifies required purpose identifiers, not only their row count."""
     app = _app()
