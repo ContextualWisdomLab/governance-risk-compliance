@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from pathlib import Path
 
@@ -418,6 +418,7 @@ def test_retention_metadata_and_legal_hold_lifecycle() -> None:
         "X-Actor-Id": "retention-officer",
         "X-Purpose": "evidence_binding",
     }
+    due_at = (datetime.now(timezone.utc) + timedelta(days=30)).replace(microsecond=0)
     for invalid_due_at in (123, "not-a-date"):
         invalid = client.post(
             "/evidence-records",
@@ -436,13 +437,13 @@ def test_retention_metadata_and_legal_hold_lifecycle() -> None:
             "evidence_title": "Quarterly access review",
             "payload_text": "Exact officer evidence.",
             "retention_class": "regulatory",
-            "disposition_due_at": "2026-09-01T00:00:00+00:00",
+            "disposition_due_at": due_at.isoformat(),
         },
     )
     assert created.status_code == 201
     body = created.json()
     assert body["retention_class"] == "regulatory"
-    assert body["disposition_due_at"] == "2026-09-01T00:00:00"
+    assert body["disposition_due_at"] == due_at.replace(tzinfo=None).isoformat()
     assert body["legal_hold_active"] is False
     record_id = body["evidence_record_id"]
 
