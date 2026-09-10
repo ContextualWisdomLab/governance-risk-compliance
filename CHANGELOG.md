@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- Preserve argparse's successful help exit instead of converting zero to usage-error code2. Add17parser regressions, including all existing command help surfaces, configuration-free help, unchanged usage errors and absent/explicit exit codes.
+
+### Removed
+
+- Retire three purpose-complete source-subset execution/capture helpers from `docs/evidence/` after full locked Product and native PostgreSQL execution became available. Preserve their exact historical source at8deede, original receipts/logs and normal full-checkout reproduction instructions. No scanner suppression or equivalent hidden dynamic executor is added; no historical receipt is overwritten.
+
 ### Added
 
 - Versioned policy authoring: `policy_document`, `policy_version`, and `policy_control_mapping` mapped only to official catalog identifiers.
@@ -32,11 +40,11 @@
 - `cwl-grc serve` now reports schema or runtime-configuration startup failures as actionable JSON instead of exposing an uncaught traceback.
 - Shared `control_framework`, `control_item`, and `authorization_purpose` reference data is now bootstrapped only by a schema-owning path; runtime refuses missing or incompatible vocabulary instead of silently repairing it.
 - Production application replicas no longer create tables, apply migrations, install triggers, or seed reference data during startup.
-- PostgreSQL support is scoped to major version 18 and exercised on 18.4; other majors are unsupported until they receive a separate compatibility decision and exact CI lane.
+- PostgreSQL support is scoped to major version18 and exercised on18.4; other majors are unsupported until they receive a separate compatibility decision and exact CI lane.
 
 ### Security
 
-- Bind the explicit plaintext PostgreSQL test profile to its validated numeric loopback address; reject alternate query host/hostaddr/port/service selectors. Test-profile `localhost` is explicitly IPv4; IPv6 uses `[::1]`. Verified-TLS production options and normal schema behavior are preserved. Add 27 no-network endpoint contracts with retained original-source RED and fixed-source GREEN evidence; native/hosted verification remains separate.
+- Bind the explicit plaintext PostgreSQL test profile to its validated numeric loopback address; reject alternate query host/hostaddr/port/service selectors. Test-profile `localhost` is explicitly IPv4; IPv6 uses `[::1]`. Verified-TLS production options and normal schema behavior are preserved. Add27no-network endpoint contracts with retained original-source RED and fixed-source GREEN evidence; native/hosted verification remains separate.
 - Always deny proxy-forwarded and non-loopback HTTP traffic while the runtime lacks Keyverse-backed identity and tenant authorization; remove the unauthenticated remote-preview bypass entirely.
 - Bind both standalone server entry points to `127.0.0.1`.
 - Require durable Fernet key material for every persistent evidence store; limit ephemeral keys to explicitly selected in-memory tests.
@@ -54,6 +62,7 @@
 
 ### ADR
 
+- `docs/adr/proposals/verification_tool_retirement.md` — Proposed retirement of completed observation executables, immutable historical evidence, normal reproduction and outstanding review findings.
 - `docs/adr/proposals/postgresql_loopback_endpoint.md` — Proposed final-address binding for the plaintext test exception, compatibility, operator guidance, primary sources and verification limits.
 - `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.

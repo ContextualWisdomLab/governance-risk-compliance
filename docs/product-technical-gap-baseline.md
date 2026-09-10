@@ -1,6 +1,43 @@
 # Product and technical gap baseline
 
-## Current endpoint repair — Proposed
+## Current review repairs — Proposed
+
+Parent: PR 18 `8deede6988480a357532c28b13381705e107993a`.
+CodeRabbit review5161670162 and scanner review5161669059 are current repair
+inputs, not approvals. The CLI help result incorrectly mapped argparse's zero
+exit to2. The repair changes only that return expression and adds17parser
+contracts: original11failures/6passes, repaired17passes. Actual local timestamps,
+source/test hashes and output are in
+[evidence/cli_help_contract/verification_receipt.json](evidence/cli_help_contract/verification_receipt.json).
+The local probe executes the actual selected main/parser definitions, not a
+complete GRC import. Full locked Product remains required on the containing head.
+
+The completed source-subset executables are retired from the current tree;
+original receipts/logs remain unchanged and their historical helper references
+resolve through immutable parent8deede. See the
+[Proposed retirement decision](adr/proposals/verification_tool_retirement.md).
+New observations must not overwrite historical evidence. Normal verification
+uses actual package imports and the existing Product/PostgreSQL lanes.
+
+On parent8deede, Product34423287766/job102703117356 passed130tests with23native
+cases skipped in that environment, production983statements/244branches100%,
+Ruff/docstrings/compile/lock/clean-tree successful. The separate native lane
+34423287712/job102703117533 actually executed those23cases on PostgreSQL18.4.
+The remaining Product warning is Starlette's httpx2 transition. These results
+are retained as parent evidence, not a later commit's GREEN or release claim.
+
+Two major review findings remain open: schema-ahead errors give inappropriate
+migration guidance, and operational entrypoints can implicitly choose SQLite
+and development schema ownership. Keep PR18 Draft until these are causally
+repaired and the exact final head passes the applicable gates. No acceptance,
+exemption or operational safety claim is inferred from this bounded help/tool
+repair. The blocked database diagnostic candidate remains excluded.
+
+The following endpoint and reconciliation sections are retained history. Their
+statements about which production symbols changed apply to those earlier
+commits, not to the CLI help-expression repair above.
+
+## Endpoint repair history — Proposed
 
 Source parent: PR 18 `56f2399ea2fa97f78afcf4da73aaa67f196a58a9`.
 The opt-in plaintext PostgreSQL test exception checked the URL host, while the
@@ -20,10 +57,11 @@ unit contracts using actual policy definitions and dialect conversion, not
 native libpq, full locked Product, PostgreSQL integration or deployed evidence.
 The full current-head Product/PostgreSQL/security/review gates remain required.
 
-Only `_build_postgresql_engine` changes in production. The previously blocked
-DB diagnostic candidate remains excluded and unpublished. Neither this repair
-nor the earlier base reconciliation changes permissions, credentials, remote
-access authorization or legal applicability. Program 69 remains open.
+Only `_build_postgresql_engine` changes in production in that endpoint commit.
+The previously blocked DB diagnostic candidate remains excluded and unpublished.
+Neither that repair nor the earlier base reconciliation changes permissions,
+credentials, remote access authorization or legal applicability. Program69
+remains open.
 
 The following reconciliation section describes the earlier two-parent commit
 56f2399. Its no-production-change statement applies to that integration only,
@@ -47,53 +85,56 @@ all previous assertions and this branch's explicit `manage_schema=True` setup.
 Only its contract-specific docstring is added to the protected test.
 
 No production module, dependency, database diagnostic setting, identity policy,
-credential, permission, release or deployed configuration changes here. In
-particular, the database diagnostic candidate previously blocked before upload
-is not included. This integration is not an alternate publication path for it.
+credential, permission, release or deployed configuration changes in that
+reconciliation commit. The database diagnostic candidate previously blocked
+before upload is not included. This integration is not its publication path.
 
 ## Historical requirements are preserved, not completed
 
 The complete previous baseline is retained byte-for-byte at
 [the original baseline archive](product_technical_gap_baseline_529cf321.md),
 using its original blob `d03b70b89ac30a579c31d66dd1a2dc4b9e697e34`. This is the
-same archive identity/path used by the separate privacy PR 70. Its relative-link
-base remains the docs directory. The preservation decision precedes this commit
-and is recorded in PR 18 comment 5610764666.
+same archive identity/path used by the separate privacy PR70. Its relative-link
+base remains the docs directory. The preservation decision precedes the
+reconciliation commit and is recorded in PR18 comment5610764666.
 
 The archive's requirements and valid implementation deltas remain open unless
 independently completed. Its dated PR/check observations, branch names and
 readiness claims are historical, not current merge admission. Do not close or
 discard identity, control/applicability, evidence-lifecycle or privacy stacks.
-When PR 70 and this branch are integrated, combine both current sections and
+When PR70 and this branch are integrated, combine both current sections and
 retain this identical historical artifact; do not resolve the baseline by
 whole-file ours/theirs replacement.
 
-## Verification scope
+## Historical reconciliation verification scope
 
 The retained [execution receipt](evidence/schema_base_reconciliation/verification_receipt.json)
 binds actual UTC execution instants, commands, Git blob identities, SHA-256
 hashes and raw outputs. On the old workflow, the clean-tree contract passed and
 the imported cancellation contract failed. Both passed on the reconciled
-workflow. The combined test file compiles and retains all previous functions.
+workflow. The combined test file compiled and retained all previous functions.
 
-These are two static workflow contracts executed from their test AST in a
-hash-verified source subset on Python 3.13.5. They are not full Product,
-PostgreSQL, hosted Actions, actionlint, browser or deployment verification.
-Direct clone was unavailable because the execution environment could not
-resolve github.com. The unchanged Product and PostgreSQL lanes must run on the
-new containing commit; predecessor successes do not transfer.
+Those were two static workflow contracts executed from their test AST in a
+hash-verified source subset on Python3.13.5, not full Product, PostgreSQL,
+hosted Actions, actionlint, browser or deployment verification. The retired
+helper is retained in immutable8deede for source inspection, not current CI use.
+The unchanged normal Product/PostgreSQL commands must run on every new head;
+predecessor successes do not transfer.
 
 ## Gaps and next acceptance
 
 | Gap | Required next action |
 | --- | --- |
-| Protected-base drift in PR 18 | Verify ordinary two-parent ancestry and zero behind the protected parent; regenerate exact-head Product/PostgreSQL/security/review evidence. |
-| Dependency Review availability | Obtain the authoritative dependency diff after resolving the recorded HTTP 403 with canonical owner `.github` issue 810. Other scanners cannot replace it. |
-| CodeQL terminal evidence | Obtain exact repository/PR/base/head/language/run-bound scan and callback evidence through `.github` issue 1929; dispatch success is not scan success. |
-| Independent review | Resolve actual current-head findings and obtain a qualifying approval. Rate-limited or skipped bot statuses are not completed reviews. |
-| Database diagnostics | The previous local candidate is unpublished. No protection of driver/server error detail, DEBUG rows or SQL literals is established by this merge. |
-| Identity and privacy source integration | Preserve PR 38 and descendants, PR 70's HTTP safeguards and the existing evidence/control/applicability stacks. Integrate through their own reviewed contracts. |
-| Privacy lifecycle and organizational facts | Program issue 69 remains open for applicable processing scope, rights, retention/destruction/restore, processor/transfer conditions, key custody, incident handling and management evidence. No compliance conclusion is made. |
+| CLI help and observation tool lifecycle | Verify the containing head's Product/SAST and independent review; keep original receipts and historical source intact. |
+| Schema recovery guidance | Distinguish ahead, behind/uninitialized and drift/concurrency conditions; do not direct an incompatible newer store into routine migration. |
+| Operational configuration defaults | Require an explicit store/profile outside dedicated local development; verify configuration failure occurs before schema or connection side effects. |
+| Protected-base drift in PR18 | Preserve ordinary ancestry and re-read zero-behind state; regenerate exact-head Product/PostgreSQL/security/review evidence. |
+| Dependency Review availability | Obtain authoritative dependency diff after resolving HTTP403 with canonical owner `.github` issue810. Other scanners cannot replace it. |
+| CodeQL terminal evidence | Obtain exact repository/PR/base/head/language/run-bound scan and callback evidence through `.github` issue1929; dispatch success is not scan success. |
+| Independent review | Resolve actual current-head findings and obtain a qualifying approval. Rate-limited/skipped bot statuses are not completed reviews. |
+| Database diagnostics | The previous local candidate is unpublished. No protection of driver/server error detail, DEBUG rows or SQL literals is established here. |
+| Identity and privacy source integration | Preserve PR38/descendants, PR70's HTTP safeguards and existing evidence/control/applicability stacks. Integrate through reviewed contracts. |
+| Privacy lifecycle and organizational facts | Program69 remains open for applicable processing scope, rights, retention/destruction/restore, processor/transfer conditions, key custody, incidents and management evidence. |
 | Release and operational readiness | Immutable release, deployed controls, restore/key recovery and authorized applicability review remain separate gates. |
 
 The original [domain completion roadmap](product/grc-domain-completion-roadmap.md)

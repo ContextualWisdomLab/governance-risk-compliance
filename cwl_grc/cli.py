@@ -44,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             namespace = parser.parse_args(args)
         except SystemExit as exc:
-            return int(exc.code or 2)
+            return int(2 if exc.code is None else exc.code)
         return _dispatch(namespace)
     except HTTPException as exc:
         print(
