@@ -40,4 +40,10 @@ The checked-in `nist_sp_800_53_r5` first-slice rows were authored against the 20
 
 The CSAP catalog stores the edition-specific KISA resource notice rather than the generic CSAP introduction page. A content digest is not claimed in the first slice because the original attachment bytes were not independently captured and hashed in the repository; adding a digest requires an immutable source-artifact ingestion workflow and reviewable byte-level evidence.
 
+OpenTelemetry Authors. (n.d.). *OpenTelemetry specification*. https://opentelemetry.io/docs/specs/
+
+OpenTelemetry Authors. (n.d.). *OpenTelemetry Python instrumentation*. https://opentelemetry.io/docs/languages/python/instrumentation/
+
+World Wide Web Consortium. (n.d.). *Trace context*. https://www.w3.org/TR/trace-context/
+
 ISO publications and other licensed standards remain subject to publisher copyright and usage restrictions. Public CWL records should use official identifiers, lawful source references, and independently authored summaries unless redistribution rights for source text are explicitly recorded.

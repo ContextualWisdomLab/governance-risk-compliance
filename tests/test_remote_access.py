@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from cwl_grc import create_app
 from cwl_grc.remote_access import request_is_local
@@ -39,9 +41,35 @@ def test_forwarded_remote_preview_is_always_denied(monkeypatch) -> None:  # noqa
     assert local.status_code == 200
     for response in (forwarded, standardized):
         assert response.status_code == 503
-        assert response.json() == {
-            "detail": (
-                "Remote preview is disabled. Configure Keyverse-backed identity and "
-                "tenant authorization before exposing CWL GRC."
-            )
-        }
+        assert response.json()["detail"] == (
+            "Remote preview is disabled. Configure Keyverse-backed identity and "
+            "tenant authorization before exposing CWL GRC."
+        )
+        assert response.json()["request_reference"]
+        assert response.headers["X-Request-ID"] == response.json()["request_reference"]
+
+
+def test_denied_remote_request_cannot_seed_trace_context() -> None:
+    """Rejected remote requests never propagate attacker-supplied trace headers."""
+    app = create_app(database_url="sqlite://", evidence_key=None)
+    exporter = InMemorySpanExporter()
+    app.state.telemetry._tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
+    attacker_traceparent = "00-11111111111111111111111111111111-2222222222222222-01"
+
+    with TestClient(app) as client:
+        denied = client.get(
+            "/healthz",
+            headers={
+                "X-Forwarded-For": "198.51.100.23",
+                "traceparent": attacker_traceparent,
+                "baggage": "attacker=injected",
+            },
+        )
+
+    assert denied.status_code == 503
+    span = exporter.get_finished_spans()[-1]
+    span_context = span.get_span_context()
+    assert f"{span_context.trace_id:032x}" != "11111111111111111111111111111111"
+    assert denied.headers["traceparent"].split("-")[1] != "11111111111111111111111111111111"
+    assert "attacker=injected" not in str(span.attributes)
+
