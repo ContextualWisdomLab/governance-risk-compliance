@@ -401,10 +401,20 @@ def serialize_policy_page(
         (version.policy_document_id, version.version_number): version
         for version in versions
     }
-    current_versions = [
-        versions_by_key[(document.policy_document_id, document.current_version_number)]
-        for document in documents
-    ]
+    current_versions = []
+    for document in documents:
+        current_version_row = versions_by_key.get(
+            (document.policy_document_id, document.current_version_number)
+        )
+        if current_version_row is None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "A policy document has no finalized current edition. "
+                    "Repair the policy store before retrying the list request."
+                ),
+            )
+        current_versions.append(current_version_row)
     version_ids = [version.policy_version_id for version in current_versions]
     mappings = (
         session.query(PolicyControlMapping)
