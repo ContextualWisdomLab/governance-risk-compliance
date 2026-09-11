@@ -115,14 +115,20 @@ def create_app(
         status_code = 500
         error_class: str | None = None
         route = route_template(request.scope)
+        client_host = getattr(request.client, "host", None)
+        local_request = request_is_local(
+            client_host,
+            request.headers.get("x-forwarded-for"),
+            request.headers.get("forwarded"),
+        )
         with app.state.telemetry.server_span(
             request.method,
             route,
-            request.headers,
+            request.headers if local_request else {},
         ) as span:
             response_traceparent = (
                 context.traceparent
-                if context.traceparent == request.headers.get("traceparent")
+                if local_request and context.traceparent == request.headers.get("traceparent")
                 else span_traceparent(span)
             )
             response_context = RequestContext(
@@ -130,12 +136,6 @@ def create_app(
                 response_traceparent,
             )
             try:
-                client_host = getattr(request.client, "host", None)
-                local_request = request_is_local(
-                    client_host,
-                    request.headers.get("x-forwarded-for"),
-                    request.headers.get("forwarded"),
-                )
                 if not local_request:
                     response = JSONResponse(
                         status_code=503,
