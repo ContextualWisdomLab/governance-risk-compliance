@@ -41,6 +41,42 @@ from test_keyverse_http_route_enforcement import (
 
 
 COMPACT_JWT = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJvZmZpY2VyLXBhcmsifQ.sig"
+EYJ_ISSUER = "https://eyJ.identity.example/realms/cwl"
+
+
+def test_token_detection_requires_a_compact_jws_not_an_eyj_substring() -> None:
+    """Trusted identifiers that merely mention eyJ are not mistaken for tokens."""
+    assert looks_like_access_token(COMPACT_JWT)
+    assert not looks_like_access_token(EYJ_ISSUER)
+    assert not looks_like_access_token("officer.eyJ.park")
+    assert not looks_like_access_token("MQ.ab.cd")
+    assert not looks_like_access_token("one.two")
+    assert not looks_like_access_token("a..c")
+
+
+def test_audit_event_keeps_issuer_and_client_names_that_contain_eyj() -> None:
+    """A valid Keyverse issuer or client name is recorded, not rejected as a token."""
+    factory = create_session_factory("sqlite://")
+    with factory() as session:
+        seed_control_catalog(session)
+        seed_authorization_purposes(session)
+        author_policy(
+            session,
+            require_purpose(
+                "officer-park",
+                PurposeCode.POLICY_AUTHORING.value,
+                PurposeCode.POLICY_AUTHORING,
+                issuer_identifier=EYJ_ISSUER,
+                client_identifier="cwl.eyJ.web",
+            ),
+            "EyJ Access Policy",
+            "Issuer and client names may mention eyJ.",
+            [ControlRef(FrameworkCode.CSAP_2026, "10.2.1")],
+        )
+        session.commit()
+        event = session.query(AuditEvent).one()
+        assert event.issuer_identifier == EYJ_ISSUER
+        assert event.client_identifier == "cwl.eyJ.web"
 
 
 def test_correlation_reference_rejects_token_material_and_keeps_exact_ids() -> None:

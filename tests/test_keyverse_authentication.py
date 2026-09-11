@@ -123,6 +123,15 @@ def test_valid_keyverse_access_token_becomes_tenant_principal() -> None:
     require_access_scopes(principal, {"grc.policy.write"})
 
 
+def test_oversized_identity_claims_fail_in_the_kernel() -> None:
+    """The verification kernel bounds subjects and organizations to the persistence width."""
+    private_key, jwk = _new_signing_material("key-1")
+    verifier = _verifier(jwk)
+    for claim in ("sub", "org"):
+        with pytest.raises(AccessTokenValidationError, match="identity"):
+            verifier.verify(_token(private_key, claims=_claims(**{claim: "x" * 129})))
+
+
 def test_scope_gate_fails_closed_for_missing_or_empty_scope() -> None:
     """Authorization requires every requested action scope."""
     private_key, jwk = _new_signing_material("key-1")
@@ -336,4 +345,22 @@ def test_settings_reject_unsafe_or_ambiguous_configuration() -> None:
             allowed_client_ids=frozenset({CLIENT_ID}),
             allowed_roles=frozenset({"compliance_officer"}),
             clock_skew_seconds=301,
+        )
+
+
+def test_settings_reject_attribution_that_cannot_be_persisted() -> None:
+    """Issuer and allowed clients must fit the columns every audit row writes."""
+    with pytest.raises(ValueError, match="issuer"):
+        KeyverseAccessTokenSettings(
+            issuer="https://identity.example.test/" + "a" * 1024,
+            audience=AUDIENCE,
+            allowed_client_ids=frozenset({CLIENT_ID}),
+            allowed_roles=frozenset({"compliance_officer"}),
+        )
+    with pytest.raises(ValueError, match="client"):
+        KeyverseAccessTokenSettings(
+            issuer=ISSUER,
+            audience=AUDIENCE,
+            allowed_client_ids=frozenset({CLIENT_ID + "0" * 128}),
+            allowed_roles=frozenset({"compliance_officer"}),
         )

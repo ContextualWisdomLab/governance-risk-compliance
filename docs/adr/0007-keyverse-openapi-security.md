@@ -20,7 +20,11 @@ unreachable.
 1. `/openapi.json` publishes `KeyverseBearer` as HTTP bearer `at+jwt`.
 2. Policy reads and mutations, policy-gap reads, evidence mutations, and officer
    form posts declare the matching `grc.policy.read`, `grc.policy.write`, or
-   `grc.evidence.write` scope.
+   `grc.evidence.write` scope in the `x-keyverse-required-scopes` vendor
+   extension. The HTTP bearer security requirement itself uses an empty array,
+   because OpenAPI reserves the requirement array for OAuth2/OpenID Connect
+   scope names; generated clients and validators otherwise reject or misread the
+   contract.
 3. `GET /` is a data-free browser bootstrap when a Keyverse verifier is
    configured. It renders no officer, tenant, policy-gap, or evidence-coverage
    state. The browser presents the Keyverse token locally and loads protected

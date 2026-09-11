@@ -8,15 +8,16 @@ from typing import Any
 
 from sqlalchemy import Engine, inspect, text
 
+from cwl_grc.authorization import (
+    DECISION_ALLOW,
+    LOCAL_PREVIEW_TENANT,
+)
+
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
 TENANT_OWNERSHIP_MIGRATION = "0002_tenant_ownership"
 AUDIT_ATTRIBUTION_MIGRATION = "0003_audit_attribution"
-LOCAL_PREVIEW_TENANT = "local_preview"
-LOCAL_PREVIEW_ISSUER = "local_preview"
-LOCAL_PREVIEW_CLIENT = "local_preview"
-LEGACY_UNATTRIBUTED_CORRELATION = "legacy_unattributed"
-DECISION_ALLOW = "allow"
+LEGACY_UNATTRIBUTED = "legacy_unattributed"
 
 
 def apply_schema_migrations(engine: Engine) -> None:
@@ -171,18 +172,20 @@ def _upgrade_audit_attribution(connection: Any) -> None:
         (
             "issuer_identifier",
             "ALTER TABLE audit_event ADD COLUMN "
-            f"issuer_identifier VARCHAR(1024) NOT NULL DEFAULT '{LOCAL_PREVIEW_ISSUER}'",
+            "issuer_identifier VARCHAR(1024) NOT NULL "
+            f"DEFAULT '{LEGACY_UNATTRIBUTED}'",
         ),
         (
             "client_identifier",
             "ALTER TABLE audit_event ADD COLUMN "
-            f"client_identifier VARCHAR(128) NOT NULL DEFAULT '{LOCAL_PREVIEW_CLIENT}'",
+            "client_identifier VARCHAR(128) NOT NULL "
+            f"DEFAULT '{LEGACY_UNATTRIBUTED}'",
         ),
         (
             "correlation_reference",
             "ALTER TABLE audit_event ADD COLUMN "
             "correlation_reference VARCHAR(128) NOT NULL "
-            f"DEFAULT '{LEGACY_UNATTRIBUTED_CORRELATION}'",
+            f"DEFAULT '{LEGACY_UNATTRIBUTED}'",
         ),
         (
             "decision_outcome",
