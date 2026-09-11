@@ -15,6 +15,7 @@ from cwl_grc import create_app
 from cwl_grc.encryption import EvidenceCipher
 from cwl_grc.health import (
     LOCAL_PREVIEW_ENVIRONMENT,
+    REQUIRED_MIGRATIONS,
     LifecycleState,
     _guard_names,
     _identity_check,
@@ -266,6 +267,18 @@ def test_readiness_requires_every_required_column(table_name: str, column_name: 
     )
     assert report["status"] == "not_ready"
     assert report["checks"]["schema"]["reason_code"] == "schema_incompatible"
+
+
+def test_readiness_required_migrations_track_applied_receipts() -> None:
+    """A healthy store records exactly the migrations readiness demands, no drift."""
+    app = _app()
+    with app.state.session_factory.kw["bind"].connect() as connection:
+        receipts = set(
+            connection.execute(
+                text("SELECT migration_key FROM schema_migration")
+            ).scalars()
+        )
+    assert receipts == set(REQUIRED_MIGRATIONS)
 
 
 def test_readiness_rejects_missing_required_purpose_with_matching_row_count() -> None:
