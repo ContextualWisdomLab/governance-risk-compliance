@@ -93,6 +93,19 @@ def test_failed_keyverse_reload_clears_stale_protected_browser_state() -> None:
     assert "Policy gaps are hidden until Keyverse authorizes this token." in script
 
 
+def test_transient_keyverse_reload_failure_keeps_the_token_but_hides_state() -> None:
+    """Transport failures hide protected state without discarding a still-valid token."""
+    script = render_officer_home([], keyverse_required=True).split("<script>", 1)[1]
+    assert "function clearProtectedState()" in script
+    assert "function clearRejectedToken()" in script
+    assert "response.status === 401 || response.status === 403" in script
+    assert "rejected.rejected = true" in script
+    assert script.index("function clearRejectedToken()") < script.index(
+        "function resetProtectedState()"
+    )
+    assert "Your token is kept; retry loading your policy gaps." in script
+
+
 def test_openapi_http_bearer_requirement_stays_empty_and_keeps_scopes_in_extension() -> None:
     """An HTTP bearer requirement carries no scope names; action scopes live in the extension."""
     from fastapi.testclient import TestClient

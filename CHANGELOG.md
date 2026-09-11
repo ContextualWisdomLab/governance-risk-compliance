@@ -49,6 +49,7 @@
 - Map a verified token that lacks an action scope to HTTP 403 through `AccessTokenScopeError` (RFC 6750 `insufficient_scope`) instead of matching exception text for `"required scope"`.
 - Reject provider refresh clocks whose `tzinfo` exists without a defined UTC offset.
 - Never embed officer-, tenant-, policy-gap-, or evidence-coverage state in the unauthenticated Keyverse browser bootstrap; protected state is fetched only after Bearer authorization.
+- A failed Keyverse policy-gap reload clears rendered gap and evidence state after any failure but discards the entered token only on an HTTP 401/403 rejection, so a network outage or malformed response no longer forces officers to re-enter a still-valid token.
 
 ### ADR
 
