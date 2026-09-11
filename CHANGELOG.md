@@ -10,7 +10,7 @@
 - Officer home form to author a policy and see uncovered policy requirements.
 - `cwl-grc` CLI: `policy author|revise|list`, `gaps`, `bind`, and `serve`.
 - Official policy-deployment identifiers: SOC 2 `CC5.3` and COSO 2013 Principle 12.
-- First buyer slice: official CSAP / SOC 2 / ISMS-P / ISO/IEC 27001:2022 / NIST SP 800-53 Rev. 5 / COSO 2013 / COSO 2017 control seeds.
+- First officer slice: official CSAP / SOC 2 / ISMS-P / ISO/IEC 27001:2022 / NIST SP 800-53 Rev. 5 / COSO 2013 / COSO 2017 control seeds.
 - Evidence create and control–evidence binding with declared actor/purpose audit context and encryption at rest.
 - Uncovered-control query and officer home that states the next action.
 - `/healthz` probe, standalone `python -m cwl_grc` entry, and `create_app()` module factory.
@@ -21,6 +21,10 @@
 - Catalog officers can list published releases and compare provenance/import-receipt metadata without implying a requirement-level catalog diff.
 - Catalog releases now retain the selected successful import identity, with a versioned migration and fail-closed snapshots for unlinked legacy rows.
 - Release-import provenance now uses a composite key: `catalog_import_run` is uniquely identified by `(catalog_import_run_id, source_artifact_version_id)` and `catalog_release` carries a matching composite foreign key, added by the `0004_catalog_release_provenance` migration, so a release can never join another source version's import run.
+- `docs/product-technical-gap-baseline.md` with observed product truth, the live PR queue, officer-visible production and domain gaps, standards corrections, ownership boundaries, and exact next actions. The 2026-08-24 refresh records PR #58 hosted Devin success, terminal hosted check counts for merge-ready develop PRs, PR #34 Strix provider-unavailable, Wave 0 Keyverse order `#38 → #55 → #56 → #57 → #58`, and central `.github` #1257 still behind `main` with OpenCode `CHANGES_REQUESTED`.
+- Wave 1 legacy-binding projection identity: `binding_id` plus `control_item_id`, tenant-scoped through the bound evidence record, with `unassessed` fan-out only after an authorized `control_requirement_mapping` exists.
+- `docs/product/grc-domain-completion-roadmap.md` defining the closed obligation → requirement → policy → internal control → implementation → test/evidence → risk/audit → remediation → controlled-reporting loop and its release gates.
+- Current doctoring references for ISO 37301:2021 and Amendment 1:2024, ISO 19011:2026 Edition 4, OSCAL 1.2.3, and the NIST OLIR Program without claiming certification or source-text redistribution rights.
 
 ### Security
 
@@ -43,3 +47,4 @@
 - `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
 - `docs/adr/0013-catalog-provenance-and-import-receipts.md` — source identity, digest receipts, and release gating before catalog requirement import.
+- `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — preserve external catalogs while adding distinct internal-control definitions, implementations, reviewed mappings, tests, effectiveness results, deficiencies, and purpose-bound evidence usage before risk and audit depend on the model.
