@@ -49,6 +49,8 @@
 - Check required action scopes before consuming an optional one-time-use Keyverse token replay guard.
 - Reject ID-token/access-token confusion, unsigned or alternate-algorithm tokens, unsupported critical headers, unknown or duplicate keys, private/symmetric/encryption JWKs, stale/future tokens, and client/subject confusion.
 - Bound offline Keyverse JWK input to 1 MiB and support reviewed old/new public-key overlap without enabling network discovery or remote GRC traffic.
+- Read the hardened-start JWKS through the 1 MiB bound without materializing an oversized file, and convert JWKS and TLS read failures into the reviewed startup diagnostic instead of a traceback.
+- Validate the hardened-start TLS certificate and key are readable, well-formed PEM that match each other before binding.
 - Map a verified token that lacks an action scope to HTTP 403 through `AccessTokenScopeError` (RFC 6750 `insufficient_scope`) instead of matching exception text for `"required scope"`.
 - Reject provider refresh clocks whose `tzinfo` exists without a defined UTC offset.
 - Never embed officer-, tenant-, policy-gap-, or evidence-coverage state in the unauthenticated Keyverse browser bootstrap; protected state is fetched only after Bearer authorization.

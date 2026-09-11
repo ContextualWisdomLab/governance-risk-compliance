@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import jwt
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
 from fastapi.testclient import TestClient
 
 from cwl_grc import create_app
@@ -113,12 +116,31 @@ def test_keyverse_required_start_admits_https_and_rejects_http(
     assert healthy.json() == {"status": "ok", "service": "cwl-grc"}
 
 
-def _write_tls_files(tmp_path) -> tuple[Path, Path]:  # noqa: ANN001
-    """Write readable TLS path placeholders used by the hardened local start."""
-    cert = tmp_path / "grc.crt"
-    key = tmp_path / "grc.key"
-    cert.write_text("certificate", encoding="utf-8")
-    key.write_text("key", encoding="utf-8")
+def _write_tls_files(tmp_path: Path, stem: str = "grc") -> tuple[Path, Path]:
+    """Write a matching self-signed certificate and private key for the hardened start."""
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "127.0.0.1")])
+    now = datetime.now(timezone.utc)
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(days=1))
+        .not_valid_after(now + timedelta(days=30))
+        .sign(private_key, hashes.SHA256())
+    )
+    cert = tmp_path / f"{stem}.crt"
+    key = tmp_path / f"{stem}.key"
+    cert.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
+    key.write_bytes(
+        private_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
     return cert, key
 
 
@@ -306,3 +328,103 @@ def test_hardened_start_missing_evidence_key_names_key_in_next_action(
     assert "CWL_GRC_EVIDENCE_KEY" in payload["error"]
     assert "CWL_GRC_EVIDENCE_KEY" in payload["next_action"]
     assert "CWL_GRC_TLS_CERTFILE" in payload["next_action"]
+
+
+def test_loopback_bind_rejects_unreadable_malformed_and_mismatched_tls(
+    monkeypatch,
+    tmp_path,
+) -> None:  # noqa: ANN001
+    """TLS material must be readable PEM, and the key must match the certificate."""
+    monkeypatch.setenv("CWL_GRC_REQUIRE_KEYVERSE", "1")
+    monkeypatch.setenv("PORT", "8443")
+    cert, key = _write_tls_files(tmp_path)
+    other_cert, other_key = _write_tls_files(tmp_path, stem="other")
+
+    empty_cert = tmp_path / "empty.crt"
+    empty_cert.write_bytes(b"")
+    empty_key = tmp_path / "empty.key"
+    empty_key.write_bytes(b"")
+    monkeypatch.setenv("CWL_GRC_TLS_CERTFILE", str(empty_cert))
+    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", str(empty_key))
+    with pytest.raises(ValueError, match="valid PEM"):
+        loopback_server_bind()
+
+    monkeypatch.setenv("CWL_GRC_TLS_CERTFILE", str(cert))
+    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", str(empty_key))
+    with pytest.raises(ValueError, match="valid PEM"):
+        loopback_server_bind()
+
+    monkeypatch.setenv("CWL_GRC_TLS_CERTFILE", str(cert))
+    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", str(other_key))
+    with pytest.raises(ValueError, match="valid PEM"):
+        loopback_server_bind()
+
+    monkeypatch.setenv("CWL_GRC_TLS_CERTFILE", str(other_cert))
+    monkeypatch.setenv("CWL_GRC_TLS_KEYFILE", str(other_key))
+    hardened = loopback_server_bind()
+    assert hardened["ssl_certfile"] == str(other_cert)
+    assert hardened["ssl_keyfile"] == str(other_key)
+
+
+def test_process_access_token_verifier_reports_unreadable_jwks_file(
+    monkeypatch,
+    tmp_path,
+) -> None:  # noqa: ANN001
+    """A JWKS file that disappears or becomes unreadable stays a startup diagnostic."""
+    from cwl_grc.keyverse_http import process_access_token_verifier
+
+    monkeypatch.setenv("CWL_GRC_REQUIRE_KEYVERSE", "1")
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_ISSUER", "https://identity.example.test/realms/cwl")
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_AUDIENCE", "cwl-grc-api")
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_CLIENT_IDS", "cwl-grc-web")
+    jwks = _write_reviewed_jwks(tmp_path)
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_JWKS_PATH", str(jwks))
+
+    def denied_open(path, *args, **kwargs):  # noqa: ANN001
+        raise PermissionError("JWKS read is denied")
+
+    monkeypatch.setattr(Path, "open", denied_open)
+    with pytest.raises(ValueError, match="readable file"):
+        process_access_token_verifier()
+
+
+def test_process_access_token_verifier_bounds_jwks_read_before_bytes(
+    monkeypatch,
+    tmp_path,
+) -> None:  # noqa: ANN001
+    """The JWKS read is bounded, so an oversized file cannot exhaust memory first."""
+    from cwl_grc.keyverse_authentication import MAX_JWKS_BYTES
+    from cwl_grc.keyverse_http import process_access_token_verifier
+
+    monkeypatch.setenv("CWL_GRC_REQUIRE_KEYVERSE", "1")
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_ISSUER", "https://identity.example.test/realms/cwl")
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_AUDIENCE", "cwl-grc-api")
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_CLIENT_IDS", "cwl-grc-web")
+    oversized = tmp_path / "oversized.jwks.json"
+    oversized.write_bytes(b"x" * (MAX_JWKS_BYTES + 1))
+    monkeypatch.setenv("CWL_GRC_KEYVERSE_JWKS_PATH", str(oversized))
+
+    requested: list[int] = []
+    original_open = Path.open
+
+    class _RecordingHandle:
+        def __init__(self, handle) -> None:  # noqa: ANN001
+            self._handle = handle
+
+        def __enter__(self):  # noqa: ANN204
+            return self
+
+        def __exit__(self, *exc):  # noqa: ANN002, ANN204
+            self._handle.close()
+
+        def read(self, size: int = -1) -> bytes:
+            requested.append(size)
+            return self._handle.read(size)
+
+    def recording_open(path, *args, **kwargs):  # noqa: ANN001
+        return _RecordingHandle(original_open(path, *args, **kwargs))
+
+    monkeypatch.setattr(Path, "open", recording_open)
+    with pytest.raises(ValueError, match="too large"):
+        process_access_token_verifier()
+    assert requested == [MAX_JWKS_BYTES + 1]

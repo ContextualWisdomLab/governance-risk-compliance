@@ -25,6 +25,7 @@ from cwl_grc.keyverse_authentication import (
     AuthenticatedPrincipal,
     KeyverseAccessTokenSettings,
     KeyverseAccessTokenVerifier,
+    MAX_JWKS_BYTES,
     MAX_PERSISTED_IDENTITY_LENGTH,
     parse_keyverse_jwks,
 )
@@ -107,7 +108,7 @@ def process_access_token_verifier() -> KeyverseAccessTokenVerifier | None:
     path = Path(jwks_path)
     if not path.is_file():
         raise ValueError("The Keyverse JWKS path must be a readable file.")
-    document = path.read_bytes()
+    document = _read_bounded_jwks(path)
     try:
         return KeyverseAccessTokenVerifier(
             KeyverseAccessTokenSettings(
@@ -120,6 +121,15 @@ def process_access_token_verifier() -> KeyverseAccessTokenVerifier | None:
         )
     except AccessTokenValidationError as exc:
         raise ValueError(str(exc)) from exc
+
+
+def _read_bounded_jwks(path: Path) -> bytes:
+    """Read at most one byte past the JWKS limit, mapping read failures to startup errors."""
+    try:
+        with path.open("rb") as handle:
+            return handle.read(MAX_JWKS_BYTES + 1)
+    except OSError as exc:
+        raise ValueError("The Keyverse JWKS path must be a readable file.") from exc
 
 
 def _csv_identifiers(raw: str) -> frozenset[str]:

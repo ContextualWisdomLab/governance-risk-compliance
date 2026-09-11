@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import ssl
 from ipaddress import ip_address
 from pathlib import Path
 from typing import Any
@@ -69,9 +70,22 @@ def loopback_server_bind() -> dict[str, Any]:
     key_path = Path(key)
     if not cert_path.is_file() or not key_path.is_file():
         raise ValueError("TLS certificate and key files must be readable files.")
+    _validate_tls_material(cert_path, key_path)
     settings["ssl_certfile"] = str(cert_path)
     settings["ssl_keyfile"] = str(key_path)
     return settings
+
+
+def _validate_tls_material(cert_path: Path, key_path: Path) -> None:
+    """Reject unreadable, malformed, or mismatched certificate/key pairs early."""
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    try:
+        context.load_cert_chain(certfile=str(cert_path), keyfile=str(key_path))
+    except (OSError, ssl.SSLError) as exc:
+        raise ValueError(
+            "TLS certificate and key files must be readable, valid PEM, and match "
+            "each other."
+        ) from exc
 
 
 def request_is_local(
