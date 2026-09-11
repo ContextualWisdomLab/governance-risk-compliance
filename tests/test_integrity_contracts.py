@@ -185,7 +185,7 @@ def test_stale_concurrent_policy_revision_returns_conflict(tmp_path: Path) -> No
         revise_policy(
             first,
             AuthorizationDecision(
-                "officer-first",
+                "officer-integrity",
                 PurposeCode.POLICY_AUTHORING,
             ),
             document_id,
@@ -197,7 +197,7 @@ def test_stale_concurrent_policy_revision_returns_conflict(tmp_path: Path) -> No
             revise_policy(
                 stale,
                 AuthorizationDecision(
-                    "officer-stale",
+                    "officer-integrity",
                     PurposeCode.POLICY_AUTHORING,
                 ),
                 document_id,
