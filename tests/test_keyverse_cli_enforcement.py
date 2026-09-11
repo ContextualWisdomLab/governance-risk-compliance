@@ -302,6 +302,47 @@ def test_invalid_keyverse_flag_blocks_cli_actor_writes(
         raise AssertionError("preview CLI writes must still require --actor")
 
 
+def test_hardened_cli_bind_closes_session_when_evidence_key_missing(
+    monkeypatch, tmp_path, capsys
+) -> None:  # noqa: ANN001
+    """A missing evidence key must not leak the bind session."""
+    from cwl_grc import cli
+
+    class _TrackingSession:
+        """Record whether the one-shot session was closed."""
+
+        closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    tracker = _TrackingSession()
+    monkeypatch.setattr(cli, "_open_session", lambda: tracker)
+    monkeypatch.delenv("CWL_GRC_EVIDENCE_KEY", raising=False)
+    monkeypatch.setenv("CWL_GRC_DATABASE_URL", f"sqlite:///{tmp_path / 'grc.sqlite'}")
+    assert (
+        cli_main(
+            [
+                "bind",
+                "--framework",
+                FrameworkCode.CSAP_2026.value,
+                "--identifier",
+                "10.2.1",
+                "--title",
+                "CSAP 10.2.1 register",
+                "--payload",
+                "park@example.co.kr approved the grant register.",
+                "--actor",
+                "officer-park",
+            ]
+        )
+        == 2
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert "evidence key" in payload["error"]
+    assert tracker.closed is True
+
+
 def test_hardened_cli_write_requires_policy_write_scope(
     monkeypatch, tmp_path, capsys
 ) -> None:  # noqa: ANN001

@@ -307,8 +307,8 @@ def _gaps_command(policy_document_id: str | None) -> int:
 def _bind_command(namespace: argparse.Namespace) -> int:
     """Store one evidence artifact and bind it to an official control."""
     session = _open_session()
-    cipher = EvidenceCipher(os.environ.get("CWL_GRC_EVIDENCE_KEY"))
     try:
+        cipher = EvidenceCipher(os.environ.get("CWL_GRC_EVIDENCE_KEY"))
         decision = _cli_decision(
             namespace.actor,
             PurposeCode.EVIDENCE_BINDING,
