@@ -9,7 +9,7 @@
 - Officer home form to author a policy and see uncovered policy requirements.
 - `cwl-grc` CLI: `policy author|revise|list`, `gaps`, `bind`, and `serve`.
 - Official policy-deployment identifiers: SOC 2 `CC5.3` and COSO 2013 Principle 12.
-- First buyer slice: official CSAP / SOC 2 / ISMS-P / ISO/IEC 27001:2022 / NIST SP 800-53 Rev. 5 / COSO 2013 / COSO 2017 control seeds.
+- First officer slice: official CSAP / SOC 2 / ISMS-P / ISO/IEC 27001:2022 / NIST SP 800-53 Rev. 5 / COSO 2013 / COSO 2017 control seeds.
 - Evidence create and control–evidence binding with declared actor/purpose audit context and encryption at rest.
 - Uncovered-control query and officer home that states the next action.
 - `/healthz` probe, standalone `python -m cwl_grc` entry, and `create_app()` module factory.
@@ -28,6 +28,10 @@
 - Keyverse audit attribution: `audit_event` stores issuer, OAuth client, request correlation, and `allow` without copying the access token; migration `0003_audit_attribution` backfills legacy rows as `local_preview` / `legacy_unattributed`.
 - Deployment-hardening runbook for local-preview migration, rollback, JWKS rotation, issuer outage, clock skew, and emergency read-only.
 - Hardened local start: `CWL_GRC_REQUIRE_KEYVERSE` refuses header-identity boots and admits only loopback TLS (`CWL_GRC_TLS_CERTFILE` / `CWL_GRC_TLS_KEYFILE` must be readable files). `cwl-grc serve` and `python -m cwl_grc` load a reviewed offline JWKS from `CWL_GRC_KEYVERSE_JWKS_PATH`. Invalid flag values fail closed. Proxy headers cannot rewrite TLS. Hardened-start and preview errors both name `CWL_GRC_EVIDENCE_KEY` for persistent stores. This is not remote production exposure.
+- `docs/product-technical-gap-baseline.md` with observed product truth, the live PR queue, officer-visible production and domain gaps, standards corrections, ownership boundaries, and exact next actions. The 2026-08-24 refresh records PR #58 hosted Devin success, terminal hosted check counts for merge-ready develop PRs, PR #34 Strix provider-unavailable, Wave 0 Keyverse order `#38 → #55 → #56 → #57 → #58`, and central `.github` #1257 still behind `main` with OpenCode `CHANGES_REQUESTED`.
+- Wave 1 legacy-binding projection identity: `binding_id` plus `control_item_id`, tenant-scoped through the bound evidence record, with `unassessed` fan-out only after an authorized `control_requirement_mapping` exists.
+- `docs/product/grc-domain-completion-roadmap.md` defining the closed obligation → requirement → policy → internal control → implementation → test/evidence → risk/audit → remediation → controlled-reporting loop and its release gates.
+- Current doctoring references for ISO 37301:2021 and Amendment 1:2024, ISO 19011:2026 Edition 4, OSCAL 1.2.3, and the NIST OLIR Program without claiming certification or source-text redistribution rights.
 
 ### Security
 
@@ -59,3 +63,4 @@
 - `docs/adr/0007-keyverse-openapi-security.md` — publish Keyverse Bearer security on protected officer policy/evidence operations while keeping `GET /` as a data-free browser bootstrap.
 - `docs/adr/0008-keyverse-audit-event-attribution.md` — persist Keyverse issuer, client, and request correlation on audit events without storing bearer tokens.
 - `docs/adr/0009-keyverse-required-tls-admission.md` — require an injected Keyverse verifier and loopback TLS before a hardened local start.
+- `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — preserve external catalogs while adding distinct internal-control definitions, implementations, reviewed mappings, tests, effectiveness results, deficiencies, and purpose-bound evidence usage before risk and audit depend on the model.
