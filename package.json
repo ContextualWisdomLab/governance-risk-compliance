@@ -16,5 +16,8 @@
     "@storybook/test-runner": "0.24.5",
     "@storybook/web-components-vite": "10.5.10",
     "storybook": "10.5.10"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
   }
 }

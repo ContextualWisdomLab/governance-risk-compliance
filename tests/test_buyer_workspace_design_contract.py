@@ -141,6 +141,7 @@ def test_frontend_toolchain_and_browser_gate_are_pinned() -> None:
     workflow = read(".github/workflows/buyer-workspace.yml")
     assert '"@playwright/test": "1.62.1"' in package
     assert '"@storybook/test-runner": "0.24.5"' in package
+    assert '"uuid": "11.1.1"' in package
     assert '"test:buyer-workspace": "playwright test tests/buyer-workspace.spec.mjs"' in package
     assert '"test:storybook": "node scripts/run-storybook-tests.mjs"' in package
     runner = read("scripts/run-storybook-tests.mjs")
