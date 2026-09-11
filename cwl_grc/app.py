@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable, Iterator
 from typing import Any
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Response
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -17,10 +18,20 @@ from cwl_grc.database import create_session_factory, session_dependency
 from cwl_grc.encryption import EvidenceCipher
 from cwl_grc.evidence import bind_control_evidence, create_evidence_record
 from cwl_grc.health import health_payload
-from cwl_grc.models import ControlItem, EvidenceRecord
+from cwl_grc.keyverse_authentication import KeyverseAccessTokenVerifier
+from cwl_grc.keyverse_http import (
+    EVIDENCE_WRITE_SCOPES,
+    POLICY_READ_SCOPES,
+    POLICY_WRITE_SCOPES,
+    RequestPrincipal,
+    apply_keyverse_openapi_security,
+    authenticate_keyverse_request,
+)
+from cwl_grc.models import ControlItem, EvidenceRecord, PolicyDocument
 from cwl_grc.officer_console import parse_control_ref, render_officer_home
 from cwl_grc.policy import (
     ControlRef,
+    PolicyGap,
     author_policy,
     list_policy_documents,
     list_policy_gaps,
@@ -42,6 +53,23 @@ def parse_framework(value: str | None) -> FrameworkCode | None:
         raise HTTPException(status_code=400, detail="Unknown control framework.") from exc
 
 
+def officer_declared_actor(
+    authorization: str | None,
+    x_actor_id: str | None,
+    form_actor: str | None,
+) -> str | None:
+    """Return a declared actor that cannot override a Bearer subject."""
+    header_actor = (x_actor_id or "").strip() or None
+    if authorization:
+        return header_actor
+    return header_actor or ((form_actor or "").strip() or None)
+
+
+def officer_declared_purpose(x_purpose: str | None, required: PurposeCode) -> str | None:
+    """Return the request purpose, or the officer-home purpose for that route."""
+    return x_purpose or required.value
+
+
 def serialize_control(item: ControlItem, *, covered: bool | None = None) -> dict[str, Any]:
     """Serialize one official control for officers and consuming services."""
     payload: dict[str, Any] = {
@@ -59,6 +87,7 @@ def create_app(
     *,
     database_url: str | None = None,
     evidence_key: str | None = None,
+    access_token_verifier: KeyverseAccessTokenVerifier | None = None,
 ) -> FastAPI:
     """Build a local-only GRC app with durable-key enforcement."""
     url = database_url or os.environ.get(
@@ -84,6 +113,59 @@ def create_app(
 
     app = FastAPI(title="CWL GRC", version="0.1.0")
     app.state.evidence_cipher = cipher
+    app.state.access_token_verifier = access_token_verifier
+
+    def custom_openapi() -> dict[str, Any]:
+        """Publish Keyverse Bearer security on officer policy and evidence routes."""
+        if app.openapi_schema is not None:
+            return app.openapi_schema
+        schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            routes=app.routes,
+        )
+        app.openapi_schema = apply_keyverse_openapi_security(schema)
+        return app.openapi_schema
+
+    app.openapi = custom_openapi
+
+    def authorized_principal(
+        *,
+        authorization: str | None,
+        declared_actor: str | None,
+        declared_tenant: str | None = None,
+        required_scopes: tuple[str, ...] = (),
+    ) -> RequestPrincipal:
+        """Resolve actor and tenant from Keyverse when configured, else local declarations."""
+        return authenticate_keyverse_request(
+            access_token_verifier,
+            authorization=authorization,
+            declared_actor=declared_actor,
+            declared_tenant=declared_tenant,
+            required_scopes=required_scopes,
+        )
+
+    def officer_owned_gaps(
+        session: Session,
+        principal: RequestPrincipal,
+        policy_document_id: str | None = None,
+    ) -> list[PolicyGap]:
+        """Return policy gaps owned by the verified officer and tenant only."""
+        gaps = list_policy_gaps(
+            session,
+            policy_document_id,
+            tenant_identifier=principal.tenant_identifier,
+        )
+        owned = {
+            document.policy_document_id
+            for document in session.query(PolicyDocument)
+            .filter_by(
+                created_by_actor=principal.actor_identifier,
+                tenant_identifier=principal.tenant_identifier,
+            )
+            .all()
+        }
+        return [gap for gap in gaps if gap.policy_document_id in owned]
 
     @app.middleware("http")
     async def enforce_developer_preview_boundary(
@@ -139,11 +221,24 @@ def create_app(
     def post_policy_document(
         body: dict[str, Any],
         session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
         x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
+        x_tenant_id: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Author a policy mapped only to official catalog identifiers."""
-        decision = require_purpose(x_actor_id, x_purpose, PurposeCode.POLICY_AUTHORING)
+        principal = authorized_principal(
+            authorization=authorization,
+            declared_actor=x_actor_id,
+            declared_tenant=x_tenant_id,
+            required_scopes=POLICY_WRITE_SCOPES,
+        )
+        decision = require_purpose(
+            principal.actor_identifier,
+            x_purpose,
+            PurposeCode.POLICY_AUTHORING,
+            tenant_identifier=principal.tenant_identifier,
+        )
         document = author_policy(
             session,
             decision,
@@ -158,11 +253,24 @@ def create_app(
         policy_document_id: str,
         body: dict[str, Any],
         session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
         x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
+        x_tenant_id: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Publish the next immutable policy edition and replacement mappings."""
-        decision = require_purpose(x_actor_id, x_purpose, PurposeCode.POLICY_AUTHORING)
+        principal = authorized_principal(
+            authorization=authorization,
+            declared_actor=x_actor_id,
+            declared_tenant=x_tenant_id,
+            required_scopes=POLICY_WRITE_SCOPES,
+        )
+        decision = require_purpose(
+            principal.actor_identifier,
+            x_purpose,
+            PurposeCode.POLICY_AUTHORING,
+            tenant_identifier=principal.tenant_identifier,
+        )
         document = revise_policy(
             session,
             decision,
@@ -173,13 +281,32 @@ def create_app(
         return serialize_policy(session, document)
 
     @app.get("/policy-documents")
-    def get_policy_documents(session: Session = Depends(get_session)) -> dict[str, Any]:
+    def get_policy_documents(
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_tenant_id: str | None = Header(default=None),
+    ) -> dict[str, Any]:
         """List authored policies and their latest official mappings."""
+        documents = list_policy_documents(session)
+        if access_token_verifier is not None:
+            principal = authorized_principal(
+                authorization=authorization,
+                declared_actor=x_actor_id,
+                declared_tenant=x_tenant_id,
+                required_scopes=POLICY_READ_SCOPES,
+            )
+            documents = [
+                document
+                for document in documents
+                if document.created_by_actor == principal.actor_identifier
+                and document.tenant_identifier == principal.tenant_identifier
+            ]
         return {
             "next_action": "Review policy gaps and attach the next evidence.",
             "policies": [
                 serialize_policy(session, document)
-                for document in list_policy_documents(session)
+                for document in documents
             ],
         }
 
@@ -187,25 +314,48 @@ def create_app(
     def get_policy_gaps(
         session: Session = Depends(get_session),
         policy_document_id: str | None = None,
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_tenant_id: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """List latest-version policy mappings that still lack evidence."""
+        if access_token_verifier is not None:
+            principal = authorized_principal(
+                authorization=authorization,
+                declared_actor=x_actor_id,
+                declared_tenant=x_tenant_id,
+                required_scopes=POLICY_READ_SCOPES,
+            )
+            gaps = officer_owned_gaps(session, principal, policy_document_id)
+        else:
+            gaps = list_policy_gaps(session, policy_document_id)
         return {
             "next_action": "Attach the next evidence on an uncovered policy control.",
-            "gaps": [
-                serialize_gap(gap)
-                for gap in list_policy_gaps(session, policy_document_id)
-            ],
+            "gaps": [serialize_gap(gap) for gap in gaps],
         }
 
     @app.post("/evidence-records", status_code=201)
     def post_evidence(
         body: dict[str, str],
         session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
         x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
+        x_tenant_id: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Store the next evidence artifact without masking PII."""
-        decision = require_purpose(x_actor_id, x_purpose, PurposeCode.EVIDENCE_BINDING)
+        principal = authorized_principal(
+            authorization=authorization,
+            declared_actor=x_actor_id,
+            declared_tenant=x_tenant_id,
+            required_scopes=EVIDENCE_WRITE_SCOPES,
+        )
+        decision = require_purpose(
+            principal.actor_identifier,
+            x_purpose,
+            PurposeCode.EVIDENCE_BINDING,
+            tenant_identifier=principal.tenant_identifier,
+        )
         record = create_evidence_record(
             session,
             cipher,
@@ -219,11 +369,24 @@ def create_app(
     def post_binding(
         body: dict[str, str],
         session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
         x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
+        x_tenant_id: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Bind stored evidence to one official control identifier."""
-        decision = require_purpose(x_actor_id, x_purpose, PurposeCode.EVIDENCE_BINDING)
+        principal = authorized_principal(
+            authorization=authorization,
+            declared_actor=x_actor_id,
+            declared_tenant=x_tenant_id,
+            required_scopes=EVIDENCE_WRITE_SCOPES,
+        )
+        decision = require_purpose(
+            principal.actor_identifier,
+            x_purpose,
+            PurposeCode.EVIDENCE_BINDING,
+            tenant_identifier=principal.tenant_identifier,
+        )
         framework = parse_framework(body.get("framework"))
         if framework is None:
             raise HTTPException(status_code=400, detail="Name the official framework.")
@@ -244,12 +407,25 @@ def create_app(
         }
 
     @app.get("/", response_class=HTMLResponse)
-    def officer_home(session: Session = Depends(get_session)) -> str:
-        """Show policy authoring, policy gaps, and the next evidence action."""
+    def officer_home(
+        session: Session = Depends(get_session),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_tenant_id: str | None = Header(default=None),
+    ) -> str:
+        """Show a browser shell; load protected officer gaps through the Bearer API."""
+        keyverse_required = access_token_verifier is not None
+        if keyverse_required:
+            gaps: list[PolicyGap] = []
+            uncovered: list[ControlItem] = []
+        else:
+            gaps = list_policy_gaps(session, None)
+            uncovered = list_uncovered_controls(session, None)
         return render_officer_home(
-            list_uncovered_controls(session, None),
-            policy_gaps=list_policy_gaps(session, None),
+            uncovered,
+            policy_gaps=gaps,
             catalog_items=list_control_items(session, None),
+            keyverse_required=keyverse_required,
         )
 
     @app.post("/officer/policy")
@@ -257,14 +433,29 @@ def create_app(
         session: Session = Depends(get_session),
         policy_title: str = Form(),
         policy_body: str = Form(),
-        actor_identifier: str = Form(),
+        actor_identifier: str = Form(default=""),
         control_refs: list[str] = Form(default=[]),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+        x_tenant_id: str | None = Header(default=None),
     ) -> RedirectResponse:
         """Author a policy from the officer home and return to the gap list."""
+        principal = authorized_principal(
+            authorization=authorization,
+            declared_actor=officer_declared_actor(
+                authorization,
+                x_actor_id,
+                actor_identifier,
+            ),
+            declared_tenant=x_tenant_id,
+            required_scopes=POLICY_WRITE_SCOPES,
+        )
         decision = require_purpose(
-            actor_identifier,
-            PurposeCode.POLICY_AUTHORING.value,
+            principal.actor_identifier,
+            officer_declared_purpose(x_purpose, PurposeCode.POLICY_AUTHORING),
             PurposeCode.POLICY_AUTHORING,
+            tenant_identifier=principal.tenant_identifier,
         )
         refs: list[ControlRef] = []
         for raw in control_refs:
@@ -283,14 +474,28 @@ def create_app(
     @app.post("/officer/evidence")
     def officer_attach(
         session: Session = Depends(get_session),
-        actor_identifier: str = Form(),
+        actor_identifier: str = Form(default=""),
         evidence_title: str = Form(),
         payload_text: str = Form(),
         framework: str | None = Form(default=None),
         catalog_identifier: str | None = Form(default=None),
         control_ref: str | None = Form(default=None),
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+        x_tenant_id: str | None = Header(default=None),
     ) -> RedirectResponse:
         """Attach evidence from the officer home and return to the gap list."""
+        principal = authorized_principal(
+            authorization=authorization,
+            declared_actor=officer_declared_actor(
+                authorization,
+                x_actor_id,
+                actor_identifier,
+            ),
+            declared_tenant=x_tenant_id,
+            required_scopes=EVIDENCE_WRITE_SCOPES,
+        )
         if control_ref:
             try:
                 framework, catalog_identifier = parse_control_ref(control_ref)
@@ -306,9 +511,10 @@ def create_app(
                 detail="Name the official control to bind.",
             )
         decision = require_purpose(
-            actor_identifier,
-            PurposeCode.EVIDENCE_BINDING.value,
+            principal.actor_identifier,
+            officer_declared_purpose(x_purpose, PurposeCode.EVIDENCE_BINDING),
             PurposeCode.EVIDENCE_BINDING,
+            tenant_identifier=principal.tenant_identifier,
         )
         record = create_evidence_record(
             session,

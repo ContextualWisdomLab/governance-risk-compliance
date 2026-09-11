@@ -9,6 +9,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     LargeBinary,
     String,
     Text,
@@ -70,9 +71,13 @@ class EvidenceRecord(Base):
     """One evidence artifact whose payload stays usable to authorized officers."""
 
     __tablename__ = "evidence_record"
+    __table_args__ = (
+        Index("evidence_record_tenant_actor", "tenant_identifier", "collector_actor"),
+    )
 
     evidence_record_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     evidence_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    tenant_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
     collector_actor: Mapped[str] = mapped_column(String(128), nullable=False)
     purpose_code: Mapped[str] = mapped_column(
         ForeignKey("authorization_purpose.purpose_code"),
@@ -122,6 +127,7 @@ class AuditEvent(Base):
     __tablename__ = "audit_event"
 
     audit_event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
     actor_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
     purpose_code: Mapped[str] = mapped_column(String(64), nullable=False)
     action_name: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -139,10 +145,12 @@ class PolicyDocument(Base):
             "current_version_number >= 0",
             name="policy_document_version_nonnegative",
         ),
+        Index("policy_document_tenant_actor", "tenant_identifier", "created_by_actor"),
     )
 
     policy_document_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     policy_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    tenant_identifier: Mapped[str] = mapped_column(String(128), nullable=False)
     created_by_actor: Mapped[str] = mapped_column(String(128), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     current_version_number: Mapped[int] = mapped_column(

@@ -15,6 +15,7 @@ import jwt
 
 MAX_JWKS_BYTES = 1024 * 1024
 MAX_CLOCK_SKEW_SECONDS = 300
+MAX_PERSISTED_IDENTITY_LENGTH = 128
 ACCESS_TOKEN_TYPES = frozenset({"at+jwt", "application/at+jwt"})
 REQUIRED_ACCESS_TOKEN_CLAIMS = (
     "iss",
@@ -35,6 +36,15 @@ PRIVATE_RSA_PARAMETERS = frozenset({"d", "p", "q", "dp", "dq", "qi", "oth"})
 
 class AccessTokenValidationError(ValueError):
     """Signal that untrusted bearer material failed a closed validation rule."""
+
+
+class AccessTokenScopeError(AccessTokenValidationError):
+    """Signal that a verified token is missing an action-specific scope.
+
+    Insufficient scope is authorization failure (HTTP 403), not authentication
+    failure (HTTP 401). RFC 6750 maps `insufficient_scope` to 403 after the
+    token itself has been authenticated.
+    """
 
 
 @dataclass(frozen=True)
@@ -187,6 +197,8 @@ class KeyverseAccessTokenVerifier:
             raise AccessTokenValidationError(
                 "This Keyverse profile accepts a human principal only."
             )
+        _reject_oversized_identity("subject", actor_id)
+        _reject_oversized_identity("tenant", tenant_id)
         scopes = _parse_scopes(payload["scope"])
         principal = AuthenticatedPrincipal(
             tenant_id=tenant_id,
@@ -273,7 +285,7 @@ def require_access_scopes(
     """Reject an authenticated principal missing any action-specific scope."""
     missing = set(required_scopes).difference(principal.scopes)
     if missing:
-        raise AccessTokenValidationError("The Keyverse token lacks a required scope.")
+        raise AccessTokenScopeError("The Keyverse token lacks a required scope.")
 
 
 def _read_untrusted_header(token: str) -> dict[str, Any]:
@@ -359,6 +371,14 @@ def _required_text(payload: Mapping[str, Any], claim: str, label: str) -> str:
     if not isinstance(value, str) or not value or value != value.strip():
         raise AccessTokenValidationError(f"The Keyverse {label} is invalid.")
     return value
+
+
+def _reject_oversized_identity(label: str, value: str) -> None:
+    """Reject an identity claim wider than the GRC-owned persistence contract."""
+    if len(value) > MAX_PERSISTED_IDENTITY_LENGTH:
+        raise AccessTokenValidationError(
+            f"The Keyverse {label} identity exceeds the persistence boundary."
+        )
 
 
 def _parse_scopes(value: Any) -> frozenset[str]:

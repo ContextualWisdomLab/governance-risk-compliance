@@ -162,10 +162,12 @@ def test_policy_authoring_requires_purpose() -> None:
     assert wrong.status_code == 403
 
 
-def test_officer_home_lets_buyer_write_policy_and_see_policy_gaps() -> None:
+def test_officer_home_lets_officer_write_policy_and_see_policy_gaps() -> None:
     client = _client()
     home = client.get("/")
     assert "Author the next policy" in home.text
+    assert "Keyverse access token" in home.text
+    assert "Buyer" not in home.text
     posted = client.post(
         "/officer/policy",
         data={
