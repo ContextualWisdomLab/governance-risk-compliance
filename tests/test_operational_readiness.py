@@ -244,6 +244,30 @@ def test_readiness_requires_every_installed_integrity_guard(guard_name: str) -> 
     )
 
 
+@pytest.mark.parametrize(
+    ("table_name", "column_name"),
+    (
+        ("control_exception", "exception_reason"),
+        ("evidence_record", "integrity_digest"),
+        ("control_test_result", "result_rationale"),
+    ),
+)
+def test_readiness_requires_every_required_column(table_name: str, column_name: str) -> None:
+    """Readiness refuses traffic when a present table is missing a required column."""
+    app = _app()
+    with app.state.session_factory.kw["bind"].begin() as connection:
+        connection.execute(text(f"ALTER TABLE {table_name} DROP COLUMN {column_name}"))
+    report = readiness_payload(
+        app.state.session_factory,
+        app.state.evidence_cipher,
+        LOCAL_PREVIEW_ENVIRONMENT,
+        None,
+        app.state.lifecycle,
+    )
+    assert report["status"] == "not_ready"
+    assert report["checks"]["schema"]["reason_code"] == "schema_incompatible"
+
+
 def test_readiness_rejects_missing_required_purpose_with_matching_row_count() -> None:
     """Readiness verifies required purpose identifiers, not only their row count."""
     app = _app()

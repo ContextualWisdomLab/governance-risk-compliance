@@ -39,6 +39,10 @@ REQUIRED_MIGRATIONS = frozenset(
     }
 )
 REQUIRED_TABLES = frozenset(Base.metadata.tables) | {"schema_migration"}
+REQUIRED_COLUMNS: dict[str, frozenset[str]] = {
+    name: frozenset(column.name for column in table.columns)
+    for name, table in Base.metadata.tables.items()
+}
 _GUARD_NAME_PATTERN = re.compile(
     r"^\s*CREATE TRIGGER (?:IF NOT EXISTS )?([A-Za-z_][A-Za-z0-9_]*)",
     re.IGNORECASE | re.MULTILINE,
@@ -52,6 +56,18 @@ def _installed_guard_names(dialect_name: str) -> frozenset[str]:
         for statement in integrity_guard_statements(dialect_name)
         if (match := _GUARD_NAME_PATTERN.search(statement))
     )
+
+
+def _missing_required_columns(inspector: Any) -> set[str]:
+    """Return qualified columns a present table is missing for the current model."""
+    missing: set[str] = set()
+    for table_name, column_names in REQUIRED_COLUMNS.items():
+        present = {column["name"] for column in inspector.get_columns(table_name)}
+        missing.update(
+            f"{table_name}.{column_name}"
+            for column_name in column_names - present
+        )
+    return missing
 
 
 SQLITE_GUARDS = _installed_guard_names("sqlite")
@@ -142,6 +158,13 @@ def _database_checks(factory: sessionmaker[Session]) -> dict[str, dict[str, str]
             if missing_tables:
                 return {
                     "database": _fail("schema_unavailable"),
+                    "schema": _fail("schema_incompatible"),
+                    "seed_state": _fail("schema_incompatible"),
+                    "integrity_guards": _fail("schema_incompatible"),
+                }
+            if _missing_required_columns(inspector):
+                return {
+                    "database": _ok("database_reachable"),
                     "schema": _fail("schema_incompatible"),
                     "seed_state": _fail("schema_incompatible"),
                     "integrity_guards": _fail("schema_incompatible"),
