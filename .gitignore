@@ -10,5 +10,8 @@ build/
 *.egg-info/
 *.sqlite
 *.sqlite3
+node_modules/
+storybook-static/
+test-results/
 .netlify
 .cursor/
