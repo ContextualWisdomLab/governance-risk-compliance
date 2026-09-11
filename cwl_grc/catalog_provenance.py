@@ -311,6 +311,10 @@ def record_catalog_import(
     counts = (requirement_count, changed_requirement_count, warning_count)
     if any(not isinstance(value, int) or isinstance(value, bool) or value < 0 for value in counts):
         raise ValueError("import counts must be non-negative integers.")
+    if changed_requirement_count > requirement_count:
+        raise ValueError(
+            "changed requirement count must not exceed the total requirement count."
+        )
     if status == "failed" and not failure_code:
         raise ValueError("failed imports require a failure code.")
     if status == "succeeded" and failure_code:

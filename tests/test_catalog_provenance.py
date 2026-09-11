@@ -973,6 +973,17 @@ def test_import_failures_and_conflicts_are_explicit() -> None:
                 run_status="succeeded",
                 requirement_count=-1,
             )
+        with pytest.raises(ValueError, match="must not exceed"):
+            record_catalog_import(
+                session,
+                _DECISION,
+                version.source_artifact_version_id,
+                parser_version="oscal-json-1",
+                importer_commit="b" * 40,
+                run_status="succeeded",
+                requirement_count=1,
+                changed_requirement_count=100,
+            )
         failed = record_catalog_import(
             session,
             _DECISION,
