@@ -96,6 +96,13 @@ def test_csap_source_is_pinned_to_the_2026_07_kisa_notice() -> None:
     assert "/main/csap/intro/" not in source
 
 
+def _adr_references(document: str) -> str:
+    """Return only the References section where locators may live."""
+    marker = "## References"
+    assert marker in document, "accepted ADRs must carry a References section"
+    return document.partition(marker)[2]
+
+
 def test_accepted_adrs_cite_verified_official_sources() -> None:
     """Accepted ADRs must carry APA 7th References using the official locators."""
     bibliography = (REPOSITORY_ROOT / "docs/doctoring/REFERENCES.md").read_text(
@@ -108,6 +115,8 @@ def test_accepted_adrs_cite_verified_official_sources() -> None:
         REPOSITORY_ROOT / "docs/adr/0002-policy-versioning-official-controls.md"
     ).read_text(encoding="utf-8")
     adr_index = (REPOSITORY_ROOT / "docs/adr/README.md").read_text(encoding="utf-8")
+    adr_one_references = _adr_references(adr_one)
+    adr_two_references = _adr_references(adr_two)
     shared_locators = (
         "https://www.aicpa-cima.com/resources/download/"
         "2017-trust-services-criteria-with-revised-points-of-focus-2022",
@@ -115,29 +124,32 @@ def test_accepted_adrs_cite_verified_official_sources() -> None:
         "https://www.iso.org/standard/27001",
         "https://isms-p.or.kr/ntcn/rcsrm/selectGnrlRcsrmDetail.do"
         "?searchRcsrmMngId=RCSRMID_000000010105",
-        "selectGnrlVrtlRcsrmList.do",
-        "%ED%81%B4%EB%9D%BC%EC%9A%B0%EB%93%9C",
+        "https://isms-p.or.kr/ntcn/rcsrm/selectGnrlVrtlRcsrmList.do"
+        "?rcsrmMenuCd=1003&searchKeyword=%ED%81%B4%EB%9D%BC%EC%9A%B0%EB%93%9C"
+        "%EC%84%9C%EB%B9%84%EC%8A%A4+%EB%B3%B4%EC%95%88%EC%9D%B8%EC%A6%9D%EA%B8%B0"
+        "%EC%A4%80+%ED%95%B4%EC%84%A4%EC%84%9C",
     )
     for locator in shared_locators:
         assert locator in bibliography
-        assert locator in adr_one
-        assert locator in adr_two
-    assert "## References" in adr_one
-    assert "## References" in adr_two
+        assert locator in adr_one_references
+        assert locator in adr_two_references
     assert "https://doi.org/10.6028/NIST.SP.800-53r5" in bibliography
-    assert "https://doi.org/10.6028/NIST.SP.800-53r5" in adr_one
+    assert "https://doi.org/10.6028/NIST.SP.800-53r5" in adr_one_references
     assert (
         "https://www.coso.org/_files/ugd/"
         "3059fc_61ea5985b03c4293960642fdce408eaa.pdf"
-    ) in adr_one
+    ) in adr_one_references
     assert (
         "https://www.openpolicyagent.org/docs/latest/policy-language/"
     ) in bibliography
     assert (
         "https://www.openpolicyagent.org/docs/latest/policy-language/"
-    ) in adr_two
+    ) in adr_two_references
     assert "isms.kisa.or.kr" not in adr_one
     assert "isms.kisa.or.kr" not in adr_two
+    assert "https://isms.kisa.or.kr" not in bibliography
+    assert "isms.kisa.or.kr/" not in bibliography
+    assert "principles poster" not in adr_two
     assert "0001-control-evidence-first-slice.md" in adr_index
     assert "0002-policy-versioning-official-controls.md" in adr_index
     assert "docs/doctoring/REFERENCES.md" in adr_index
