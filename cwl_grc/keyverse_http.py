@@ -8,7 +8,15 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from cwl_grc.authorization import LOCAL_PREVIEW_TENANT
+from cwl_grc.authorization import (
+    AuthorizationDecision,
+    LOCAL_PREVIEW_CLIENT,
+    LOCAL_PREVIEW_ISSUER,
+    LOCAL_PREVIEW_TENANT,
+    PurposeCode,
+    require_purpose,
+)
+from cwl_grc.correlation import current_correlation_reference
 from cwl_grc.keyverse_authentication import (
     AccessTokenScopeError,
     AccessTokenValidationError,
@@ -81,6 +89,8 @@ class RequestPrincipal:
 
     actor_identifier: str
     tenant_identifier: str
+    issuer_identifier: str = LOCAL_PREVIEW_ISSUER
+    client_identifier: str = LOCAL_PREVIEW_CLIENT
 
 
 def extract_bearer_token(authorization: str | None) -> str:
@@ -135,7 +145,29 @@ def authenticate_keyverse_request(
         raise HTTPException(status_code=status, detail=str(exc)) from exc
     _reject_impersonation(principal, declared_actor, declared_tenant)
     _reject_unpersistable_identity(principal)
-    return RequestPrincipal(principal.actor_id, principal.tenant_id)
+    return RequestPrincipal(
+        principal.actor_id,
+        principal.tenant_id,
+        issuer_identifier=verifier.issuer,
+        client_identifier=principal.client_id,
+    )
+
+
+def decision_for_request(
+    principal: RequestPrincipal,
+    purpose_value: str | None,
+    required: PurposeCode,
+) -> AuthorizationDecision:
+    """Build an attributed purpose decision for one authenticated request."""
+    return require_purpose(
+        principal.actor_identifier,
+        purpose_value,
+        required,
+        tenant_identifier=principal.tenant_identifier,
+        issuer_identifier=principal.issuer_identifier,
+        client_identifier=principal.client_identifier,
+        correlation_reference=current_correlation_reference(),
+    )
 
 
 def _reject_impersonation(
@@ -161,6 +193,7 @@ def _reject_unpersistable_identity(principal: AuthenticatedPrincipal) -> None:
     if (
         len(principal.actor_id) > MAX_PERSISTED_IDENTITY_LENGTH
         or len(principal.tenant_id) > MAX_PERSISTED_IDENTITY_LENGTH
+        or len(principal.client_id) > MAX_PERSISTED_IDENTITY_LENGTH
     ):
         raise HTTPException(
             status_code=401,

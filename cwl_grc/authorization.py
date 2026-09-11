@@ -10,6 +10,7 @@ from typing import assert_never
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from cwl_grc.correlation import current_correlation_reference
 from cwl_grc.models import AuthorizationPurpose
 
 
@@ -23,6 +24,9 @@ class PurposeCode(StrEnum):
 
 
 LOCAL_PREVIEW_TENANT = "local_preview"
+LOCAL_PREVIEW_ISSUER = "local_preview"
+LOCAL_PREVIEW_CLIENT = "local_preview"
+DECISION_ALLOW = "allow"
 
 
 @dataclass(frozen=True)
@@ -32,6 +36,10 @@ class AuthorizationDecision:
     actor_identifier: str
     purpose_code: PurposeCode
     tenant_identifier: str = LOCAL_PREVIEW_TENANT
+    issuer_identifier: str = LOCAL_PREVIEW_ISSUER
+    client_identifier: str = LOCAL_PREVIEW_CLIENT
+    correlation_reference: str = ""
+    decision_outcome: str = DECISION_ALLOW
 
 
 def seed_authorization_purposes(session: Session) -> None:
@@ -69,6 +77,9 @@ def require_purpose(
     required: PurposeCode,
     *,
     tenant_identifier: str | None = None,
+    issuer_identifier: str | None = None,
+    client_identifier: str | None = None,
+    correlation_reference: str | None = None,
 ) -> AuthorizationDecision:
     """Accept only a named actor acting under the required purpose."""
     if not actor_identifier or not purpose_value:
@@ -86,4 +97,15 @@ def require_purpose(
             detail=f"This action requires {required.value}.",
         )
     tenant = (tenant_identifier or "").strip() or LOCAL_PREVIEW_TENANT
-    return AuthorizationDecision(actor_identifier, purpose_code, tenant)
+    issuer = (issuer_identifier or "").strip() or LOCAL_PREVIEW_ISSUER
+    client = (client_identifier or "").strip() or LOCAL_PREVIEW_CLIENT
+    correlation = (correlation_reference or "").strip() or current_correlation_reference()
+    return AuthorizationDecision(
+        actor_identifier,
+        purpose_code,
+        tenant,
+        issuer,
+        client,
+        correlation,
+        DECISION_ALLOW,
+    )
