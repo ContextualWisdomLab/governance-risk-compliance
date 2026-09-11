@@ -222,6 +222,8 @@ def create_app(
                 )
             else:
                 response = await call_next(request)
+            if access_token_verifier is not None and request.url.path == "/controls/uncovered":
+                response.headers["Cache-Control"] = "no-store"
             response.headers["X-Request-ID"] = current_correlation_reference()
             return response
         finally:
