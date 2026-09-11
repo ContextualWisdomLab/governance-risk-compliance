@@ -120,6 +120,14 @@ def _period(start: datetime, end: datetime | None, label: str = "effective perio
         raise HTTPException(status_code=400, detail=f"The {label} is reversed.")
 
 
+def _review_within(start: datetime, review_at: datetime, end: datetime | None) -> None:
+    """Reject a next review date outside the effective period it reviews."""
+    if review_at < start:
+        raise HTTPException(status_code=400, detail="The next review date precedes the effective period.")
+    if end is not None and review_at > end:
+        raise HTTPException(status_code=400, detail="The next review date falls after the effective period.")
+
+
 def _same_tenant(session: Session, model: type[ModelT], identifier: str, tenant_id: str) -> ModelT:
     """Load one tenant-owned row or return a safe not-found response."""
     row = session.query(model).filter_by(**{model.__table__.primary_key.columns.keys()[0]: identifier, "tenant_id": tenant_id}).one_or_none()
@@ -365,6 +373,7 @@ def decide_applicability(
     start = _utc(effective_from)
     end = _utc(effective_to) if effective_to else None
     _period(start, end)
+    _review_within(start, _utc(next_review_at), end)
     applicability = ApplicabilityDecision(
         applicability_decision_id=uuid4().hex,
         tenant_id=decision.tenant_id,

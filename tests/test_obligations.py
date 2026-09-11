@@ -304,6 +304,56 @@ def test_obligation_lifecycle_preserves_applicability_and_change_history() -> No
         assert list_obligation_worklist(session, decision, as_of=datetime(2026, 5, 1))[0].queue == "overdue"
 
 
+def test_applicability_rejects_review_date_outside_effective_period() -> None:
+    """A next review date outside the effective period fails closed as an invalid interval."""
+    factory = _factory()
+    decision = _decision()
+    with factory() as session:
+        _source_row, revision = _source(session, decision)
+        obligation = _obligation(session, decision, revision)
+        with pytest.raises(HTTPException, match="next review"):
+            decide_applicability(
+                session,
+                decision,
+                obligation.compliance_obligation_id,
+                ApplicabilityCode.APPLICABLE.value,
+                "organization",
+                "tenant-1",
+                "The obligation applies to the exact tenant scope.",
+                "evidence://scope-review",
+                MARCH,
+                FEBRUARY,
+            )
+        with pytest.raises(HTTPException, match="next review"):
+            decide_applicability(
+                session,
+                decision,
+                obligation.compliance_obligation_id,
+                ApplicabilityCode.APPLICABLE.value,
+                "organization",
+                "tenant-1",
+                "The review is scheduled after the decision lapses.",
+                "evidence://scope-review",
+                FEBRUARY,
+                datetime(2026, 6, 1),
+                effective_to=MARCH,
+            )
+        in_window = decide_applicability(
+            session,
+            decision,
+            obligation.compliance_obligation_id,
+            ApplicabilityCode.APPLICABLE.value,
+            "organization",
+            "tenant-1",
+            "The review is scheduled inside the effective period.",
+            "evidence://scope-review",
+            FEBRUARY,
+            MARCH,
+            effective_to=datetime(2026, 4, 1),
+        )
+        assert in_window.next_review_at == MARCH
+
+
 def test_obligation_requirement_target_is_unique_when_optional_targets_are_null() -> None:
     """The database rejects duplicate policy targets despite nullable columns."""
     factory = _factory()
