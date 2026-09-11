@@ -14,13 +14,13 @@ from cwl_grc.keyverse_authentication import (
     AccessTokenValidationError,
     AuthenticatedPrincipal,
     KeyverseAccessTokenVerifier,
+    MAX_PERSISTED_IDENTITY_LENGTH,
 )
 
 POLICY_READ_SCOPES = ("grc.policy.read",)
 POLICY_WRITE_SCOPES = ("grc.policy.write",)
 EVIDENCE_WRITE_SCOPES = ("grc.evidence.write",)
 KEYVERSE_BEARER_SCHEME = "KeyverseBearer"
-MAX_PERSISTED_IDENTITY_LENGTH = 128
 KEYVERSE_PROTECTED_OPERATIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("/policy-documents", "post", POLICY_WRITE_SCOPES),
     (
