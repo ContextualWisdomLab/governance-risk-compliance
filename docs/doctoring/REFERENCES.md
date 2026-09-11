@@ -1,8 +1,10 @@
 # Doctoring references
 
-Official texts used for first-slice identifiers and product-completion decisions. If a citation and the code conflict, fix the code. A reference records provenance; it does not authorize copying licensed source text or claiming certification.
+Official texts used for first-slice identifiers, authentication contracts, and product-completion decisions. If a citation and the code conflict, fix the code. A reference records provenance; it does not authorize copying licensed source text or claiming certification.
 
 American Institute of Certified Public Accountants. (2022). *2017 trust services criteria for security, availability, processing integrity, confidentiality, and privacy (with revised points of focus—2022)* (TSP Section 100). https://www.aicpa-cima.com/resources/download/2017-trust-services-criteria-with-revised-points-of-focus-2022
+
+Bertocci, V. (2021). *JSON Web Token (JWT) profile for OAuth 2.0 access tokens* (RFC 9068). RFC Editor. https://www.rfc-editor.org/rfc/rfc9068
 
 Committee of Sponsoring Organizations of the Treadway Commission. (2013). *Internal control—Integrated framework*. https://www.coso.org/guidance-on-ic
 
@@ -28,7 +30,13 @@ National Institute of Standards and Technology. (2025, August 27). *Security and
 
 National Institute of Standards and Technology. (2025, August 27). *Summary of changes: NIST SP 800-53 Release 5.2.0*. https://csrc.nist.gov/files/projects/Risk-Management/800-53%20Comment%20Site/SP800-53-r5.2.0-changes.pdf
 
+Lodderstedt, T., Bradley, J., Labunets, A., & Fett, D. (2025). *Best current practice for OAuth 2.0 security* (RFC 9700, BCP 240). RFC Editor. https://www.rfc-editor.org/rfc/rfc9700
+
 Open Policy Agent. (n.d.). *Policy language*. https://www.openpolicyagent.org/docs/latest/policy-language/
+
+OpenID Foundation. (2023a). *OpenID Connect Core 1.0 incorporating errata set 2*. https://openid.net/specs/openid-connect-core-1_0-errata2.html
+
+OpenID Foundation. (2023b). *OpenID Connect Discovery 1.0 incorporating errata set 2*. https://openid.net/specs/openid-connect-discovery-1_0-errata2.html
 
 Ross, R., & Pillitteri, V. (2020). *Security and privacy controls for information systems and organizations* (NIST Special Publication 800-53 Rev. 5). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-53r5
 
@@ -38,6 +46,8 @@ The product-completion baseline uses ISO 37301:2021, confirmed current in 2026, 
 
 The checked-in `nist_sp_800_53_r5` first-slice rows were authored against the 2020 Rev. 5 catalog and have not been refreshed or proven complete against final Release 5.2.0. NIST issued Release 5.2.0 on August 27, 2025 with new and revised controls, enhancements, discussions, related controls, references, and corresponding assessment-procedure updates. Issue #29 must ingest a lawfully acquired exact release artifact, preserve its digest and import receipt, compute a reviewed edition diff, and decide whether the framework key remains compatible or requires a new release-specific identity before the catalog baseline is described as 5.2.0.
 
-The CSAP catalog stores the edition-specific KISA resource notice rather than the generic CSAP introduction page. A content digest is not claimed in the first slice because the original attachment bytes were not independently captured and hashed in the repository; adding a digest requires an immutable source-artifact ingestion workflow and reviewable byte-level evidence.
+The CSAP catalog stores the edition-specific KISA resource notice rather than the generic CSAP introduction page. A content digest is not claimed in this slice because the original attachment bytes were not independently captured and hashed in the repository; adding a digest requires an immutable source-artifact ingestion workflow and reviewable byte-level evidence.
+
+The first Keyverse authentication prerequisite follows RFC 9068 for explicit JWT access-token typing, signed RS256 validation, issuer/audience checks, and required access-token claims; RFC 9700 for resource/action restriction and client-versus-resource-owner separation; and the OpenID Connect Core/Discovery errata-set-2 issuer and signing-key metadata semantics. Discovery and live JWK retrieval are intentionally deferred until URL pinning, redirect refusal, response bounds, cache/rotation, and issuer-outage behavior have executable tests.
 
 ISO publications and other licensed standards remain subject to publisher copyright and usage restrictions. Public CWL records should use official identifiers, lawful source references, and independently authored summaries unless redistribution rights for source text are explicitly recorded.
