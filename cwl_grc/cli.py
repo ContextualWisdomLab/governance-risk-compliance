@@ -198,14 +198,15 @@ def _owned_policy_documents(
     session: Session,
     principal: RequestPrincipal | None,
 ) -> list[PolicyDocument]:
-    """List policies, limited to the verified tenant when Keyverse is required."""
+    """List policies owned by the verified officer and tenant in hardened mode."""
     documents = list_policy_documents(session)
     if principal is None:
         return documents
     return [
         document
         for document in documents
-        if document.tenant_identifier == principal.tenant_identifier
+        if document.created_by_actor == principal.actor_identifier
+        and document.tenant_identifier == principal.tenant_identifier
     ]
 
 
@@ -214,7 +215,7 @@ def _owned_policy_gaps(
     principal: RequestPrincipal | None,
     policy_document_id: str | None,
 ) -> list[PolicyGap]:
-    """List uncovered mappings, limited to the verified tenant when Keyverse is required."""
+    """List uncovered mappings owned by the verified officer and tenant."""
     tenant = None if principal is None else principal.tenant_identifier
     gaps = list_policy_gaps(session, policy_document_id, tenant_identifier=tenant)
     if principal is None:
