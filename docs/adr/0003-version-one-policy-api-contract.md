@@ -35,6 +35,11 @@ therefore an explicit deployment gate, not an implied property of this API.
    problem members, a request reference, and no reflected request values.
 5. Mark the unversioned policy routes deprecated in OpenAPI while retaining
    them for local compatibility. They are not removed in this slice.
+6. Treat a stored policy whose declared current version has no finalized edition
+   as an integrity conflict. Version-one collection reads return a bounded `409`
+   problem response instead of omitting the policy, synthesizing an edition, or
+   allowing a serializer `KeyError` to become an HTTP 500. Repairing that store
+   remains an explicit migration/operations action.
 
 ## Consequences
 
