@@ -10,6 +10,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     LargeBinary,
@@ -154,6 +155,11 @@ class CatalogImportRun(Base):
             "parser_version",
             name="catalog_import_run_version_parser",
         ),
+        UniqueConstraint(
+            "catalog_import_run_id",
+            "source_artifact_version_id",
+            name="catalog_import_run_version_identity",
+        ),
         CheckConstraint(
             "run_status IN ('succeeded', 'failed')",
             name="catalog_import_run_status",
@@ -178,7 +184,8 @@ class CatalogImportRun(Base):
         back_populates="catalog_import_run", uselist=False
     )
     catalog_releases: Mapped[list[CatalogRelease]] = relationship(
-        back_populates="catalog_import_run"
+        back_populates="catalog_import_run",
+        foreign_keys="CatalogRelease.catalog_import_run_id",
     )
 
 
@@ -219,6 +226,11 @@ class CatalogRelease(Base):
             "release_key",
             name="catalog_release_version_key",
         ),
+        ForeignKeyConstraint(
+            ["catalog_import_run_id", "source_artifact_version_id"],
+            ["catalog_import_run.catalog_import_run_id", "catalog_import_run.source_artifact_version_id"],
+            name="catalog_release_import_run_version",
+        ),
         CheckConstraint(
             "release_status IN ('draft', 'published', 'withdrawn')",
             name="catalog_release_status",
@@ -230,18 +242,18 @@ class CatalogRelease(Base):
     source_artifact_version_id: Mapped[str] = mapped_column(
         ForeignKey("source_artifact_version.source_artifact_version_id"), nullable=False
     )
-    catalog_import_run_id: Mapped[str | None] = mapped_column(
-        ForeignKey("catalog_import_run.catalog_import_run_id"), nullable=True
-    )
+    catalog_import_run_id: Mapped[str] = mapped_column(String(64), nullable=False)
     release_key: Mapped[str] = mapped_column(String(128), nullable=False)
     release_status: Mapped[str] = mapped_column(String(32), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     source_artifact_version: Mapped[SourceArtifactVersion] = relationship(
-        back_populates="catalog_releases"
+        back_populates="catalog_releases",
+        foreign_keys=[source_artifact_version_id],
     )
-    catalog_import_run: Mapped[CatalogImportRun | None] = relationship(
-        back_populates="catalog_releases"
+    catalog_import_run: Mapped[CatalogImportRun] = relationship(
+        back_populates="catalog_releases",
+        foreign_keys=[catalog_import_run_id],
     )
     frameworks: Mapped[list[ControlFramework]] = relationship(
         back_populates="catalog_release"

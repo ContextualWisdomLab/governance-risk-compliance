@@ -50,8 +50,8 @@ flowchart LR
 | `source_license_policy` | Explicit source-text export policy for a catalog provenance class |
 | `source_artifact` | Immutable allowlisted publisher/reference pointer; no source bytes |
 | `source_artifact_version` | Immutable edition, digest, media, size, and date metadata |
-| `catalog_import_run` / `catalog_import_receipt` | Parser identity, outcome, counts, and deterministic receipt digest |
-| `catalog_release` | Published provenance release, allowed only after a successful receipt |
+| `catalog_import_run` / `catalog_import_receipt` | Parser identity, outcome, counts, and deterministic receipt digest; a run is uniquely identified by `(catalog_import_run_id, source_artifact_version_id)` |
+| `catalog_release` | Published provenance release, allowed only after a successful receipt; its composite `(catalog_import_run_id, source_artifact_version_id)` key references the same identity, so a release can never join a receipt from another source version |
 
 A policy gap is a latest finalized-edition mapping whose control has zero `control_evidence_binding` rows. There is no second evidence-binding table.
 

@@ -11,6 +11,7 @@ from sqlalchemy import Connection, Engine, inspect, text
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
 CATALOG_PROVENANCE_MIGRATION = "0002_catalog_provenance"
 CATALOG_RELEASE_RECEIPT_LINK_MIGRATION = "0003_catalog_release_receipt_link"
+CATALOG_RELEASE_PROVENANCE_MIGRATION = "0004_catalog_release_provenance"
 
 
 def apply_schema_migrations(engine: Engine) -> None:
@@ -53,6 +54,18 @@ def apply_schema_migrations(engine: Engine) -> None:
                 ),
                 {
                     "migration_key": CATALOG_RELEASE_RECEIPT_LINK_MIGRATION,
+                    "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
+                },
+            )
+        if CATALOG_RELEASE_PROVENANCE_MIGRATION not in applied:
+            _apply_catalog_release_provenance_migration(connection)
+            connection.execute(
+                text(
+                    "INSERT INTO schema_migration (migration_key, applied_at) "
+                    "VALUES (:migration_key, :applied_at)"
+                ),
+                {
+                    "migration_key": CATALOG_RELEASE_PROVENANCE_MIGRATION,
                     "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
                 },
             )
@@ -169,6 +182,45 @@ def _apply_catalog_release_receipt_link_migration(connection: Connection) -> Non
             )
             WHERE catalog_import_run_id IS NULL
             """
+        )
+    )
+
+
+def _apply_catalog_release_provenance_migration(connection: Connection) -> None:
+    """Key import runs by identity and version so releases can reference both."""
+    inspector = inspect(connection)
+    table_names = set(inspector.get_table_names())
+    if "catalog_import_run" in table_names:
+        columns = {
+            column["name"] for column in inspector.get_columns("catalog_import_run")
+        }
+        if {"catalog_import_run_id", "source_artifact_version_id"}.issubset(columns):
+            connection.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "catalog_import_run_version_identity "
+                    "ON catalog_import_run ("
+                    "catalog_import_run_id, source_artifact_version_id)"
+                )
+            )
+    if "catalog_import_run" not in table_names or "catalog_release" not in table_names:
+        return
+    if connection.dialect.name != "postgresql":
+        return
+    constraint_names = {
+        constraint["name"]
+        for constraint in inspector.get_foreign_keys("catalog_release")
+        if constraint["name"]
+    }
+    if "catalog_release_import_run_version" in constraint_names:
+        return
+    connection.execute(
+        text(
+            "ALTER TABLE catalog_release "
+            "ADD CONSTRAINT catalog_release_import_run_version "
+            "FOREIGN KEY (catalog_import_run_id, source_artifact_version_id) "
+            "REFERENCES catalog_import_run ("
+            "catalog_import_run_id, source_artifact_version_id)"
         )
     )
 

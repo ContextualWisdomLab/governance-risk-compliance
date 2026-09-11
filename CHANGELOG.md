@@ -20,6 +20,7 @@
 - Catalog provenance first slice for Issue #29: allowlisted source pointers, immutable SHA-256 edition metadata, parser receipts, and post-success release records; no raw source bytes or remote fetching.
 - Catalog officers can list published releases and compare provenance/import-receipt metadata without implying a requirement-level catalog diff.
 - Catalog releases now retain the selected successful import identity, with a versioned migration and fail-closed snapshots for unlinked legacy rows.
+- Release-import provenance now uses a composite key: `catalog_import_run` is uniquely identified by `(catalog_import_run_id, source_artifact_version_id)` and `catalog_release` carries a matching composite foreign key, added by the `0004_catalog_release_provenance` migration, so a release can never join another source version's import run.
 
 ### Security
 
