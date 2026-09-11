@@ -91,3 +91,19 @@ def test_failed_keyverse_reload_clears_stale_protected_browser_state() -> None:
     assert "resetProtectedState();" in script
     assert "sessionStorage.removeItem(tokenKey);" in script
     assert "Policy gaps are hidden until Keyverse authorizes this token." in script
+
+
+def test_openapi_http_bearer_requirement_stays_empty_and_keeps_scopes_in_extension() -> None:
+    """An HTTP bearer requirement carries no scope names; action scopes live in the extension."""
+    from fastapi.testclient import TestClient
+
+    from cwl_grc.app import create_app
+    from cwl_grc.keyverse_http import KEYVERSE_PROTECTED_OPERATIONS
+
+    client = TestClient(create_app(database_url="sqlite://", evidence_key=None))
+    spec = client.get("/openapi.json").json()
+    for path, method, scopes in KEYVERSE_PROTECTED_OPERATIONS:
+        operation = spec["paths"][path][method]
+        assert operation["security"] == [{"KeyverseBearer": []}]
+        assert operation["x-keyverse-required-scopes"] == list(scopes)
+        assert scopes, "each protected operation must declare its required Keyverse scope"

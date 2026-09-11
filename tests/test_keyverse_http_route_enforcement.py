@@ -529,13 +529,22 @@ def test_openapi_publishes_keyverse_bearer_on_officer_routes() -> None:
     assert "grc.evidence.write" in scheme["description"]
     assert "data-free officer bootstrap" in scheme["description"]
     assert spec["paths"]["/policy-documents"]["post"]["security"] == [
-        {"KeyverseBearer": ["grc.policy.write"]}
+        {"KeyverseBearer": []}
+    ]
+    assert spec["paths"]["/policy-documents"]["post"]["x-keyverse-required-scopes"] == [
+        "grc.policy.write"
     ]
     assert spec["paths"]["/policy-documents"]["get"]["security"] == [
-        {"KeyverseBearer": ["grc.policy.read"]}
+        {"KeyverseBearer": []}
+    ]
+    assert spec["paths"]["/policy-documents"]["get"]["x-keyverse-required-scopes"] == [
+        "grc.policy.read"
     ]
     assert spec["paths"]["/evidence-records"]["post"]["security"] == [
-        {"KeyverseBearer": ["grc.evidence.write"]}
+        {"KeyverseBearer": []}
+    ]
+    assert spec["paths"]["/evidence-records"]["post"]["x-keyverse-required-scopes"] == [
+        "grc.evidence.write"
     ]
     assert "security" not in spec["paths"]["/"]["get"]
     assert "security" not in spec["paths"]["/healthz"]["get"]
