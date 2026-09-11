@@ -11,6 +11,7 @@ import pytest
 
 from cwl_grc.production_readiness import (
     ReadinessManifestError,
+    _is_canonical_issue_url,
     load_manifest,
     main,
     readiness_summary,
@@ -418,3 +419,30 @@ def test_main_returns_machine_readable_validation_error(
         "error": f"Readiness manifest {path} is not valid JSON.",
         "valid": False,
     }
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        f"{ISSUE_PREFIX}4",
+        f"{ISSUE_PREFIX}1234",
+    ],
+)
+def test_canonical_issue_url_accepts_only_ascii_digit_numbers(value: str) -> None:
+    """Canonical issue URLs accept plain ASCII decimal issue numbers."""
+    assert _is_canonical_issue_url(value) is True
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        f"{ISSUE_PREFIX}٤",
+        f"{ISSUE_PREFIX}४",
+        f"{ISSUE_PREFIX}4.0",
+        f"{ISSUE_PREFIX}4 ",
+        f"{ISSUE_PREFIX}+4",
+    ],
+)
+def test_canonical_issue_url_rejects_non_ascii_and_signed_numbers(value: str) -> None:
+    """Non-ASCII digits and sign/precision characters are not canonical issue numbers."""
+    assert _is_canonical_issue_url(value) is False

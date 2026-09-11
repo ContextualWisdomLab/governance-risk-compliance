@@ -438,4 +438,4 @@ def _is_canonical_issue_url(value: str) -> bool:
     if not value.startswith(ISSUE_URL_PREFIX):
         return False
     issue_number = value.removeprefix(ISSUE_URL_PREFIX)
-    return bool(issue_number) and issue_number.isdigit()
+    return bool(issue_number) and issue_number.isascii() and issue_number.isdigit()
