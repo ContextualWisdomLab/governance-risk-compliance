@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -11,6 +12,7 @@ from sqlalchemy import create_engine, delete, inspect, text, update
 from sqlalchemy.exc import DBAPIError
 
 from cwl_grc import create_app
+from cwl_grc import migrations as migrations_module
 from cwl_grc.authorization import (
     AuthorizationDecision,
     PurposeCode,
@@ -274,12 +276,18 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
                 "WHERE policy_version_id = 'version-1'"
             )
         ).scalar_one()
-        receipt_count = connection.execute(
-            text("SELECT COUNT(*) FROM schema_migration")
-        ).scalar_one()
     assert counter == 3
     assert finalized in {True, 1}
-    assert receipt_count == 3
+    with engine.connect() as connection:
+        migration_keys = set(
+            connection.execute(text("SELECT migration_key FROM schema_migration")).scalars()
+        )
+    assert {
+        "0001_policy_integrity",
+        "0002_catalog_provenance",
+        "0003_catalog_release_receipt_link",
+        "0004_catalog_release_provenance",
+    } <= migration_keys
 
 
 def test_catalog_migration_adds_release_link_to_existing_framework(
@@ -321,10 +329,15 @@ def test_catalog_migration_adds_release_link_to_existing_framework(
     }
     assert "catalog_release_id" in framework_columns
     with engine.connect() as connection:
-        receipt_count = connection.execute(
-            text("SELECT COUNT(*) FROM schema_migration")
-        ).scalar_one()
-    assert receipt_count == 3
+        migration_keys = set(
+            connection.execute(text("SELECT migration_key FROM schema_migration")).scalars()
+        )
+    assert {
+        "0001_policy_integrity",
+        "0002_catalog_provenance",
+        "0003_catalog_release_receipt_link",
+        "0004_catalog_release_provenance",
+    } <= migration_keys
 
 
 def test_policy_migration_skips_partial_schema(tmp_path: Path) -> None:
@@ -428,6 +441,91 @@ def test_catalog_release_migration_backfills_latest_successful_receipt(
             )
         ).scalar_one()
     assert linked_run == "run-new"
+
+
+def test_catalog_release_provenance_migration_skips_partial_import_run(
+    tmp_path: Path,
+) -> None:
+    """A legacy import-run table without the version column is left untouched."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'partial-import-run.sqlite'}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE schema_migration ("
+                "migration_key VARCHAR(64) PRIMARY KEY, "
+                "applied_at TIMESTAMP NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO schema_migration VALUES "
+                "('0001_policy_integrity', CURRENT_TIMESTAMP), "
+                "('0002_catalog_provenance', CURRENT_TIMESTAMP), "
+                "('0003_catalog_release_receipt_link', CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE catalog_import_run ("
+                "catalog_import_run_id VARCHAR(64) PRIMARY KEY)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE catalog_release ("
+                "catalog_release_id VARCHAR(64) PRIMARY KEY)"
+            )
+        )
+    apply_schema_migrations(engine)
+    indexes = {
+        index["name"] for index in inspect(engine).get_indexes("catalog_import_run")
+    }
+    assert "catalog_import_run_version_identity" not in indexes
+
+
+def test_catalog_release_provenance_postgres_constraint_is_idempotent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PostgreSQL adds the composite foreign key once and skips an existing one."""
+
+    class _Inspector:
+        def __init__(self, constraints: list[dict]) -> None:
+            self._constraints = constraints
+
+        def get_table_names(self) -> list[str]:
+            return ["catalog_import_run", "catalog_release"]
+
+        def get_columns(self, table: str) -> list[dict]:
+            return [
+                {"name": "catalog_import_run_id"},
+                {"name": "source_artifact_version_id"},
+            ]
+
+        def get_foreign_keys(self, table: str) -> list[dict]:
+            return self._constraints
+
+    for constraints, expected in (
+        ([], 1),
+        ([{"name": "catalog_release_import_run_version"}], 0),
+    ):
+        executed: list[str] = []
+
+        class _Connection:
+            dialect = SimpleNamespace(name="postgresql")
+
+            def execute(self, statement, *_args, **_kwargs):  # noqa: ANN002, ANN003
+                executed.append(str(statement))
+
+        monkeypatch.setattr(
+            migrations_module,
+            "inspect",
+            lambda connection, _constraints=constraints: _Inspector(_constraints),
+        )
+        migrations_module._apply_catalog_release_provenance_migration(_Connection())
+        assert (
+            sum("ALTER TABLE catalog_release" in statement for statement in executed)
+            == expected
+        )
 
 
 def test_integrity_guard_ddl_covers_supported_and_unknown_dialects() -> None:
