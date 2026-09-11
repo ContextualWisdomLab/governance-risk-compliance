@@ -168,10 +168,11 @@ def test_officer_declared_actor_ignores_form_identity_when_bearer_present() -> N
 def test_main_binds_only_loopback(monkeypatch) -> None:  # noqa: ANN001
     captured: dict[str, object] = {}
 
-    def fake_run(app, host, port):  # noqa: ANN001
+    def fake_run(app, host, port, **kwargs):  # noqa: ANN001
         captured["host"] = host
         captured["port"] = port
         captured["title"] = app.title
+        captured["proxy_headers"] = kwargs.get("proxy_headers")
 
     monkeypatch.setattr("cwl_grc.__main__.uvicorn.run", fake_run)
     monkeypatch.setenv("PORT", "9099")
@@ -186,7 +187,23 @@ def test_main_binds_only_loopback(monkeypatch) -> None:  # noqa: ANN001
         "host": "127.0.0.1",
         "port": 9099,
         "title": "CWL GRC",
+        "proxy_headers": False,
     }
+
+
+def test_main_fails_closed_on_invalid_keyverse_flag(monkeypatch, capsys) -> None:  # noqa: ANN001
+    """python -m cwl_grc must not traceback when the hardened-start flag is invalid."""
+    import json
+
+    monkeypatch.setenv("CWL_GRC_REQUIRE_KEYVERSE", "treu")
+    from cwl_grc.__main__ import main
+
+    with pytest.raises(SystemExit) as exited:
+        main()
+    assert exited.value.code == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert "CWL_GRC_REQUIRE_KEYVERSE" in payload["error"]
+    assert "CWL_GRC_KEYVERSE_JWKS_PATH" in payload["next_action"]
 
 
 def test_require_purpose_rejects_mismatched_purpose() -> None:

@@ -71,8 +71,26 @@ seconds.
 4. Catalog `GET /controls` and `GET /healthz` stay unauthenticated because they
    expose published control identifiers and liveness, not tenant records.
 
+## Hardened local start
+
+`CWL_GRC_REQUIRE_KEYVERSE=1` is a loopback hardening switch, not remote
+admission.
+
+1. Set `CWL_GRC_KEYVERSE_ISSUER`, `CWL_GRC_KEYVERSE_AUDIENCE`,
+   `CWL_GRC_KEYVERSE_CLIENT_IDS`, and `CWL_GRC_KEYVERSE_JWKS_PATH` to a reviewed
+   public JWKS file. Do not point this start at a live discovery URL.
+2. Set `CWL_GRC_TLS_CERTFILE` and `CWL_GRC_TLS_KEYFILE` to readable files.
+   Empty paths and missing files fail closed before Uvicorn starts.
+3. Set `CWL_GRC_EVIDENCE_KEY` for any persistent store.
+4. Keep the bind on `127.0.0.1`. HTTP, including `/healthz`, returns 503.
+5. Do not trust `X-Forwarded-Proto` or actor headers as identity.
+
+If the verifier, certificate, key, or evidence key is missing, `cwl-grc serve`
+exits 2 and states that next action. Unset `CWL_GRC_REQUIRE_KEYVERSE` remains
+the unauthenticated developer preview.
+
 ## What remains before production
 
-Encrypted transport, Keyverse-backed admission of customer traffic, and
-independent review of the remaining Issue #4 authorization work. Until those
-exist, treat every deployment of this kernel as a local developer preview.
+Keyverse-backed admission of customer traffic, independent review, and
+deployment onto a non-loopback address. Until those exist, treat every
+deployment of this kernel as a local developer preview.

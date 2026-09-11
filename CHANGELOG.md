@@ -28,6 +28,7 @@
 - Keyverse policy-gap queries count only the verified tenant's evidence bindings, so one organization's CSAP mapping cannot hide another organization's uncovered control.
 - Keyverse audit attribution: `audit_event` stores issuer, OAuth client, request correlation, and `allow` without copying the access token; migration `0003_audit_attribution` backfills legacy rows with a `legacy_unattributed` sentinel for issuer, client, and correlation rather than asserting local-preview provenance.
 - Deployment-hardening runbook for local-preview migration, rollback, JWKS rotation, issuer outage, clock skew, and emergency read-only.
+- Hardened local start: `CWL_GRC_REQUIRE_KEYVERSE` refuses header-identity boots and admits only loopback TLS (`CWL_GRC_TLS_CERTFILE` / `CWL_GRC_TLS_KEYFILE` must be readable files). `cwl-grc serve` and `python -m cwl_grc` load a reviewed offline JWKS from `CWL_GRC_KEYVERSE_JWKS_PATH`. Invalid flag values fail closed. Proxy headers cannot rewrite TLS. Hardened-start and preview errors both name `CWL_GRC_EVIDENCE_KEY` for persistent stores. This is not remote production exposure.
 - `docs/product-technical-gap-baseline.md` with observed product truth, the live PR queue, officer-visible production and domain gaps, standards corrections, ownership boundaries, and exact next actions. The 2026-08-24 refresh records PR #58 hosted Devin success, terminal hosted check counts for merge-ready develop PRs, PR #34 Strix provider-unavailable, Wave 0 Keyverse order `#38 → #55 → #56 → #57 → #58`, and central `.github` #1257 still behind `main` with OpenCode `CHANGES_REQUESTED`.
 - Wave 1 legacy-binding projection identity: `binding_id` plus `control_item_id`, tenant-scoped through the bound evidence record, with `unassessed` fan-out only after an authorized `control_requirement_mapping` exists.
 - `docs/product/grc-domain-completion-roadmap.md` defining the closed obligation → requirement → policy → internal control → implementation → test/evidence → risk/audit → remediation → controlled-reporting loop and its release gates.
@@ -48,6 +49,8 @@
 - Check required action scopes before consuming an optional one-time-use Keyverse token replay guard.
 - Reject ID-token/access-token confusion, unsigned or alternate-algorithm tokens, unsupported critical headers, unknown or duplicate keys, private/symmetric/encryption JWKs, stale/future tokens, and client/subject confusion.
 - Bound offline Keyverse JWK input to 1 MiB and support reviewed old/new public-key overlap without enabling network discovery or remote GRC traffic.
+- Read the hardened-start JWKS through the 1 MiB bound without materializing an oversized file, and convert JWKS and TLS read failures into the reviewed startup diagnostic instead of a traceback.
+- Validate the hardened-start TLS certificate and key are readable, well-formed PEM that match each other before binding.
 - Map a verified token that lacks an action scope to HTTP 403 through `AccessTokenScopeError` (RFC 6750 `insufficient_scope`) instead of matching exception text for `"required scope"`.
 - Reject provider refresh clocks whose `tzinfo` exists without a defined UTC offset.
 - Never embed officer-, tenant-, policy-gap-, or evidence-coverage state in the unauthenticated Keyverse browser bootstrap; protected state is fetched only after Bearer authorization.
@@ -64,4 +67,5 @@
 - `docs/adr/0006-keyverse-tenant-owned-persistence.md` — persist Keyverse `org` on policy, evidence, and audit rows and isolate reads/writes by tenant.
 - `docs/adr/0007-keyverse-openapi-security.md` — publish Keyverse Bearer security on protected officer policy/evidence operations while keeping `GET /` as a data-free browser bootstrap.
 - `docs/adr/0008-keyverse-audit-event-attribution.md` — persist Keyverse issuer, client, and request correlation on audit events without storing bearer tokens.
+- `docs/adr/0009-keyverse-required-tls-admission.md` — require an injected Keyverse verifier and loopback TLS before a hardened local start.
 - `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — preserve external catalogs while adding distinct internal-control definitions, implementations, reviewed mappings, tests, effectiveness results, deficiencies, and purpose-bound evidence usage before risk and audit depend on the model.
