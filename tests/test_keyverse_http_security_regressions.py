@@ -20,11 +20,17 @@ NOW = datetime(2026, 8, 31, 12, 20, tzinfo=timezone.utc)
 class _PrincipalVerifier:
     """Return one already-verified principal for HTTP-adapter boundary tests."""
 
-    def __init__(self, *, actor_id: str = "officer-park", tenant_id: str = "tenant-acme") -> None:
+    def __init__(
+        self,
+        *,
+        actor_id: str = "officer-park",
+        tenant_id: str = "tenant-acme",
+        client_id: str = "cwl-grc-web",
+    ) -> None:
         self._principal = AuthenticatedPrincipal(
             tenant_id=tenant_id,
             actor_id=actor_id,
-            client_id="cwl-grc-web",
+            client_id=client_id,
             role="compliance_officer",
             workspace_id="grc-primary",
             scopes=frozenset({"grc.policy.read"}),
@@ -69,6 +75,7 @@ def test_verified_identity_is_bounded_before_reaching_128_character_columns() ->
     for verifier in (
         _PrincipalVerifier(actor_id="a" * 129),
         _PrincipalVerifier(tenant_id="t" * 129),
+        _PrincipalVerifier(client_id="c" * 129),
     ):
         try:
             authenticate_keyverse_request(

@@ -337,3 +337,21 @@ def test_settings_reject_unsafe_or_ambiguous_configuration() -> None:
             allowed_roles=frozenset({"compliance_officer"}),
             clock_skew_seconds=301,
         )
+
+
+def test_settings_reject_attribution_that_cannot_be_persisted() -> None:
+    """Issuer and allowed clients must fit the columns every audit row writes."""
+    with pytest.raises(ValueError, match="issuer"):
+        KeyverseAccessTokenSettings(
+            issuer="https://identity.example.test/" + "a" * 1024,
+            audience=AUDIENCE,
+            allowed_client_ids=frozenset({CLIENT_ID}),
+            allowed_roles=frozenset({"compliance_officer"}),
+        )
+    with pytest.raises(ValueError, match="client"):
+        KeyverseAccessTokenSettings(
+            issuer=ISSUER,
+            audience=AUDIENCE,
+            allowed_client_ids=frozenset({CLIENT_ID + "0" * 128}),
+            allowed_roles=frozenset({"compliance_officer"}),
+        )

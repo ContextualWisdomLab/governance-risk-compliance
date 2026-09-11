@@ -15,6 +15,9 @@ import jwt
 
 MAX_JWKS_BYTES = 1024 * 1024
 MAX_CLOCK_SKEW_SECONDS = 300
+MAX_PERSISTED_IDENTITY_LENGTH = 128
+MAX_ISSUER_IDENTIFIER_LENGTH = 1024
+MAX_CLIENT_IDENTIFIER_LENGTH = 128
 ACCESS_TOKEN_TYPES = frozenset({"at+jwt", "application/at+jwt"})
 REQUIRED_ACCESS_TOKEN_CLAIMS = (
     "iss",
@@ -69,6 +72,10 @@ class KeyverseAccessTokenSettings:
             or parsed.fragment
         ):
             raise ValueError("Keyverse requires one exact HTTPS issuer URL.")
+        if len(self.issuer) > MAX_ISSUER_IDENTIFIER_LENGTH:
+            raise ValueError(
+                "The Keyverse issuer exceeds the attribution persistence boundary."
+            )
         if not self.audience or self.audience != self.audience.strip():
             raise ValueError("Keyverse requires one exact non-empty resource audience.")
         if not self.allowed_client_ids or any(
@@ -76,6 +83,13 @@ class KeyverseAccessTokenSettings:
             for client_id in self.allowed_client_ids
         ):
             raise ValueError("Keyverse requires an exact non-empty allowed client set.")
+        if any(
+            len(client_id) > MAX_CLIENT_IDENTIFIER_LENGTH
+            for client_id in self.allowed_client_ids
+        ):
+            raise ValueError(
+                "A Keyverse client exceeds the attribution persistence boundary."
+            )
         if not self.allowed_roles or any(
             not role or role != role.strip() for role in self.allowed_roles
         ):

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 from contextvars import ContextVar, Token
 from uuid import uuid4
 
@@ -10,15 +12,43 @@ MAX_CORRELATION_LENGTH = 128
 ALLOWED_CORRELATION_CHARACTERS = frozenset(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."
 )
+_COMPACT_JWS_CHARACTERS = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+)
 _CORRELATION_REFERENCE: ContextVar[str | None] = ContextVar(
     "cwl_grc_correlation_reference",
     default=None,
 )
 
 
+def _is_json_object_segment(segment: str) -> bool:
+    """Return whether one dot-separated segment is a base64url-encoded JSON object."""
+    if not segment or set(segment) - _COMPACT_JWS_CHARACTERS:
+        return False
+    try:
+        decoded = base64.b64decode(
+            segment + "=" * (-len(segment) % 4),
+            altchars=b"-_",
+            validate=True,
+        )
+        document = json.loads(decoded)
+    except ValueError:
+        return False
+    return isinstance(document, dict)
+
+
 def looks_like_access_token(value: str) -> bool:
-    """Return whether a string resembles compact JWT access-token material."""
-    return value.count(".") >= 2 and "eyJ" in value
+    """Return whether a string has the structure of a compact JWS access token.
+
+    Detection is structural rather than a substring search: a compact JWT is
+    exactly three base64url segments whose header and payload decode to JSON
+    objects. Trusted identifiers that only mention ``eyJ`` are not rejected.
+    """
+    segments = value.split(".")
+    if len(segments) != 3:
+        return False
+    header, payload, _signature = segments
+    return _is_json_object_segment(header) and _is_json_object_segment(payload)
 
 
 def normalize_correlation_reference(value: str | None) -> str:

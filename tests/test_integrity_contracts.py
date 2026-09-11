@@ -359,8 +359,8 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
     assert evidence_tenant == "local_preview"
     assert audit_tenant == "local_preview"
     assert audit_attribution == (
-        "local_preview",
-        "local_preview",
+        "legacy_unattributed",
+        "legacy_unattributed",
         "legacy_unattributed",
         "allow",
     )

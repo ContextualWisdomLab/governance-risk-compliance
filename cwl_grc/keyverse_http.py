@@ -22,13 +22,13 @@ from cwl_grc.keyverse_authentication import (
     AccessTokenValidationError,
     AuthenticatedPrincipal,
     KeyverseAccessTokenVerifier,
+    MAX_PERSISTED_IDENTITY_LENGTH,
 )
 
 POLICY_READ_SCOPES = ("grc.policy.read",)
 POLICY_WRITE_SCOPES = ("grc.policy.write",)
 EVIDENCE_WRITE_SCOPES = ("grc.evidence.write",)
 KEYVERSE_BEARER_SCHEME = "KeyverseBearer"
-MAX_PERSISTED_IDENTITY_LENGTH = 128
 KEYVERSE_PROTECTED_OPERATIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("/policy-documents", "post", POLICY_WRITE_SCOPES),
     (
@@ -136,7 +136,6 @@ def authenticate_keyverse_request(
         status = 403 if isinstance(exc, AccessTokenScopeError) else 401
         raise HTTPException(status_code=status, detail=str(exc)) from exc
     _reject_impersonation(principal, declared_actor, declared_tenant)
-    _reject_impersonation(principal, declared_actor, declared_tenant)
     _reject_unpersistable_identity(principal)
     return RequestPrincipal(
         principal.actor_id,
@@ -186,6 +185,7 @@ def _reject_unpersistable_identity(principal: AuthenticatedPrincipal) -> None:
     if (
         len(principal.actor_id) > MAX_PERSISTED_IDENTITY_LENGTH
         or len(principal.tenant_id) > MAX_PERSISTED_IDENTITY_LENGTH
+        or len(principal.client_id) > MAX_PERSISTED_IDENTITY_LENGTH
     ):
         raise HTTPException(
             status_code=401,
