@@ -17,6 +17,7 @@ class PurposeCode(StrEnum):
     """Declared purposes that may touch GRC records."""
 
     COVERAGE_REVIEW = "coverage_review"
+    CATALOG_GOVERNANCE = "catalog_governance"
     EVIDENCE_BINDING = "evidence_binding"
     HEALTH_PROBE = "health_probe"
     POLICY_AUTHORING = "policy_authoring"
@@ -47,6 +48,8 @@ def seed_authorization_purposes(session: Session) -> None:
 def purpose_label(code: PurposeCode) -> str:
     """Return the officer-facing label for a purpose code."""
     match code:
+        case PurposeCode.CATALOG_GOVERNANCE:
+            return "Register and review catalog sources"
         case PurposeCode.COVERAGE_REVIEW:
             return "Review control coverage"
         case PurposeCode.EVIDENCE_BINDING:

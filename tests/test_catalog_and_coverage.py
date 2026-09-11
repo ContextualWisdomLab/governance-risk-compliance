@@ -13,6 +13,16 @@ def _client() -> TestClient:
     return TestClient(create_app(database_url="sqlite://", evidence_key=None))
 
 
+def _catalog_headers() -> dict[str, str]:
+    """Return purpose-limited headers for catalog review."""
+    return {"X-Actor-Id": "catalog-reviewer", "X-Purpose": "catalog_governance"}
+
+
+def _policy_headers() -> dict[str, str]:
+    """Return purpose-limited headers for policy review."""
+    return {"X-Actor-Id": "policy-reviewer", "X-Purpose": "policy_authoring"}
+
+
 def test_healthz_reports_ok() -> None:
     response = _client().get("/healthz")
     assert response.status_code == 200
@@ -23,9 +33,9 @@ def test_healthz_reports_ok() -> None:
 
 def test_lists_real_soc2_isms_p_and_csap_identifiers() -> None:
     client = _client()
-    soc2 = client.get("/controls", params={"framework": FrameworkCode.SOC2_TSC_2017.value})
-    isms = client.get("/controls", params={"framework": FrameworkCode.ISMS_P_2023.value})
-    csap = client.get("/controls", params={"framework": FrameworkCode.CSAP_2026.value})
+    soc2 = client.get("/controls", headers=_catalog_headers(), params={"framework": FrameworkCode.SOC2_TSC_2017.value})
+    isms = client.get("/controls", headers=_catalog_headers(), params={"framework": FrameworkCode.ISMS_P_2023.value})
+    csap = client.get("/controls", headers=_catalog_headers(), params={"framework": FrameworkCode.CSAP_2026.value})
     assert soc2.status_code == 200
     identifiers = {item["catalog_identifier"] for item in soc2.json()["controls"]}
     assert {"CC1.1", "CC5.3", "CC6.1", "CC6.2", "CC6.3", "P3.1"} <= identifiers
@@ -40,10 +50,10 @@ def test_lists_real_soc2_isms_p_and_csap_identifiers() -> None:
 
 def test_lists_iso_nist_and_coso_identifiers() -> None:
     client = _client()
-    iso = client.get("/controls", params={"framework": FrameworkCode.ISO27001_2022.value}).json()
-    nist = client.get("/controls", params={"framework": FrameworkCode.NIST_SP_800_53_R5.value}).json()
-    ic = client.get("/controls", params={"framework": FrameworkCode.COSO_IC_2013.value}).json()
-    erm = client.get("/controls", params={"framework": FrameworkCode.COSO_ERM_2017.value}).json()
+    iso = client.get("/controls", headers=_catalog_headers(), params={"framework": FrameworkCode.ISO27001_2022.value}).json()
+    nist = client.get("/controls", headers=_catalog_headers(), params={"framework": FrameworkCode.NIST_SP_800_53_R5.value}).json()
+    ic = client.get("/controls", headers=_catalog_headers(), params={"framework": FrameworkCode.COSO_IC_2013.value}).json()
+    erm = client.get("/controls", headers=_catalog_headers(), params={"framework": FrameworkCode.COSO_ERM_2017.value}).json()
     assert {"A.5.1", "A.8.2", "A.8.15"} <= {item["catalog_identifier"] for item in iso["controls"]}
     assert {"AC-2", "AU-2", "IA-2"} <= {item["catalog_identifier"] for item in nist["controls"]}
     assert {"Principle 1", "Principle 10", "Principle 12"} <= {
@@ -53,8 +63,16 @@ def test_lists_iso_nist_and_coso_identifiers() -> None:
 
 
 def test_unknown_framework_is_rejected() -> None:
-    response = _client().get("/controls", params={"framework": "toy-catalog"})
+    response = _client().get("/controls", headers=_catalog_headers(), params={"framework": "toy-catalog"})
     assert response.status_code == 400
+
+
+def test_catalog_and_officer_reads_require_their_declared_purpose() -> None:
+    client = _client()
+    assert client.get("/controls").status_code == 401
+    assert client.get("/controls/uncovered").status_code == 401
+    assert client.get("/", headers=_catalog_headers()).status_code == 403
+    assert client.get("/controls", headers=_policy_headers()).status_code == 403
 
 
 def test_uncovered_csap_control_until_officer_binds_evidence() -> None:
@@ -63,7 +81,7 @@ def test_uncovered_csap_control_until_officer_binds_evidence() -> None:
         "X-Actor-Id": "officer-ahn",
         "X-Purpose": "evidence_binding",
     }
-    gaps = client.get("/controls/uncovered", params={"framework": FrameworkCode.CSAP_2026.value})
+    gaps = client.get("/controls/uncovered", headers=_catalog_headers(), params={"framework": FrameworkCode.CSAP_2026.value})
     assert gaps.status_code == 200
     uncovered = {item["catalog_identifier"] for item in gaps.json()["controls"]}
     assert "10.2.1" in uncovered
@@ -88,7 +106,7 @@ def test_uncovered_csap_control_until_officer_binds_evidence() -> None:
         },
     )
     assert bind.status_code == 201
-    after = client.get("/controls/uncovered", params={"framework": FrameworkCode.CSAP_2026.value})
+    after = client.get("/controls/uncovered", headers=_catalog_headers(), params={"framework": FrameworkCode.CSAP_2026.value})
     assert "10.2.1" not in {item["catalog_identifier"] for item in after.json()["controls"]}
     assert "10.3.1" in {item["catalog_identifier"] for item in after.json()["controls"]}
 
@@ -128,6 +146,7 @@ def test_soc2_cc6_1_and_isms_p_2_5_1_bind_independently() -> None:
         item["catalog_identifier"]
         for item in client.get(
             "/controls/uncovered",
+            headers=_catalog_headers(),
             params={"framework": FrameworkCode.SOC2_TSC_2017.value},
         ).json()["controls"]
     }
@@ -135,6 +154,7 @@ def test_soc2_cc6_1_and_isms_p_2_5_1_bind_independently() -> None:
         item["catalog_identifier"]
         for item in client.get(
             "/controls/uncovered",
+            headers=_catalog_headers(),
             params={"framework": FrameworkCode.ISMS_P_2023.value},
         ).json()["controls"]
     }
@@ -214,7 +234,7 @@ def test_evidence_requires_purpose_limited_actor() -> None:
 
 
 def test_officer_home_states_next_action_for_uncovered_control() -> None:
-    page = _client().get("/")
+    page = _client().get("/", headers=_policy_headers())
     assert page.status_code == 200
     text = page.text
     assert "10.2.1" in text
@@ -224,7 +244,7 @@ def test_officer_home_states_next_action_for_uncovered_control() -> None:
 
 
 def test_lists_every_seeded_framework_when_unfiltered() -> None:
-    response = _client().get("/controls")
+    response = _client().get("/controls", headers=_catalog_headers())
     frameworks = {item["framework"] for item in response.json()["controls"]}
     assert FrameworkCode.NIST_SP_800_53_R5.value in frameworks
     assert FrameworkCode.ISO27001_2022.value in frameworks
@@ -303,5 +323,56 @@ def test_officer_can_bind_evidence_from_home_form() -> None:
         follow_redirects=False,
     )
     assert posted.status_code == 303
-    gaps = client.get("/controls/uncovered", params={"framework": FrameworkCode.CSAP_2026.value})
+    gaps = client.get("/controls/uncovered", headers=_catalog_headers(), params={"framework": FrameworkCode.CSAP_2026.value})
     assert "12.3.1" not in {item["catalog_identifier"] for item in gaps.json()["controls"]}
+
+
+def test_officer_form_redirect_survives_browser_navigation() -> None:
+    """A form submit followed by its redirect must not land on a 401."""
+    client = _client()
+    posted = client.post(
+        "/officer/evidence",
+        data={
+            "framework": FrameworkCode.SOC2_TSC_2017.value,
+            "catalog_identifier": "CC6.1",
+            "actor_identifier": "officer-nam",
+            "evidence_title": "SOC 2 CC6.1 access roster",
+            "payload_text": "nam@example.go.kr quarterly review.",
+        },
+        follow_redirects=False,
+    )
+    assert posted.status_code == 303
+    location = posted.headers["location"]
+    assert location.startswith("/?actor_identifier=officer-nam&purpose_code=policy_authoring")
+    followed = client.get(location)
+    assert followed.status_code == 200
+    assert "CC6.1" in followed.text
+
+
+def test_officer_policy_form_redirect_survives_browser_navigation() -> None:
+    """Policy authoring redirects keep the declared-purpose context for the browser."""
+    client = _client()
+    posted = client.post(
+        "/officer/policy",
+        data={
+            "policy_title": "Access review cadence",
+            "policy_body": "Quarterly access reviews are recorded.",
+            "actor_identifier": "officer-seo",
+        },
+        follow_redirects=False,
+    )
+    assert posted.status_code == 303
+    followed = client.get(posted.headers["location"])
+    assert followed.status_code == 200
+    assert "Policy requirements that still lack evidence" in followed.text
+
+
+def test_officer_home_still_requires_declared_purpose() -> None:
+    """Query-param fallback cannot bypass the purpose declaration requirement."""
+    anonymous = _client().get("/")
+    assert anonymous.status_code == 401
+    wrong_purpose = _client().get(
+        "/",
+        params={"actor_identifier": "officer-min", "purpose_code": "evidence_binding"},
+    )
+    assert wrong_purpose.status_code == 403

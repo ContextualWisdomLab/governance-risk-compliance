@@ -27,6 +27,19 @@ def _bind_headers() -> dict[str, str]:
     return {"X-Actor-Id": "officer-ahn", "X-Purpose": "evidence_binding"}
 
 
+def _catalog_headers() -> dict[str, str]:
+    """Return purpose-limited headers for catalog review."""
+    return {"X-Actor-Id": "catalog-reviewer", "X-Purpose": "catalog_governance"}
+
+
+def test_policy_reads_require_policy_authoring_purpose() -> None:
+    client = _client()
+    assert client.get("/policy-documents").status_code == 401
+    assert client.get("/policy-gaps").status_code == 401
+    assert client.get("/policy-documents", headers=_catalog_headers()).status_code == 403
+    assert client.get("/policy-gaps", headers=_catalog_headers()).status_code == 403
+
+
 def test_officer_authors_policy_mapped_to_official_controls() -> None:
     client = _client()
     created = client.post(
@@ -56,7 +69,7 @@ def test_officer_authors_policy_mapped_to_official_controls() -> None:
         "10.2.1",
     ) in mapped
     assert (FrameworkCode.SOC2_TSC_2017.value, "CC6.1") in mapped
-    listed = client.get("/policy-documents")
+    listed = client.get("/policy-documents", headers=_author_headers())
     assert listed.status_code == 200
     assert any(item["policy_document_id"] == body["policy_document_id"] for item in listed.json()["policies"])
 
@@ -120,7 +133,7 @@ def test_policy_gaps_use_the_same_control_evidence_bindings() -> None:
             ],
         },
     ).json()
-    gaps = client.get("/policy-gaps", params={"policy_document_id": created["policy_document_id"]})
+    gaps = client.get("/policy-gaps", headers=_author_headers(), params={"policy_document_id": created["policy_document_id"]})
     assert gaps.status_code == 200
     assert gaps.json()["next_action"] == "Attach the next evidence on an uncovered policy control."
     uncovered = {item["catalog_identifier"] for item in gaps.json()["gaps"]}
@@ -143,7 +156,7 @@ def test_policy_gaps_use_the_same_control_evidence_bindings() -> None:
         },
     )
     assert bind.status_code == 201
-    after = client.get("/policy-gaps", params={"policy_document_id": created["policy_document_id"]})
+    after = client.get("/policy-gaps", headers=_author_headers(), params={"policy_document_id": created["policy_document_id"]})
     remaining = {item["catalog_identifier"] for item in after.json()["gaps"]}
     assert remaining == {"CC6.2"}
 
@@ -164,7 +177,7 @@ def test_policy_authoring_requires_purpose() -> None:
 
 def test_officer_home_lets_buyer_write_policy_and_see_policy_gaps() -> None:
     client = _client()
-    home = client.get("/")
+    home = client.get("/", headers=_author_headers())
     assert "Author the next policy" in home.text
     posted = client.post(
         "/officer/policy",
@@ -177,12 +190,14 @@ def test_officer_home_lets_buyer_write_policy_and_see_policy_gaps() -> None:
                 f"{FrameworkCode.ISMS_P_2023.value}|2.5.1",
             ],
         },
-        follow_redirects=True,
+        follow_redirects=False,
     )
-    assert posted.status_code == 200
-    assert "Account Management Policy" in posted.text
-    assert "10.2.1" in posted.text
-    assert "Attach the next evidence" in posted.text
+    assert posted.status_code == 303
+    refreshed = client.get("/", headers=_author_headers())
+    assert refreshed.status_code == 200
+    assert "Account Management Policy" in refreshed.text
+    assert "10.2.1" in refreshed.text
+    assert "Attach the next evidence" in refreshed.text
 
 
 def test_cli_authors_policy_lists_gaps_and_binds_evidence(tmp_path: Path, capsys) -> None:
@@ -348,8 +363,8 @@ def test_policy_validation_and_gap_lookup_errors() -> None:
         json={"policy_body": "  ", "control_refs": []},
     )
     assert blank_revision.status_code == 400
-    assert client.get("/policy-gaps", params={"policy_document_id": "missing"}).status_code == 404
-    unfiltered = client.get("/policy-gaps")
+    assert client.get("/policy-gaps", headers=_author_headers(), params={"policy_document_id": "missing"}).status_code == 404
+    unfiltered = client.get("/policy-gaps", headers=_author_headers())
     assert unfiltered.status_code == 200
     assert "10.2.1" in {item["catalog_identifier"] for item in unfiltered.json()["gaps"]}
 
