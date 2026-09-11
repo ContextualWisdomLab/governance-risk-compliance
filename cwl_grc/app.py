@@ -222,6 +222,8 @@ def create_app(
                 )
             else:
                 response = await call_next(request)
+            if access_token_verifier is not None and request.url.path == "/controls/uncovered":
+                response.headers["Cache-Control"] = "no-store"
             response.headers["X-Request-ID"] = current_correlation_reference()
             return response
         finally:
@@ -245,9 +247,25 @@ def create_app(
     def uncovered_controls(
         session: Session = Depends(get_session),
         framework: str | None = None,
+        authorization: str | None = Header(default=None),
+        x_actor_id: str | None = Header(default=None),
+        x_tenant_id: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        """List official controls that still need evidence."""
-        items = list_uncovered_controls(session, parse_framework(framework))
+        """List official controls still lacking evidence in the caller's tenant."""
+        tenant_identifier: str | None = None
+        if access_token_verifier is not None:
+            principal = authorized_principal(
+                authorization=authorization,
+                declared_actor=x_actor_id,
+                declared_tenant=x_tenant_id,
+                required_scopes=POLICY_READ_SCOPES,
+            )
+            tenant_identifier = principal.tenant_identifier
+        items = list_uncovered_controls(
+            session,
+            parse_framework(framework),
+            tenant_identifier=tenant_identifier,
+        )
         return {
             "next_action": "Attach the next evidence on an uncovered control.",
             "controls": [serialize_control(item, covered=False) for item in items],
