@@ -10,7 +10,12 @@ from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Resp
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from cwl_grc.authorization import PurposeCode, require_purpose, seed_authorization_purposes
+from cwl_grc.authorization import (
+    PurposeCode,
+    require_declared_tenant,
+    require_purpose,
+    seed_authorization_purposes,
+)
 from cwl_grc.catalog import FrameworkCode, list_control_items, seed_control_catalog
 from cwl_grc.coverage import list_uncovered_controls
 from cwl_grc.database import create_session_factory, session_dependency
@@ -30,6 +35,7 @@ from cwl_grc.policy import (
     serialize_policy,
 )
 from cwl_grc.remote_access import request_is_local
+from cwl_grc.workspace_posture import build_preview_posture
 
 
 def parse_framework(value: str | None) -> FrameworkCode | None:
@@ -196,6 +202,27 @@ def create_app(
                 for gap in list_policy_gaps(session, policy_document_id)
             ],
         }
+
+    @app.get("/workspace/posture")
+    def get_workspace_posture(
+        session: Session = Depends(get_session),
+        x_actor_id: str | None = Header(default=None),
+        x_purpose: str | None = Header(default=None),
+        x_tenant_id: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """Return actor-scoped local preview posture with explicit missing-truth states."""
+        decision = require_purpose(
+            x_actor_id,
+            x_purpose,
+            PurposeCode.COVERAGE_REVIEW,
+        )
+        tenant_identifier = require_declared_tenant(x_tenant_id)
+        return build_preview_posture(
+            session,
+            actor_identifier=decision.actor_identifier,
+            tenant_identifier=tenant_identifier,
+            purpose_code=decision.purpose_code,
+        )
 
     @app.post("/evidence-records", status_code=201)
     def post_evidence(
