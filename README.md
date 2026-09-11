@@ -13,6 +13,12 @@ This repository is the ContextualWisdomLab home for policy, control, risk, evide
 5. Read the policy-gap list and attach the next evidence on an uncovered mapped control.
 6. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
 
+The version-one policy contract is available at `/v1/policy-documents` and
+`/v1/policy-gaps`. It requires strict JSON bodies and an `Idempotency-Key` for
+mutations, returns bounded cursor pages, and uses `ETag`/`If-Match` for
+revisions. The older unversioned policy routes remain as deprecated local
+compatibility routes. Version-one errors use `application/problem+json`.
+
 The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. The command-line server binds to `127.0.0.1`, and the app always rejects proxy-forwarded or non-loopback traffic. No runtime bypass exists. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
 
 ## Operator CLI
@@ -33,9 +39,9 @@ The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `
 
 | Action | Where |
 | --- | --- |
-| Author or revise a policy | `POST /policy-documents`, `POST /policy-documents/{id}/versions`, `cwl-grc policy author`, or `cwl-grc policy revise` |
-| List policies | `GET /policy-documents` or `cwl-grc policy list` |
-| See policy/control gaps | `GET /policy-gaps?policy_document_id=`, `cwl-grc gaps`, or `/` |
+| Author or revise a policy | `POST /v1/policy-documents`, `POST /v1/policy-documents/{id}/versions`, `cwl-grc policy author`, or `cwl-grc policy revise` |
+| List policies | `GET /v1/policy-documents` or `cwl-grc policy list` |
+| See policy/control gaps | `GET /v1/policy-gaps?policy_document_id=`, `cwl-grc gaps`, or `/` |
 | List official controls | `GET /controls?framework=csap_2026` |
 | See catalog coverage gaps | `GET /controls/uncovered?framework=soc2_tsc_2017` |
 | Store evidence | `POST /evidence-records` with `X-Actor-Id` and `X-Purpose: evidence_binding` |
@@ -53,6 +59,8 @@ Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `n
 - Finalized policy text and mappings cannot be updated, deleted, or extended through SQL.
 - `policy_document.current_version_number` serializes revision allocation; a stale writer receives `409 Conflict` and must reload.
 - Versioned schema upgrades leave `schema_migration` receipts and upgrade existing first-slice stores before integrity triggers are installed.
+- Version-one mutation retries are recorded in `idempotency_record`; stale revisions fail their `If-Match` precondition before any new edition is written.
+- Version-revision idempotency is target-scoped, concurrent key reservation is retry-safe, and paged policy reads batch related rows.
 - A persistent database cannot start without explicit `CWL_GRC_EVIDENCE_KEY` material. Ephemeral keys are limited to explicitly selected in-memory tests.
 
 ## Personal-data handling

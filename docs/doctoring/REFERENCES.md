@@ -32,12 +32,20 @@ Open Policy Agent. (n.d.). *Policy language*. https://www.openpolicyagent.org/do
 
 Ross, R., & Pillitteri, V. (2020). *Security and privacy controls for information systems and organizations* (NIST Special Publication 800-53 Rev. 5). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-53r5
 
-Policy authoring in the first slice follows ISO/IEC 27001:2022 clause 5.2 (information security policy as documented information) and Annex A control A.5.1 (policies for information security); COSO (2013) Principle 12 and AICPA (2022) SOC 2 CC5.3 (deploy control activities through policies and procedures); KISA (2023) ISMS-P 1.1.5; and KISA (2026) CSAP 1.1.1. Open Policy Agent Rego was reviewed and not adopted: it is an authorization PDP language, not a policy-document or evidence-binding store.
+Policy authoring in this slice follows ISO/IEC 27001:2022 clause 5.2 (information security policy as documented information) and Annex A control A.5.1 (policies for information security); COSO (2013) Principle 12 and AICPA (2022) SOC 2 CC5.3 (deploy control activities through policies and procedures); KISA (2023) ISMS-P 1.1.5; and KISA (2026) CSAP 1.1.1. Open Policy Agent Rego was reviewed and not adopted: it is an authorization PDP language, not a policy-document or evidence-binding store.
 
 The product-completion baseline uses ISO 37301:2021, confirmed current in 2026, for compliance-obligation and compliance-management-system framing. ISO 19011:2026 replaces the withdrawn ISO 19011:2018 baseline for management-system audit guidance; ISO 19011 provides guidance and does not itself provide certification. OSCAL 1.2.3 is the current machine-readable model baseline for catalog, profile, control mapping, component definition, system security plan, assessment plan, assessment results, and plan-of-action-and-milestones interoperability. OLIR mappings retain their own publisher, version, draft/final status, and provenance and are not automatically authoritative CWL decisions.
 
 The checked-in `nist_sp_800_53_r5` first-slice rows were authored against the 2020 Rev. 5 catalog and have not been refreshed or proven complete against final Release 5.2.0. NIST issued Release 5.2.0 on August 27, 2025 with new and revised controls, enhancements, discussions, related controls, references, and corresponding assessment-procedure updates. Issue #29 must ingest a lawfully acquired exact release artifact, preserve its digest and import receipt, compute a reviewed edition diff, and decide whether the framework key remains compatible or requires a new release-specific identity before the catalog baseline is described as 5.2.0.
 
-The CSAP catalog stores the edition-specific KISA resource notice rather than the generic CSAP introduction page. A content digest is not claimed in the first slice because the original attachment bytes were not independently captured and hashed in the repository; adding a digest requires an immutable source-artifact ingestion workflow and reviewable byte-level evidence.
+The CSAP catalog stores the edition-specific KISA resource notice rather than the generic CSAP introduction page. A content digest is not claimed in this slice because the original attachment bytes were not independently captured and hashed in the repository; adding a digest requires an immutable source-artifact ingestion workflow and reviewable byte-level evidence.
+
+The version-one HTTP contract uses RFC 9457 problem details and the
+`application/problem+json` media type, and uses RFC 9110 conditional-request
+semantics for `ETag`/`If-Match`. RFC 9111 caching guidance informed the choice
+to keep the policy ETag representation-specific and strong. These references
+define HTTP interoperability; they do not provide authentication, tenant
+authorization, or a general idempotency standard. Those remain explicit
+Keyverse and product-contract work.
 
 ISO publications and other licensed standards remain subject to publisher copyright and usage restrictions. Public CWL records should use official identifiers, lawful source references, and independently authored summaries unless redistribution rights for source text are explicitly recorded.

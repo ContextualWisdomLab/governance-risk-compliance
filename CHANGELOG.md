@@ -16,6 +16,8 @@
 - Product CI for lint, docstring coverage, and 100% statement/branch test coverage.
 - Hash-locked `uv.lock` dependency graph for runtime and development dependencies.
 - Versioned schema-upgrade receipts for existing first-slice stores.
+- Strict `/v1` policy/control API with bounded cursor pages, durable idempotency keys, strong ETags, If-Match revision preconditions, and RFC 9457 problem details; legacy policy routes are marked deprecated in OpenAPI.
+- Hardened version-one retries against concurrent key races and cross-policy key reuse; batched paged reads and bounded non-reflective validation errors.
 - `docs/product-technical-gap-baseline.md` with observed product truth, the live PR queue, officer-visible production and domain gaps, standards corrections, ownership boundaries, and exact next actions. The 2026-08-24 refresh records PR #58 hosted Devin success, terminal hosted check counts for merge-ready develop PRs, PR #34 Strix provider-unavailable, Wave 0 Keyverse order `#38 → #55 → #56 → #57 → #58`, and central `.github` #1257 still behind `main` with OpenCode `CHANGES_REQUESTED`.
 - Wave 1 legacy-binding projection identity: `binding_id` plus `control_item_id`, tenant-scoped through the bound evidence record, with `unassessed` fan-out only after an authorized `control_requirement_mapping` exists.
 - `docs/product/grc-domain-completion-roadmap.md` defining the closed obligation → requirement → policy → internal control → implementation → test/evidence → risk/audit → remediation → controlled-reporting loop and its release gates.
@@ -37,4 +39,5 @@
 
 - `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
+- `docs/adr/0003-version-one-policy-api-contract.md` — strict, replay-safe, paginated version-one policy API with an explicit local-preview security boundary.
 - `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — preserve external catalogs while adding distinct internal-control definitions, implementations, reviewed mappings, tests, effectiveness results, deficiencies, and purpose-bound evidence usage before risk and audit depend on the model.
