@@ -103,11 +103,7 @@ _OFFICER_HOME_SCRIPT = """
     }
   }
 
-  function resetProtectedState() {
-    sessionStorage.removeItem(tokenKey);
-    if (tokenInput) {
-      tokenInput.value = "";
-    }
+  function clearProtectedState() {
     clearChildren(gapList);
     if (gapList) {
       var hidden = document.createElement("li");
@@ -127,6 +123,18 @@ _OFFICER_HOME_SCRIPT = """
       authState,
       "Policy gaps are hidden until Keyverse authorizes this token."
     );
+  }
+
+  function clearRejectedToken() {
+    sessionStorage.removeItem(tokenKey);
+    if (tokenInput) {
+      tokenInput.value = "";
+    }
+  }
+
+  function resetProtectedState() {
+    clearRejectedToken();
+    clearProtectedState();
   }
 
   function loadOfficerGaps() {
@@ -149,6 +157,11 @@ _OFFICER_HOME_SCRIPT = """
     fetch("/policy-gaps", {
       headers: { Authorization: "Bearer " + token }
     }).then(function (response) {
+      if (response.status === 401 || response.status === 403) {
+        var rejected = new Error("keyverse-token-rejected");
+        rejected.rejected = true;
+        throw rejected;
+      }
       if (!response.ok) {
         throw new Error("keyverse-policy-gaps");
       }
@@ -159,8 +172,20 @@ _OFFICER_HOME_SCRIPT = """
         authState,
         "Policy gaps loaded. Author a policy or attach evidence to an uncovered control."
       );
-    }).catch(function () {
-      resetProtectedState();
+    }).catch(function (error) {
+      if (error && error.rejected) {
+        resetProtectedState();
+        setState(
+          authState,
+          "Keyverse rejected this token. Enter an authorized token, then load your policy gaps."
+        );
+        return;
+      }
+      clearProtectedState();
+      setState(
+        authState,
+        "Could not reach the local service or read its response. Your token is kept; retry loading your policy gaps."
+      );
     });
   }
 

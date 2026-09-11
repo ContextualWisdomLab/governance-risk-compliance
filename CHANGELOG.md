@@ -22,6 +22,7 @@
 - Keyverse-enabled `GET /` now serves only a data-free browser bootstrap; protected policy-gap state loads through the Bearer-authorized `/policy-gaps` API, while officer form posts require the same Keyverse Bearer token.
 - Tenant-owned persistence: `policy_document`, `evidence_record`, and `audit_event` store `tenant_identifier`, migrate existing rows to `local_preview`, and isolate reads/writes by Keyverse `org`.
 - OpenAPI `/openapi.json` publishes `KeyverseBearer` (`at+jwt`) on protected policy, evidence, policy-gap, and officer form operations with `grc.policy.read`, `grc.policy.write`, and `grc.evidence.write`; the data-free browser bootstrap, catalog, and `/healthz` stay unmarked.
+- OpenAPI protected operations publish an empty HTTP bearer security requirement and carry the required Keyverse scopes in the `x-keyverse-required-scopes` vendor extension, so spec validators and generated clients do not misread OAuth scope names on a non-OAuth2 scheme.
 - Officer home browser forms store the Keyverse access token in `sessionStorage`, send it as an `Authorization: Bearer` header, and refresh protected state through the authorized API after a successful mutation. Local preview without a verifier posts `X-Actor-Id` from the officer identifier instead of requiring a token.
 - Officer evidence form authenticates before validating `control_ref`, so unauthenticated callers receive 401 rather than a 400 that leaked catalog well-formedness.
 - Keyverse policy-gap queries count only the verified tenant's evidence bindings, so one organization's CSAP mapping cannot hide another organization's uncovered control.
@@ -50,6 +51,8 @@
 - Map a verified token that lacks an action scope to HTTP 403 through `AccessTokenScopeError` (RFC 6750 `insufficient_scope`) instead of matching exception text for `"required scope"`.
 - Reject provider refresh clocks whose `tzinfo` exists without a defined UTC offset.
 - Never embed officer-, tenant-, policy-gap-, or evidence-coverage state in the unauthenticated Keyverse browser bootstrap; protected state is fetched only after Bearer authorization.
+- The Keyverse verification kernel rejects `sub`/`org` identity claims wider than the 128-character persistence contract, so oversized tokens fail closed at verification instead of at storage.
+- A failed Keyverse policy-gap reload clears rendered gap and evidence state after any failure but discards the entered token only on an HTTP 401/403 rejection, so a network outage or malformed response no longer forces officers to re-enter a still-valid token.
 
 ### ADR
 

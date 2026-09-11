@@ -64,14 +64,22 @@ def keyverse_bearer_security_scheme() -> dict[str, Any]:
 
 
 def apply_keyverse_openapi_security(schema: dict[str, Any]) -> dict[str, Any]:
-    """Attach Keyverse Bearer security to officer policy and evidence operations."""
+    """Attach Keyverse Bearer security to officer policy and evidence operations.
+
+    An HTTP bearer scheme is not an OAuth2 flow, so the security requirement
+    array stays empty and the action-specific Keyverse scopes travel in the
+    documented ``x-keyverse-required-scopes`` vendor extension. Publishing OAuth
+    scope names inside the bearer requirement misleads validators and generated
+    clients that reserve that array for oauth2/openIdConnect schemes.
+    """
     components = schema.setdefault("components", {})
     schemes = components.setdefault("securitySchemes", {})
     schemes[KEYVERSE_BEARER_SCHEME] = keyverse_bearer_security_scheme()
     paths = schema.setdefault("paths", {})
     for path, method, scopes in KEYVERSE_PROTECTED_OPERATIONS:
         operation = paths[path][method]
-        operation["security"] = [{KEYVERSE_BEARER_SCHEME: list(scopes)}]
+        operation["security"] = [{KEYVERSE_BEARER_SCHEME: []}]
+        operation["x-keyverse-required-scopes"] = list(scopes)
     return schema
 
 

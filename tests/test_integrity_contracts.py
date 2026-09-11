@@ -527,6 +527,38 @@ def test_audit_attribution_migration_keeps_existing_attribution_values(
     )
 
 
+def test_late_created_owned_tables_carry_tenant_columns_despite_partial_receipt(
+    tmp_path: Path,
+) -> None:
+    """A recorded receipt cannot strand a later supported initialization with unowned tables."""
+    database_url = f"sqlite:///{tmp_path / 'partial.sqlite'}"
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE schema_migration ("
+                "migration_key VARCHAR(64) PRIMARY KEY, "
+                "applied_at TIMESTAMP NOT NULL)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO schema_migration VALUES "
+                "('0001_policy_integrity', CURRENT_TIMESTAMP)"
+            )
+        )
+    apply_schema_migrations(engine)
+    engine.dispose()
+
+    factory = create_session_factory(database_url)
+    with factory() as session:
+        session.execute(text("SELECT 1"))
+    inspector = inspect(create_engine(database_url))
+    for table_name in ("policy_document", "evidence_record", "audit_event"):
+        columns = {column["name"] for column in inspector.get_columns(table_name)}
+        assert "tenant_identifier" in columns
+
+
 def test_integrity_guard_ddl_covers_supported_and_unknown_dialects() -> None:
     """SQLite and PostgreSQL get guards; unknown stores fail closed."""
     sqlite_ddl = "\n".join(integrity_guard_statements("sqlite"))

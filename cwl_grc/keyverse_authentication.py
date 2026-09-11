@@ -215,6 +215,8 @@ class KeyverseAccessTokenVerifier:
             raise AccessTokenValidationError(
                 "This Keyverse profile accepts a human principal only."
             )
+        _reject_oversized_identity("subject", actor_id)
+        _reject_oversized_identity("tenant", tenant_id)
         scopes = _parse_scopes(payload["scope"])
         principal = AuthenticatedPrincipal(
             tenant_id=tenant_id,
@@ -387,6 +389,14 @@ def _required_text(payload: Mapping[str, Any], claim: str, label: str) -> str:
     if not isinstance(value, str) or not value or value != value.strip():
         raise AccessTokenValidationError(f"The Keyverse {label} is invalid.")
     return value
+
+
+def _reject_oversized_identity(label: str, value: str) -> None:
+    """Reject an identity claim wider than the GRC-owned persistence contract."""
+    if len(value) > MAX_PERSISTED_IDENTITY_LENGTH:
+        raise AccessTokenValidationError(
+            f"The Keyverse {label} identity exceeds the persistence boundary."
+        )
 
 
 def _parse_scopes(value: Any) -> frozenset[str]:
