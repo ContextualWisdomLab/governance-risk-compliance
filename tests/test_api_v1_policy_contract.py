@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
+from cryptography.fernet import Fernet
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 import pytest
@@ -21,7 +23,8 @@ from cwl_grc.app import (
 )
 from cwl_grc.authorization import AuthorizationDecision, PurposeCode
 from cwl_grc.catalog import FrameworkCode
-from cwl_grc.models import IdempotencyRecord
+from cwl_grc.database import create_session_factory
+from cwl_grc.models import IdempotencyRecord, PolicyDocument
 from cwl_grc.policy import encode_page_cursor
 
 
@@ -241,6 +244,36 @@ def test_v1_listing_batches_related_policy_queries() -> None:
     assert sum("from policy_version" in statement for statement in statements) == 1
     assert sum("from policy_control_mapping" in statement for statement in statements) == 1
     assert sum("from control_item" in statement for statement in statements) == 1
+
+
+def test_v1_listing_fails_closed_for_versionless_legacy_policy(tmp_path) -> None:
+    """Reject an inconsistent migrated policy row instead of crashing or hiding it."""
+    database_url = f"sqlite:///{tmp_path / 'legacy-policy.sqlite'}"
+    client = TestClient(
+        create_app(database_url=database_url, evidence_key=Fernet.generate_key().decode("ascii"))
+    )
+    factory = create_session_factory(database_url)
+    with factory() as session:
+        session.add(
+            PolicyDocument(
+                policy_document_id="legacy-versionless",
+                policy_title="Imported legacy policy",
+                created_by_actor="migration",
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                current_version_number=0,
+            )
+        )
+        session.commit()
+
+    response = client.get("/v1/policy-documents")
+
+    assert response.status_code == 409
+    assert response.headers["content-type"].startswith("application/problem+json")
+    assert response.json()["type"].endswith("/conflict")
+    assert response.json()["detail"] == (
+        "A policy document has no finalized current edition. "
+        "Repair the policy store before retrying the list request."
+    )
 
 
 def test_idempotency_reservation_handles_unique_insert_races() -> None:
