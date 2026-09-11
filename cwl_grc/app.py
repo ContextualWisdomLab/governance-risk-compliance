@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from cwl_grc.authorization import (
     AuthorizationDecision,
+    LOCAL_DEVELOPMENT_ACTOR,
     LOCAL_DEVELOPMENT_TENANT,
     PurposeCode,
     require_purpose,
@@ -178,13 +179,13 @@ def create_app(
 
     def require_request_actor(
         authorization: str | None,
-        declared_actor: str | None,
+        _declared_actor: str | None,
         purpose_value: str | None,
         required_purpose: PurposeCode,
         required_scope: str,
     ):
-        """Return a tenant-bound purpose decision from signed identity when enabled."""
-        actor_identifier = declared_actor
+        """Return a tenant-bound decision using fixed local or signed identity."""
+        actor_identifier = LOCAL_DEVELOPMENT_ACTOR
         tenant_id = LOCAL_DEVELOPMENT_TENANT
         if access_token_verifier is not None:
             if authorization is None:
@@ -235,6 +236,21 @@ def create_app(
             purpose_value,
             PurposeCode.COVERAGE_REVIEW,
             "grc.policy.read",
+        ).tenant_id
+
+    def tenant_for_coverage_read(
+        authorization: str | None,
+        purpose_value: str | None,
+    ) -> str:
+        """Resolve the exact tenant for protected catalog and coverage reads."""
+        if access_token_verifier is None:
+            return LOCAL_DEVELOPMENT_TENANT
+        return require_request_actor(
+            authorization,
+            None,
+            purpose_value,
+            PurposeCode.COVERAGE_REVIEW,
+            "grc.control.read",
         ).tenant_id
 
     def decision_for_compliance_read(
@@ -418,7 +434,7 @@ def create_app(
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """List official controls and tenant-scoped effectiveness statuses."""
-        tenant_id = tenant_for_policy_read(authorization, x_purpose)
+        tenant_id = tenant_for_coverage_read(authorization, x_purpose)
         coverage = list_control_coverage(
             session,
             parse_framework(framework),
@@ -687,7 +703,7 @@ def create_app(
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """List official controls still needing evidence for the verified tenant."""
-        tenant_id = tenant_for_policy_read(authorization, x_purpose)
+        tenant_id = tenant_for_coverage_read(authorization, x_purpose)
         coverage = [
             item
             for item in list_control_coverage(
@@ -711,13 +727,12 @@ def create_app(
         body: dict[str, Any],
         session: Session = Depends(get_session),
         authorization: str | None = Header(default=None),
-        x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Author a policy mapped only to official catalog identifiers."""
         decision = require_request_actor(
             authorization,
-            x_actor_id,
+            None,
             x_purpose,
             PurposeCode.POLICY_AUTHORING,
             "grc.policy.write",
@@ -737,13 +752,12 @@ def create_app(
         body: dict[str, Any],
         session: Session = Depends(get_session),
         authorization: str | None = Header(default=None),
-        x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Publish the next immutable policy edition and replacement mappings."""
         decision = require_request_actor(
             authorization,
-            x_actor_id,
+            None,
             x_purpose,
             PurposeCode.POLICY_AUTHORING,
             "grc.policy.write",
@@ -799,13 +813,12 @@ def create_app(
         body: dict[str, Any],
         session: Session = Depends(get_session),
         authorization: str | None = Header(default=None),
-        x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Store the next evidence artifact without masking PII."""
         decision = require_request_actor(
             authorization,
-            x_actor_id,
+            None,
             x_purpose,
             PurposeCode.EVIDENCE_BINDING,
             "grc.evidence.write",
@@ -827,13 +840,12 @@ def create_app(
         body: dict[str, Any],
         session: Session = Depends(get_session),
         authorization: str | None = Header(default=None),
-        x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Place a verified legal hold without deleting or masking evidence."""
         decision = require_request_actor(
             authorization,
-            x_actor_id,
+            None,
             x_purpose,
             PurposeCode.EVIDENCE_RETENTION,
             "grc.evidence.retention",
@@ -852,13 +864,12 @@ def create_app(
         evidence_record_id: str,
         session: Session = Depends(get_session),
         authorization: str | None = Header(default=None),
-        x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Release a verified legal hold and leave disposition to a later workflow."""
         decision = require_request_actor(
             authorization,
-            x_actor_id,
+            None,
             x_purpose,
             PurposeCode.EVIDENCE_RETENTION,
             "grc.evidence.retention",
@@ -871,13 +882,12 @@ def create_app(
         body: dict[str, str],
         session: Session = Depends(get_session),
         authorization: str | None = Header(default=None),
-        x_actor_id: str | None = Header(default=None),
         x_purpose: str | None = Header(default=None),
     ) -> dict[str, Any]:
         """Bind same-tenant stored evidence to one official control identifier."""
         decision = require_request_actor(
             authorization,
-            x_actor_id,
+            None,
             x_purpose,
             PurposeCode.EVIDENCE_BINDING,
             "grc.evidence.write",
@@ -932,14 +942,13 @@ def create_app(
         session: Session = Depends(get_session),
         policy_title: str = Form(),
         policy_body: str = Form(),
-        actor_identifier: str = Form(),
         control_refs: list[str] = Form(default=[]),
         authorization: str | None = Header(default=None),
     ) -> RedirectResponse:
         """Author a local-development policy from the officer home."""
         decision = require_request_actor(
             authorization,
-            actor_identifier,
+            None,
             PurposeCode.POLICY_AUTHORING.value,
             PurposeCode.POLICY_AUTHORING,
             "grc.policy.write",
@@ -961,7 +970,6 @@ def create_app(
     @app.post("/officer/evidence")
     def officer_attach(
         session: Session = Depends(get_session),
-        actor_identifier: str = Form(),
         evidence_title: str = Form(),
         payload_text: str = Form(),
         framework: str | None = Form(default=None),
@@ -986,7 +994,7 @@ def create_app(
             )
         decision = require_request_actor(
             authorization,
-            actor_identifier,
+            None,
             PurposeCode.EVIDENCE_BINDING.value,
             PurposeCode.EVIDENCE_BINDING,
             "grc.evidence.write",

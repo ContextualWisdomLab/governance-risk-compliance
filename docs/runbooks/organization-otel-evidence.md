@@ -55,4 +55,3 @@ collector, route-template, session-correlation, or Valkey client change.
 The GRC `/healthz`, `/readyz`, and `/startupz` probes remain the deployment
 admission checks. A successful probe without collector acceptance is not
 production telemetry evidence.
-

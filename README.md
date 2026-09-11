@@ -16,7 +16,7 @@ This repository is the ContextualWisdomLab home for policy, control, risk, evide
 8. Confirm `/readyz` returns `200` with database, schema, seed, guard, key, identity, and lifecycle checks; use `/startupz` to inspect the checks that admitted the process.
 9. Set the standard `OTEL_EXPORTER_OTLP_ENDPOINT` only when an approved collector is available; request traces and low-cardinality request metrics are then exported asynchronously.
 
-The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. `X-Actor-Id` and `X-Purpose` declare audit context and purpose; they do not authenticate an actor. The command-line server binds to `127.0.0.1`, and the app always rejects proxy-forwarded or non-loopback traffic. No runtime bypass exists. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
+The HTTP surface is an **unauthenticated developer preview**, not a production identity boundary. Local HTTP mutations use the fixed `local_development_actor` audit actor; caller-supplied `X-Actor-Id` is ignored. `X-Purpose` declares purpose but does not authenticate an actor. The command-line server binds to `127.0.0.1`, and the app always rejects proxy-forwarded or non-loopback traffic. No runtime bypass exists. Do not route external traffic until Keyverse-backed OIDC, tenant authorization, and deployment hardening are implemented.
 
 ## Operator CLI
 
@@ -40,8 +40,8 @@ The data commands `policy author`, `policy revise`, `policy list`, `gaps`, and `
 | List policies | `GET /policy-documents` or `cwl-grc policy list` |
 | See policy/control gaps | `GET /policy-gaps?policy_document_id=`, `cwl-grc gaps`, or `/` |
 | List official controls | `GET /controls?framework=csap_2026` |
-| See explicit catalog coverage statuses | `GET /controls?framework=soc2_tsc_2017` or `GET /controls/uncovered?framework=soc2_tsc_2017` |
-| Store evidence | `POST /evidence-records` with `X-Actor-Id` and `X-Purpose: evidence_binding` |
+| See explicit catalog coverage statuses | `GET /controls?framework=soc2_tsc_2017` or `GET /controls/uncovered?framework=soc2_tsc_2017`; Keyverse mode requires `grc.control.read` and `X-Purpose: coverage_review` |
+| Store evidence | `POST /evidence-records` with `X-Purpose: evidence_binding`; local HTTP uses the fixed `local_development_actor` |
 | Store compatibility evidence binding | `POST /control-evidence-bindings` or `cwl-grc bind`; direct bindings remain `unassessed` until a scoped control test uses the evidence |
 | Register source and exact revision | `POST /obligations/sources`, `POST /obligations/sources/{id}/revisions` with `X-Purpose: compliance_governance` |
 | Register and decide an obligation | `POST /obligations`, `POST /obligations/{id}/applicability-decisions`; decisions require rationale, evidence reference, period, and next review |
@@ -64,6 +64,7 @@ Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `n
 - `policy_document.current_version_number` serializes revision allocation; a stale writer receives `409 Conflict` and must reload.
 - Versioned schema upgrades leave `schema_migration` receipts and upgrade existing first-slice stores before integrity triggers are installed.
 - Internal controls are separate from official catalog requirements: published definition versions, scoped implementations, reviewed mappings, design/operating tests, deficiencies, exceptions, and purpose-approved evidence usage project explicit coverage statuses.
+- Database guards reject mismatched control-definition/implementation test graphs, and coverage ignores retired definitions and inactive test plans.
 - Obligations are separate from framework controls: exact source revisions, jurisdiction/scope, evidenced applicability decisions, commitments, proposed policy/control links, immutable change intake, and impact/re-approval worklists preserve legal and operational truth without copying source text. Requirement creation never self-asserts approval.
 - A persistent database cannot start without explicit `CWL_GRC_EVIDENCE_KEY` material. Ephemeral keys are limited to explicitly selected in-memory tests.
 

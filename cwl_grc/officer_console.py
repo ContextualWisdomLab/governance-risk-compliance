@@ -73,6 +73,7 @@ def render_officer_home(
 <body>
   <h1>Author the next policy, then test uncovered controls</h1>
   <p>Map each policy to official CSAP / SOC 2 / ISMS-P / ISO 27001 identifiers. Officer contact details stay usable; they are not masked.</p>
+  <p>Local developer actor: local_development_actor. This preview identity is fixed and is not authentication.</p>
   <p>Review explicit control statuses and establish the next control test.</p>
   <h2>Author the next policy</h2>
   <form method="post" action="/officer/policy">
@@ -81,9 +82,6 @@ def render_officer_home(
     </label>
     <label>Policy body
       <textarea name="policy_body" required></textarea>
-    </label>
-    <label>Officer identifier
-      <input name="actor_identifier" required placeholder="officer-ahn">
     </label>
     <label>Official controls this policy maps
       <select name="control_refs" multiple>{policy_options}</select>
@@ -97,9 +95,6 @@ def render_officer_home(
   <form method="post" action="/officer/evidence">
     <label>Control awaiting review
       <select name="control_ref" required>{evidence_options}</select>
-    </label>
-    <label>Officer identifier
-      <input name="actor_identifier" required placeholder="officer-ahn">
     </label>
     <label>Evidence title
       <input name="evidence_title" required placeholder="CSAP 10.2.1 access-grant register">

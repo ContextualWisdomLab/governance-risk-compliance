@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from cwl_grc import create_app
+from cwl_grc.authorization import LOCAL_DEVELOPMENT_ACTOR
 from cwl_grc.catalog import FrameworkCode
 
 
@@ -95,6 +96,17 @@ def test_legacy_binding_remains_unassessed_until_control_test() -> None:
     assert legacy["coverage_status"] == "unassessed"
     assert legacy["next_action"] == "Treat legacy evidence as unassessed and create a control test."
     assert "10.3.1" in {item["catalog_identifier"] for item in after.json()["controls"]}
+
+
+def test_local_actor_header_cannot_choose_audit_actor() -> None:
+    client = _client()
+    response = client.post(
+        "/evidence-records",
+        headers={"X-Actor-Id": "attacker", "X-Purpose": "evidence_binding"},
+        json={"evidence_title": "Access review", "payload_text": "Exact register."},
+    )
+    assert response.status_code == 201
+    assert response.json()["collector_actor"] == LOCAL_DEVELOPMENT_ACTOR
 
 
 def test_soc2_cc6_1_and_isms_p_2_5_1_bind_independently() -> None:
@@ -225,6 +237,8 @@ def test_officer_home_states_next_action_for_uncovered_control() -> None:
     assert "CC6.1" in text
     assert "2.5.1" in text
     assert "establish the next control test" in text
+    assert f"Local developer actor: {LOCAL_DEVELOPMENT_ACTOR}" in text
+    assert "Officer identifier" not in text
 
 
 def test_lists_every_seeded_framework_when_unfiltered() -> None:

@@ -302,7 +302,7 @@ def test_coverage_and_officer_console_reads_use_verified_tenant() -> None:
         headers=_headers(
             private_key,
             tenant_id="tenant-a",
-            scope="grc.policy.read",
+            scope="grc.control.read",
             purpose="coverage_review",
         ),
     )
@@ -312,7 +312,7 @@ def test_coverage_and_officer_console_reads_use_verified_tenant() -> None:
         headers=_headers(
             private_key,
             tenant_id="tenant-b",
-            scope="grc.policy.read",
+            scope="grc.control.read",
             purpose="coverage_review",
         ),
     )
@@ -326,7 +326,7 @@ def test_coverage_and_officer_console_reads_use_verified_tenant() -> None:
         headers=_headers(
             private_key,
             tenant_id="tenant-a",
-            scope="grc.policy.read",
+            scope="grc.control.read",
             purpose="coverage_review",
         ),
     )
@@ -336,7 +336,7 @@ def test_coverage_and_officer_console_reads_use_verified_tenant() -> None:
         headers=_headers(
             private_key,
             tenant_id="tenant-b",
-            scope="grc.policy.read",
+            scope="grc.control.read",
             purpose="coverage_review",
         ),
     )

@@ -15,11 +15,17 @@ from cwl_grc import create_app
 from cwl_grc.encryption import EvidenceCipher
 from cwl_grc.health import (
     LOCAL_PREVIEW_ENVIRONMENT,
+    REQUIRED_MIGRATIONS,
     LifecycleState,
     _guard_names,
     _identity_check,
     _evidence_key_check,
     readiness_payload,
+)
+from cwl_grc.migrations import (
+    INTERNAL_CONTROL_MODEL_MIGRATION,
+    OBLIGATION_MODEL_MIGRATION,
+    OBLIGATION_REQUIREMENT_TARGET_MIGRATION,
 )
 from cwl_grc.observability import (
     build_request_context,
@@ -184,6 +190,95 @@ def test_readiness_reports_schema_receipt_seed_guard_and_key_failures() -> None:
     assert _evidence_key_check(WrongRoundTripCipher())["reason_code"] == (
         "evidence_key_round_trip_failed"
     )
+
+
+@pytest.mark.parametrize(
+    "migration_key",
+    (
+        INTERNAL_CONTROL_MODEL_MIGRATION,
+        OBLIGATION_MODEL_MIGRATION,
+        OBLIGATION_REQUIREMENT_TARGET_MIGRATION,
+    ),
+)
+def test_readiness_requires_every_current_schema_receipt(migration_key: str) -> None:
+    """Readiness refuses traffic while any registered migration receipt is absent."""
+    app = _app()
+    with app.state.session_factory.kw["bind"].begin() as connection:
+        connection.execute(
+            text("DELETE FROM schema_migration WHERE migration_key = :migration_key"),
+            {"migration_key": migration_key},
+        )
+    report = readiness_payload(
+        app.state.session_factory,
+        app.state.evidence_cipher,
+        LOCAL_PREVIEW_ENVIRONMENT,
+        None,
+        app.state.lifecycle,
+    )
+    assert report["status"] == "not_ready"
+    assert report["checks"]["schema"]["reason_code"] == "schema_migration_incomplete"
+
+
+@pytest.mark.parametrize(
+    "guard_name",
+    (
+        "compliance_obligation_block_update",
+        "evidence_usage_block_delete",
+        "control_test_result_block_update",
+    ),
+)
+def test_readiness_requires_every_installed_integrity_guard(guard_name: str) -> None:
+    """Readiness refuses traffic when any migration-installed integrity guard is absent."""
+    app = _app()
+    with app.state.session_factory.kw["bind"].begin() as connection:
+        connection.execute(text(f"DROP TRIGGER {guard_name}"))
+    report = readiness_payload(
+        app.state.session_factory,
+        app.state.evidence_cipher,
+        LOCAL_PREVIEW_ENVIRONMENT,
+        None,
+        app.state.lifecycle,
+    )
+    assert report["status"] == "not_ready"
+    assert report["checks"]["integrity_guards"]["reason_code"] == (
+        "integrity_guards_incomplete"
+    )
+
+
+@pytest.mark.parametrize(
+    ("table_name", "column_name"),
+    (
+        ("control_exception", "exception_reason"),
+        ("evidence_record", "integrity_digest"),
+        ("control_test_result", "result_rationale"),
+    ),
+)
+def test_readiness_requires_every_required_column(table_name: str, column_name: str) -> None:
+    """Readiness refuses traffic when a present table is missing a required column."""
+    app = _app()
+    with app.state.session_factory.kw["bind"].begin() as connection:
+        connection.execute(text(f"ALTER TABLE {table_name} DROP COLUMN {column_name}"))
+    report = readiness_payload(
+        app.state.session_factory,
+        app.state.evidence_cipher,
+        LOCAL_PREVIEW_ENVIRONMENT,
+        None,
+        app.state.lifecycle,
+    )
+    assert report["status"] == "not_ready"
+    assert report["checks"]["schema"]["reason_code"] == "schema_incompatible"
+
+
+def test_readiness_required_migrations_track_applied_receipts() -> None:
+    """A healthy store records exactly the migrations readiness demands, no drift."""
+    app = _app()
+    with app.state.session_factory.kw["bind"].connect() as connection:
+        receipts = set(
+            connection.execute(
+                text("SELECT migration_key FROM schema_migration")
+            ).scalars()
+        )
+    assert receipts == set(REQUIRED_MIGRATIONS)
 
 
 def test_readiness_rejects_missing_required_purpose_with_matching_row_count() -> None:

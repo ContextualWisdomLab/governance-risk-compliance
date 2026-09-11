@@ -81,7 +81,9 @@ and does not make a framework mapping a legal applicability decision.
   status projection, rejection paths, migration backfill, immutable triggers,
   and cross-tenant composite keys.
 - PostgreSQL 18 runtime probing covers schema creation, seed data, evidence
-  usage, operating effectiveness, composite tenant rejection, and immutable
-  result mutation rejection.
+  usage, operating effectiveness, composite tenant rejection, immutable result
+  mutation rejection, and upgrading an older schema before the compatibility
+  indexes exist. This is local acceptance evidence; Product CI does not yet
+  provision PostgreSQL or install a PostgreSQL driver.
 - Product CI remains the source of truth for exact-head lint, docstring, test,
   branch coverage, compile, lock, and clean-tree checks.
