@@ -134,6 +134,7 @@ def test_uncovered_controls_are_authenticated_and_tenant_scoped() -> None:
         headers={"Authorization": f"Bearer {acme_token}"},
     )
     assert acme_coverage.status_code == 200
+    assert acme_coverage.headers["cache-control"] == "no-store"
     assert "10.2.1" not in _catalog_ids(acme_coverage)
 
     other_coverage = client.get(
@@ -142,6 +143,7 @@ def test_uncovered_controls_are_authenticated_and_tenant_scoped() -> None:
         headers={"Authorization": f"Bearer {other_token}"},
     )
     assert other_coverage.status_code == 200
+    assert other_coverage.headers["cache-control"] == "no-store"
     assert "10.2.1" in _catalog_ids(other_coverage)
 
     insufficient_scope = _token(
