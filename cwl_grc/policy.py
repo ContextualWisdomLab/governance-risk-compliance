@@ -130,9 +130,13 @@ def revise_policy(
     policy_body: str,
     refs: list[ControlRef],
 ) -> PolicyDocument:
-    """Atomically allocate and append the next immutable policy edition."""
+    """Append an immutable edition only for the policy's owning officer and tenant."""
     document = session.get(PolicyDocument, policy_document_id)
-    if document is None or document.tenant_identifier != decision.tenant_identifier:
+    if (
+        document is None
+        or document.created_by_actor != decision.actor_identifier
+        or document.tenant_identifier != decision.tenant_identifier
+    ):
         raise HTTPException(status_code=404, detail="That policy document is not on file.")
     body = policy_body.strip()
     if not body:
