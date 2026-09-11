@@ -10,6 +10,19 @@ test('keyboard actions expose exact values and truthful preview boundaries', asy
   await expect(page.getByText('officer-facing state semantics')).toBeVisible();
   await expect(page.getByText(/buyer/i)).toHaveCount(0);
 
+  const metricStates = async (name) => {
+    const card = page.locator('.metric', { hasText: name });
+    return (await card.locator('[data-i18n^="status."]').allInnerTexts()).map((text) => text.trim());
+  };
+  expect(await metricStates('Controls tested')).toEqual(['2 not assessed', '2 scheduled']);
+  expect(await metricStates('Evidence fresh')).toEqual(['2 stale', '1 awaiting collection']);
+  await expect(page.getByRole('row', { name: /Controls tested/ })).toContainText(
+    '2 not assessed, 2 scheduled',
+  );
+  await expect(page.getByRole('row', { name: /Evidence fresh/ })).toContainText(
+    '2 stale, 1 awaiting collection',
+  );
+
   const exactValues = page.getByRole('link', { name: 'View exact values' }).first();
   await exactValues.focus();
   await expect(exactValues).toBeFocused();
@@ -37,7 +50,34 @@ test('mobile and print fallbacks keep the page usable without false overflow', a
 
   await page.emulateMedia({ media: 'print' });
   await expect(page.locator('.button').first()).toBeHidden();
-  await expect(page.getByRole('table')).toBeVisible();
+  const table = page.getByRole('table');
+  await expect(table).toBeVisible();
+
+  await expect(page.getByText('Period: 2026 Q3')).toBeVisible();
+  for (const column of ['Measure', 'Value', 'Status', 'Source version', 'Limitation', 'Next action']) {
+    await expect(page.getByRole('columnheader', { name: column })).toBeVisible();
+  }
+  await expect(table).toContainText('control-test-2026-q3');
+  await expect(table).toContainText('evidence-index-2026-08-20');
+  await expect(table).toContainText('No effectiveness claim is made for unassessed or scheduled controls.');
+  await expect(table).toContainText('Schedule tests');
+
+  const scrollRegion = page.locator('.table-scroll');
+  await expect(scrollRegion).toHaveCSS('overflow-x', 'visible');
+  const headers = page.getByRole('columnheader');
+  await expect(headers).toHaveCount(6);
+  for (const header of await headers.all()) {
+    const box = await header.boundingBox();
+    expect(box.width).toBeGreaterThan(0);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+  }
+  const bodyCells = page.locator('table tbody tr').first().locator('th, td');
+  await expect(bodyCells).toHaveCount(6);
+  for (const cell of await bodyCells.all()) {
+    const text = (await cell.innerText()).trim();
+    expect(text.length).toBeGreaterThan(0);
+    expect(await cell.evaluate((node) => node.scrollWidth > node.clientWidth + 1)).toBe(false);
+  }
 });
 
 test('locale switching translates labels without changing state identifiers', async ({ page }) => {

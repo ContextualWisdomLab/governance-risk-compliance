@@ -1,5 +1,6 @@
 """Regression contract for the bounded GRC buyer-workspace design slice."""
 
+import re
 from pathlib import Path
 
 
@@ -10,6 +11,32 @@ def read(path: str) -> str:
     """Return repository text used by the design-contract assertions."""
 
     return (ROOT / path).read_text(encoding="utf-8")
+
+
+def test_workspace_metric_states_reconcile_with_their_denominators() -> None:
+    """Each fraction metric's numerator plus every stated state must reach its denominator."""
+
+    html = read("apps/grc-workspace/index.html")
+    english = read("apps/grc-workspace/i18n.mjs").split("ko: Object.freeze(", 1)[0]
+    cards = re.findall(r'<article class="metric">.*?</article>', html, flags=re.DOTALL)
+    reconciled = 0
+    for card in cards:
+        fraction = re.search(r"<strong>(\d+)\s*/\s*(\d+)</strong>", card)
+        if not fraction:
+            continue
+        numerator, denominator = int(fraction.group(1)), int(fraction.group(2))
+        keys = re.findall(r'data-i18n="(status\.[^"]+)"', card)
+        assert keys, card
+        total = numerator
+        for key in keys:
+            message = re.search(rf"'{re.escape(key)}':\s*'([^']*)'", english)
+            assert message, key
+            count = re.match(r"\s*(\d+)", message.group(1))
+            assert count, message.group(1)
+            total += int(count.group(1))
+        assert total == denominator, (keys, total, denominator)
+        reconciled += 1
+    assert reconciled == 2
 
 
 def test_workspace_exposes_truthful_buyer_states_and_next_actions() -> None:
@@ -44,6 +71,8 @@ def test_workspace_preserves_keyboard_motion_touch_print_and_responsive_contract
         "@media (prefers-reduced-motion: reduce)",
         "@media print",
         "@media (max-width: 720px)",
+        "@container workspace (max-width: 720px)",
+        "container-type: inline-size",
         "min-height: 44px",
         "clip-path: inset(50%)",
         "[hidden] { display: none !important; }",
@@ -111,13 +140,20 @@ def test_frontend_toolchain_and_browser_gate_are_pinned() -> None:
     mise = read("mise.toml")
     workflow = read(".github/workflows/buyer-workspace.yml")
     assert '"@playwright/test": "1.62.1"' in package
+    assert '"@storybook/test-runner": "0.24.5"' in package
     assert '"test:buyer-workspace": "playwright test tests/buyer-workspace.spec.mjs"' in package
+    assert '"test:storybook": "node scripts/run-storybook-tests.mjs"' in package
+    runner = read("scripts/run-storybook-tests.mjs")
+    assert "test-storybook" in runner
+    assert "--index-json" in runner
+    assert "storybook-static" in runner
     assert '"name": "cwl-grc-design-authority"' in lock
     assert 'node = "24.18.0"' in mise
     assert "corepack npm ci" in workflow
     assert "node-version: '24.18.0'" in workflow
     assert "playwright install --with-deps chromium" in workflow
     assert "test:buyer-workspace" in workflow
+    assert "test:storybook" in workflow
 
 
 def test_design_authority_is_traceable_to_figma_and_decision_records() -> None:

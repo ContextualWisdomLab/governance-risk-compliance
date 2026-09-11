@@ -77,8 +77,27 @@ async function playStyleSelection({ canvas, canvasElement, userEvent }) {
 
 async function playLayoutAndResponsive({ canvasElement }) {
   const host = workspaceHost({ canvasElement });
+  const workspace = host.querySelector('.workspace');
   await expect(host.style.maxWidth).toBe('390px');
-  await expect(host.querySelector('.workspace')).toBeTruthy();
+  await expect(workspace).toBeTruthy();
+  await expect(workspace.scrollWidth).toBeLessThanOrEqual(workspace.clientWidth);
+  const columns = (selector) =>
+    getComputedStyle(workspace.querySelector(selector)).gridTemplateColumns.split(' ').length;
+  await expect(columns('.metric-grid')).toBe(1);
+  await expect(columns('.two-column')).toBe(1);
+  const headerDirection = getComputedStyle(
+    workspace.querySelector('.workspace__header'),
+  ).flexDirection;
+  await expect(headerDirection).toBe('column');
+  for (const action of workspace.querySelectorAll('.button')) {
+    const parent = action.parentElement;
+    const parentStyle = getComputedStyle(parent);
+    const available =
+      parent.clientWidth -
+      parseFloat(parentStyle.paddingLeft) -
+      parseFloat(parentStyle.paddingRight);
+    await expect(action.getBoundingClientRect().width).toBeGreaterThanOrEqual(available - 1);
+  }
 }
 
 async function playTypographyAndColor({ canvas, canvasElement }) {

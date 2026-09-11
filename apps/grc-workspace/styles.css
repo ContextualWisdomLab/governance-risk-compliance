@@ -28,7 +28,7 @@ body { margin: 0; color: var(--grc-ink); background: var(--grc-canvas); }
 button, input, select, textarea { font: inherit; }
 button { min-height: 44px; }
 
-.workspace { width: min(1376px, 100%); margin: 0 auto; padding: 32px; }
+.workspace { width: min(1376px, 100%); margin: 0 auto; padding: 32px; container-type: inline-size; container-name: workspace; }
 .workspace__header, .section-heading, .actions, .header-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 h1, h2, p { margin-top: 0; }
 h1 { margin-bottom: 8px; font-size: clamp(2rem, 5vw, 2.6rem); letter-spacing: -0.03em; }
@@ -83,6 +83,19 @@ thead th { background: var(--grc-canvas); }
 
 @media (max-width: 720px) {
   .workspace { padding: 20px 16px 32px; }
+  .workspace__header, .section-heading, .notice, .actions, .header-actions { align-items: stretch; flex-direction: column; }
+  .metric-grid { grid-template-columns: 1fr; }
+  .trace-list li { grid-template-columns: 1fr; }
+  .action-list li { align-items: flex-start; flex-direction: column; }
+  .button { width: 100%; }
+}
+
+@container workspace (max-width: 960px) {
+  .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .two-column { grid-template-columns: 1fr; }
+}
+
+@container workspace (max-width: 720px) {
   .workspace__header, .section-heading, .notice, .actions, .header-actions { align-items: stretch; flex-direction: column; }
   .metric-grid { grid-template-columns: 1fr; }
   .trace-list li { grid-template-columns: 1fr; }
