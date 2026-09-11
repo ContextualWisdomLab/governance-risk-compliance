@@ -1,4 +1,4 @@
-"""Hardened CLI reads are tenant-scoped rather than author-scoped."""
+"""Hardened CLI reads preserve officer ownership inside the verified tenant."""
 
 from types import SimpleNamespace
 
@@ -6,8 +6,8 @@ from cwl_grc.cli import _owned_policy_documents
 from cwl_grc.keyverse_http import RequestPrincipal
 
 
-def test_hardened_cli_policy_projection_includes_same_tenant_colleague(monkeypatch) -> None:
-    """A verified officer can read policy documents owned by the same tenant."""
+def test_hardened_cli_policy_projection_requires_actor_and_tenant_ownership(monkeypatch) -> None:
+    """A verified officer sees only policy documents they created in their tenant."""
     documents = [
         SimpleNamespace(
             policy_document_id="same-tenant-colleague",
@@ -22,7 +22,7 @@ def test_hardened_cli_policy_projection_includes_same_tenant_colleague(monkeypat
         SimpleNamespace(
             policy_document_id="foreign-tenant",
             tenant_identifier="tenant-beta",
-            created_by_actor="officer-lee",
+            created_by_actor="officer-park",
         ),
     ]
     monkeypatch.setattr(
@@ -34,7 +34,6 @@ def test_hardened_cli_policy_projection_includes_same_tenant_colleague(monkeypat
     projected = _owned_policy_documents(object(), principal)
 
     assert [document.policy_document_id for document in projected] == [
-        "same-tenant-colleague",
         "same-tenant-self",
     ]
 
