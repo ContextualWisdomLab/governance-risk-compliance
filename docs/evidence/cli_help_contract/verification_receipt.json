@@ -1,0 +1,86 @@
+{
+  "schema_version": "1.0",
+  "repository": "ContextualWisdomLab/governance-risk-compliance",
+  "source_parent": "8deede6988480a357532c28b13381705e107993a",
+  "source_path": "cwl_grc/cli.py",
+  "test_path": "tests/test_cli_help_contract.py",
+  "scope": "17 parser-only tests. Local probe executes the hash-verified main and _parser definitions with real argparse; operational dispatch is a failing test sentinel. This is not a full GRC import, locked Product, database, server or deployment test. The temporary probe is not shipped.",
+  "environment": {
+    "python": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+    "pytest": "9.0.2"
+  },
+  "files": {
+    "cli_before.py": {
+      "git_blob_oid": "711e622380d442d342545ba1d4a6736fe4e5c5e6",
+      "sha256": "89f22cb9d64cabffa8bebb7b0fa1a85e82367cb1104b84308b21d3db1dca7983",
+      "size_bytes": 11095
+    },
+    "cli_after.py": {
+      "git_blob_oid": "f5f758a126a32cef460ec7f679b11871c8ec9c6e",
+      "sha256": "8509142769f44eb79915f1b85e263b8b3da3e507132efa9de810bc1b9c818d9c",
+      "size_bytes": 11117
+    },
+    "tests/test_cli_help_contract.py": {
+      "git_blob_oid": "2ca2ebe609324c5860ae221ab11a4aec956e4e39",
+      "sha256": "bdd92013862a4cee514dbb0117f67584b35bbeb3446760d8ee98fa93c613c9fc",
+      "size_bytes": 3127
+    }
+  },
+  "source_preservation": "Only the SystemExit return expression differs. All other original bytes remain exact. Python 3.12 grammar accepted, not a Python 3.12 runtime execution.",
+  "commands": [
+    {
+      "argv": [
+        "/opt/pyvenv/bin/python",
+        "local_parser_probe.py",
+        "cli_before.py"
+      ],
+      "started_at": "2026-09-10T01:30:49.064841+00:00",
+      "finished_at": "2026-09-10T01:30:50.790856+00:00",
+      "exit_code": 1,
+      "raw_output": "help_before.log",
+      "raw_output_sha256": "6a06aeb19883ce24c3cb8f3f150312a35440c428402631eb6055dc28d8808a4e"
+    },
+    {
+      "argv": [
+        "/opt/pyvenv/bin/python",
+        "local_parser_probe.py",
+        "cli_after.py"
+      ],
+      "started_at": "2026-09-10T01:30:50.791293+00:00",
+      "finished_at": "2026-09-10T01:30:52.487014+00:00",
+      "exit_code": 0,
+      "raw_output": "help_after.log",
+      "raw_output_sha256": "8344c740777b253cd77212ac3822daaea35efb01429f399e8d9a8dba88ecd5ed"
+    },
+    {
+      "argv": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "compileall",
+        "-q",
+        "cli_after.py",
+        "tests/test_cli_help_contract.py"
+      ],
+      "started_at": "2026-09-10T01:30:52.487387+00:00",
+      "finished_at": "2026-09-10T01:30:53.174122+00:00",
+      "exit_code": 0,
+      "raw_output": "compile_check.log",
+      "raw_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "results": {
+    "original_failed": 11,
+    "original_passed": 6,
+    "fixed_passed": 17,
+    "warning_count_each_test_run": 1,
+    "warning": "PytestAssertRewriteWarning for already imported anyio in the local probe; not suppressed."
+  },
+  "reproduction": "In a complete authorized checkout, run python -m pytest tests/test_cli_help_contract.py. Normal Product imports the full GRC package and is authoritative. Historic subset results remain separate; fresh whole-repository results are not inferred.",
+  "pytest_arguments": [
+    "-q",
+    "tests/test_cli_help_contract.py",
+    "--tb=line",
+    "--show-capture=no",
+    "-rN"
+  ]
+}

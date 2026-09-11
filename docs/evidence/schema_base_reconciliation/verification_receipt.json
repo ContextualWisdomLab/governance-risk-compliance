@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0",
+  "source_parent": "ed112ed0d17e9cf81c00fba9ed3c5624146e9641",
+  "protected_parent": "529cf321f134e26c0cd379ee53c06ab5297363b6",
+  "common_ancestor": "83e13a1fe80cbf63fb089c337d4da749c4a7956c",
+  "scope": "Two static workflow contracts extracted from the combined test AST. Not full Product, PostgreSQL or hosted CI.",
+  "python_version": "3.13.5",
+  "commands": [
+    {
+      "argv": ["/opt/pyvenv/bin/python", "run_contract_check.py", "source_before"],
+      "working_directory": "/mnt/data/grc_continuation",
+      "started_at": "2026-09-10T00:30:57.410788+00:00",
+      "finished_at": "2026-09-10T00:30:57.983538+00:00",
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "raw_output": "negative_control.log",
+      "raw_output_sha256": "f3ef3c149ca5172008094f79d59cdf39aa7c79cb9b504d5796493d80444fafac"
+    },
+    {
+      "argv": ["/opt/pyvenv/bin/python", "run_contract_check.py", "source_merged"],
+      "working_directory": "/mnt/data/grc_continuation",
+      "started_at": "2026-09-10T00:30:57.983808+00:00",
+      "finished_at": "2026-09-10T00:30:58.589309+00:00",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "raw_output": "reconciled_contracts.log",
+      "raw_output_sha256": "8016c342590913cb3d6e8fd85c40e207b2e26dad674dcfee4634677db1115d4e"
+    },
+    {
+      "argv": ["/opt/pyvenv/bin/python", "-m", "compileall", "-q", "source_merged/tests"],
+      "working_directory": "/mnt/data/grc_continuation",
+      "started_at": "2026-09-10T00:30:58.589541+00:00",
+      "finished_at": "2026-09-10T00:30:59.165067+00:00",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "raw_output": "compile_check.log",
+      "raw_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "files": {
+    "run_contract_check.py": {
+      "git_blob_oid": "af1b9b96a2e32d983b6d75dfc75f427ba76e0bef",
+      "sha256": "f67766e58d64f48571a509758ab7d0c74972b47133f443705ab729cd5bcd453d",
+      "size_bytes": 1119
+    },
+    "source_before/tests/test_integrity_contracts.py": {
+      "git_blob_oid": "5fa31d96eb4c2aae9982d675f76068e3a2de51fc",
+      "sha256": "9c41747595b269ce0b6fd7b1351606dc0f2e1343079eb4b3826d5d0d67242258",
+      "size_bytes": 10562
+    },
+    "source_before/.github/workflows/product.yml": {
+      "git_blob_oid": "502a773824befc872631a5494e492c29f9a548cd",
+      "sha256": "30d2894a322a2d3c3bdc0ba3f9b2e30aaa970b820c33e1e4fe60b29eef9b4650",
+      "size_bytes": 2111
+    },
+    "source_merged/tests/test_integrity_contracts.py": {
+      "git_blob_oid": "1d26a4124cf3c2ef61456d760771381ed44d0f14",
+      "sha256": "20b18e9909c05b77b1a3c01a6ea362d8ff393e1d6a0ad9c63bd59e593b0a6cec",
+      "size_bytes": 11136
+    },
+    "source_merged/.github/workflows/product.yml": {
+      "git_blob_oid": "7b3e363082af9fc98ab0e89a1ccb59aa030ae984",
+      "sha256": "39ed8894e7f5451f58dc93b8a1d7d9706f48491ad1eff2dc7a3590910e202713",
+      "size_bytes": 2199
+    }
+  }
+}

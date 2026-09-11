@@ -1,0 +1,53 @@
+FFFFFFFFFF.....F.                                                        [100%]
+=================================== FAILURES ===================================
+E   AssertionError: assert 2 == 0
+     +  where 2 = <function main at 0x7f0c91f998a0>(['--help'])
+     +    where <function main at 0x7f0c91f998a0> = cli_module.main
+/mnt/data/grc_cli_review/tests/test_cli_help_contract.py:38: AssertionError: assert 2 == 0
+E   AssertionError: assert 2 == 0
+     +  where 2 = <function main at 0x7f0c91f998a0>(['database', '--help'])
+     +    where <function main at 0x7f0c91f998a0> = cli_module.main
+/mnt/data/grc_cli_review/tests/test_cli_help_contract.py:38: AssertionError: assert 2 == 0
+E   AssertionError: assert 2 == 0
+     +  where 2 = <function main at 0x7f0c91f998a0>(['database', 'migrate', '--help'])
+     +    where <function main at 0x7f0c91f998a0> = cli_module.main
+/mnt/data/grc_cli_review/tests/test_cli_help_contract.py:38: AssertionError: assert 2 == 0
+E   AssertionError: assert 2 == 0
+     +  where 2 = <function main at 0x7f0c91f998a0>(['database', 'check', '--help'])
+     +    where <function main at 0x7f0c91f998a0> = cli_module.main
+/mnt/data/grc_cli_review/tests/test_cli_help_contract.py:38: AssertionError: assert 2 == 0
+E   AssertionError: assert 2 == 0
+     +  where 2 = <function main at 0x7f0c91f998a0>(['policy', '--help'])
+     +    where <function main at 0x7f0c91f998a0> = cli_module.main
+/mnt/data/grc_cli_review/tests/test_cli_help_contract.py:38: AssertionError: assert 2 == 0
+E   AssertionError: assert 2 == 0
+     +  where 2 = <function main at 0x7f0c91f998a0>(['policy', 'author', '--help'])
+     +    where <function main at 0x7f0c91f998a0> = cli_module.main
+/mnt/data/grc_cli_review/tests/test_cli_help_contract.py:38: AssertionError: assert 2 == 0
+E   AssertionError: assert 2 == 0
+     +  where 2 = <function main at 0x7f0c91f998a0>(['policy', 'revise', '--help'])
+     +    where <function main at 0x7f0c91f998a0> = cli_module.main
+/mnt/data/grc_cli_review/tests/test_cli_help_contract.py:38: AssertionError: assert 2 == 0
+E   AssertionError: assert 2 == 0
+     +  where 2 = <function main at 0x7f0c91f998a0>(['policy', 'list', '--help'])
+     +    where <function main at 0x7f0c91f998a0> = cli_module.main
+/mnt/data/grc_cli_review/tests/test_cli_help_contract.py:38: AssertionError: assert 2 == 0
+E   AssertionError: assert 2 == 0
+     +  where 2 = <function main at 0x7f0c91f998a0>(['gaps', '--help'])
+     +    where <function main at 0x7f0c91f998a0> = cli_module.main
+/mnt/data/grc_cli_review/tests/test_cli_help_contract.py:38: AssertionError: assert 2 == 0
+E   AssertionError: assert 2 == 0
+     +  where 2 = <function main at 0x7f0c91f998a0>(['bind', '--help'])
+     +    where <function main at 0x7f0c91f998a0> = cli_module.main
+/mnt/data/grc_cli_review/tests/test_cli_help_contract.py:38: AssertionError: assert 2 == 0
+E   AssertionError: assert 2 == 0
+     +  where 2 = <function main at 0x7f0c91f998a0>(['--help'])
+     +    where <function main at 0x7f0c91f998a0> = cli_module.main
+/mnt/data/grc_cli_review/tests/test_cli_help_contract.py:73: AssertionError: assert 2 == 0
+=============================== warnings summary ===============================
+../../../opt/pyvenv/lib/python3.13/site-packages/_pytest/config/__init__.py:1303
+  /opt/pyvenv/lib/python3.13/site-packages/_pytest/config/__init__.py:1303: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio
+    self._mark_plugins_for_rewrite(hook, disable_autoload)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+11 failed, 6 passed, 1 warning in 0.09s

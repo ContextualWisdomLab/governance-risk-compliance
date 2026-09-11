@@ -41,7 +41,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 def _seeded_policy_factory(database_url: str = "sqlite://"):  # noqa: ANN202
     """Return a product store containing one finalized policy edition."""
-    factory = create_session_factory(database_url)
+    factory = create_session_factory(database_url, manage_schema=True)
     with factory() as session:
         seed_control_catalog(session)
         seed_authorization_purposes(session)
@@ -70,6 +70,7 @@ def test_product_workflow_rejects_any_dirty_tree() -> None:
 
 
 def test_product_workflow_only_cancels_superseded_pull_request_heads() -> None:
+    """Separate repositories and PRs; do not cancel a non-PR Product run."""
     workflow = (
         REPOSITORY_ROOT / ".github/workflows/product.yml"
     ).read_text(encoding="utf-8")
@@ -112,7 +113,7 @@ def test_persistent_database_cannot_start_without_an_evidence_key(
     """A durable store never starts with an unrecoverable random evidence key."""
     database_url = f"sqlite:///{tmp_path / 'persistent.sqlite'}"
     with pytest.raises(ValueError, match="evidence key"):
-        create_app(database_url=database_url, evidence_key=None)
+        create_app(database_url=database_url, evidence_key=None, schema_mode="development")
 
 
 def test_audit_events_reject_update_and_delete_at_database_boundary() -> None:

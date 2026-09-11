@@ -2,12 +2,27 @@
 
 ## Unreleased
 
+### Fixed
+
+- Report the recovery action that matches the actual schema state instead of always telling the operator to migrate. A schema that is ahead of the binary now points to a compatible build or restore/forward-fix, while behind, uninitialized, drift, reference-data, and advisory-lock states keep their own correct guidance.
+- Require an explicit store and schema-ownership profile from every operational entrypoint. `create_app` and officer commands now fail before an engine or session is built when `CWL_GRC_DATABASE_URL` or `CWL_GRC_SCHEMA_MODE` is missing, so no replica silently selects a local SQLite file or the DDL-owning development mode. Only `python -m cwl_grc` keeps the local development defaults.
+- Preserve argparse's successful help exit instead of converting zero to usage-error code2. Add17parser regressions, including all existing command help surfaces, configuration-free help, unchanged usage errors and absent/explicit exit codes.
+
+### Removed
+
+- Retire three purpose-complete source-subset execution/capture helpers from `docs/evidence/` after full locked Product and native PostgreSQL execution became available. Preserve their exact historical source at8deede, original receipts/logs and normal full-checkout reproduction instructions. No scanner suppression or equivalent hidden dynamic executor is added; no historical receipt is overwritten.
+
 ### Added
 
 - Versioned policy authoring: `policy_document`, `policy_version`, and `policy_control_mapping` mapped only to official catalog identifiers.
 - Policy-gap query that reuses `control_evidence_binding` (no second evidence model).
 - Officer home form to author a policy and see uncovered policy requirements.
-- `cwl-grc` CLI: `policy author|revise|list`, `gaps`, `bind`, and `serve`.
+- `cwl-grc` officer CLI: `policy author|revise|list`, `gaps`, `bind`, and `serve`.
+- Explicit database-operator CLI: `cwl-grc database migrate` owns schema/reference changes and `cwl-grc database check` verifies compatibility without DDL.
+- Runtime schema profiles: local `development` preparation and fail-closed `runtime` compatibility mode.
+- Hash-locked `psycopg[binary]` 3.3.4 support through the exact `postgresql+psycopg` SQLAlchemy dialect.
+- Digest-pinned PostgreSQL 18.4 integration workflow covering clean install, DDL-free restart, advisory migration locking, trigger parity, session timeouts, and reference-data compatibility.
+- PostgreSQL schema-lifecycle ADR, standards doctoring, expand/contract guidance, failed-migration handling, rollback boundaries, and emergency read-only runbook.
 - Official policy-deployment identifiers: SOC 2 `CC5.3` and COSO 2013 Principle 12.
 - First officer slice: official CSAP / SOC 2 / ISMS-P / ISO/IEC 27001:2022 / NIST SP 800-53 Rev. 5 / COSO 2013 / COSO 2017 control seeds.
 - Evidence create and control–evidence binding with declared actor/purpose audit context and encryption at rest.
@@ -16,25 +31,42 @@
 - Product CI for lint, docstring coverage, and 100% statement/branch test coverage.
 - Hash-locked `uv.lock` dependency graph for runtime and development dependencies.
 - Versioned schema-upgrade receipts for existing first-slice stores.
+- Runtime schema checks for declared column types, nullability, defaults, primary keys, unique constraints, and foreign keys.
 - `docs/product-technical-gap-baseline.md` with observed product truth, the live PR queue, officer-visible production and domain gaps, standards corrections, ownership boundaries, and exact next actions. The 2026-08-24 refresh records PR #58 hosted Devin success, terminal hosted check counts for merge-ready develop PRs, PR #34 Strix provider-unavailable, Wave 0 Keyverse order `#38 → #55 → #56 → #57 → #58`, and central `.github` #1257 still behind `main` with OpenCode `CHANGES_REQUESTED`.
 - Wave 1 legacy-binding projection identity: `binding_id` plus `control_item_id`, tenant-scoped through the bound evidence record, with `unassessed` fan-out only after an authorized `control_requirement_mapping` exists.
 - `docs/product/grc-domain-completion-roadmap.md` defining the closed obligation → requirement → policy → internal control → implementation → test/evidence → risk/audit → remediation → controlled-reporting loop and its release gates.
 - Current doctoring references for ISO 37301:2021 and Amendment 1:2024, ISO 19011:2026 Edition 4, OSCAL 1.2.3, and the NIST OLIR Program without claiming certification or source-text redistribution rights.
 
+### Changed
+
+- `cwl-grc serve` now reports schema or runtime-configuration startup failures as actionable JSON instead of exposing an uncaught traceback.
+- Shared `control_framework`, `control_item`, and `authorization_purpose` reference data is now bootstrapped only by a schema-owning path; runtime refuses missing or incompatible vocabulary instead of silently repairing it.
+- Production application replicas no longer create tables, apply migrations, install triggers, or seed reference data during startup.
+- PostgreSQL support is scoped to major version18 and exercised on18.4; other majors are unsupported until they receive a separate compatibility decision and exact CI lane.
+
 ### Security
 
+- Bind the explicit plaintext PostgreSQL test profile to its validated numeric loopback address; reject alternate query host/hostaddr/port/service selectors. Test-profile `localhost` is explicitly IPv4; IPv6 uses `[::1]`. Verified-TLS production options and normal schema behavior are preserved. Add27no-network endpoint contracts with retained original-source RED and fixed-source GREEN evidence; native/hosted verification remains separate.
 - Always deny proxy-forwarded and non-loopback HTTP traffic while the runtime lacks Keyverse-backed identity and tenant authorization; remove the unauthenticated remote-preview bypass entirely.
 - Bind both standalone server entry points to `127.0.0.1`.
 - Require durable Fernet key material for every persistent evidence store; limit ephemeral keys to explicitly selected in-memory tests.
 - Enforce append-only `audit_event` history and finalized `policy_version` / `policy_control_mapping` immutability with SQLite and PostgreSQL database triggers.
 - Serialize policy edition allocation through an optimistic database counter and return `409 Conflict` to stale writers.
+- Acquire a fixed PostgreSQL transaction advisory lock before schema mutation so concurrent migration owners fail before interleaving DDL or reference-data writes.
+- Require remote PostgreSQL `sslmode=verify-full`; permit disabled TLS only in an explicit loopback integration-test profile.
+- Bound PostgreSQL connect, statement, lock, idle-transaction, pool-acquisition, overflow, and recycle behavior; require `lock_timeout < statement_timeout`.
+- Refuse uninitialized, behind, ahead, table-incomplete, or reference-incompatible schemas before runtime sessions are opened.
+- Refuse runtime startup when stored schema definitions drift from the reviewed SQLAlchemy metadata.
 - Preserve exact operational evidence values while requiring purpose-specific field selection, encryption, retention, and audit for the future production boundary.
 - Pin the CSAP 2026.07 catalog provenance to the official KISA resource notice rather than a generic product page.
-- Pin every Product workflow action to an immutable commit and verify the exact pull-request head before testing.
+- Pin every Product and PostgreSQL workflow action and service image to immutable identities and verify the exact pull-request head before testing.
 - Replace mutable `pip install` resolution with `uv sync --locked`, verify lock freshness, and reject any tracked or untracked dirty tree on every Product run.
 
 ### ADR
 
+- `docs/adr/proposals/verification_tool_retirement.md` — Proposed retirement of completed observation executables, immutable historical evidence, normal reproduction and outstanding review findings.
+- `docs/adr/proposals/postgresql_loopback_endpoint.md` — Proposed final-address binding for the plaintext test exception, compatibility, operator guidance, primary sources and verification limits.
 - `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
+- `docs/adr/0006-explicit-postgresql-schema-lifecycle.md` — separate migration ownership from runtime, close the PostgreSQL connection policy, and reject unsupported schema/reference states before traffic.
 - `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — preserve external catalogs while adding distinct internal-control definitions, implementations, reviewed mappings, tests, effectiveness results, deficiencies, and purpose-bound evidence usage before risk and audit depend on the model.

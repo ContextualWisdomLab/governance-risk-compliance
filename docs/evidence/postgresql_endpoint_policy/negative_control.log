@@ -1,0 +1,106 @@
+FFFFFFFFFFFFFF..........FFF                                              [100%]
+=================================== FAILURES ===================================
+___ test_plaintext_profile_rejects_query_endpoint_selectors[host=192.0.2.10] ___
+tests/test_postgresql_endpoint_policy.py:59: in test_plaintext_profile_rejects_query_endpoint_selectors
+    with pytest.raises(ValueError, match="endpoint"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'ValueError'>
+___ test_plaintext_profile_rejects_query_endpoint_selectors[host=127.0.0.1] ____
+tests/test_postgresql_endpoint_policy.py:59: in test_plaintext_profile_rejects_query_endpoint_selectors
+    with pytest.raises(ValueError, match="endpoint"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'ValueError'>
+___ test_plaintext_profile_rejects_query_endpoint_selectors[host=localhost] ____
+tests/test_postgresql_endpoint_policy.py:59: in test_plaintext_profile_rejects_query_endpoint_selectors
+    with pytest.raises(ValueError, match="endpoint"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_plaintext_profile_rejects_query_endpoint_selectors[host=127.0.0.1&host=192.0.2.10] _
+tests/test_postgresql_endpoint_policy.py:59: in test_plaintext_profile_rejects_query_endpoint_selectors
+    with pytest.raises(ValueError, match="endpoint"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_plaintext_profile_rejects_query_endpoint_selectors[hostaddr=192.0.2.10] _
+tests/test_postgresql_endpoint_policy.py:59: in test_plaintext_profile_rejects_query_endpoint_selectors
+    with pytest.raises(ValueError, match="endpoint"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_plaintext_profile_rejects_query_endpoint_selectors[hostaddr=127.0.0.1] __
+tests/test_postgresql_endpoint_policy.py:59: in test_plaintext_profile_rejects_query_endpoint_selectors
+    with pytest.raises(ValueError, match="endpoint"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'ValueError'>
+______ test_plaintext_profile_rejects_query_endpoint_selectors[port=5433] ______
+tests/test_postgresql_endpoint_policy.py:59: in test_plaintext_profile_rejects_query_endpoint_selectors
+    with pytest.raises(ValueError, match="endpoint"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_plaintext_profile_rejects_query_endpoint_selectors[service=unit_profile] _
+tests/test_postgresql_endpoint_policy.py:59: in test_plaintext_profile_rejects_query_endpoint_selectors
+    with pytest.raises(ValueError, match="endpoint"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'ValueError'>
+__ test_plaintext_profile_rejects_query_endpoint_selectors[%68ost=192.0.2.10] __
+tests/test_postgresql_endpoint_policy.py:59: in test_plaintext_profile_rejects_query_endpoint_selectors
+    with pytest.raises(ValueError, match="endpoint"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'ValueError'>
+_ test_plaintext_profile_pins_the_validated_loopback_address[127.0.0.1-127.0.0.1] _
+tests/test_postgresql_endpoint_policy.py:87: in test_plaintext_profile_pins_the_validated_loopback_address
+    assert driver_arguments["hostaddr"] == host_address
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'hostaddr'
+_ test_plaintext_profile_pins_the_validated_loopback_address[127.0.0.2-127.0.0.2] _
+tests/test_postgresql_endpoint_policy.py:87: in test_plaintext_profile_pins_the_validated_loopback_address
+    assert driver_arguments["hostaddr"] == host_address
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'hostaddr'
+_ test_plaintext_profile_pins_the_validated_loopback_address[localhost-127.0.0.1] _
+tests/test_postgresql_endpoint_policy.py:87: in test_plaintext_profile_pins_the_validated_loopback_address
+    assert driver_arguments["hostaddr"] == host_address
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'hostaddr'
+_ test_plaintext_profile_pins_the_validated_loopback_address[LOCALHOST-127.0.0.1] _
+tests/test_postgresql_endpoint_policy.py:87: in test_plaintext_profile_pins_the_validated_loopback_address
+    assert driver_arguments["hostaddr"] == host_address
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'hostaddr'
+____ test_plaintext_profile_pins_the_validated_loopback_address[[::1]-::1] _____
+tests/test_postgresql_endpoint_policy.py:87: in test_plaintext_profile_pins_the_validated_loopback_address
+    assert driver_arguments["hostaddr"] == host_address
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'hostaddr'
+_ test_plaintext_profile_supplies_explicit_address_despite_environment_defaults[PGHOSTADDR] _
+tests/test_postgresql_endpoint_policy.py:164: in test_plaintext_profile_supplies_explicit_address_despite_environment_defaults
+    assert prepared_connections[0]["hostaddr"] == "127.0.0.1"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'hostaddr'
+_ test_plaintext_profile_supplies_explicit_address_despite_environment_defaults[PGHOST] _
+tests/test_postgresql_endpoint_policy.py:164: in test_plaintext_profile_supplies_explicit_address_despite_environment_defaults
+    assert prepared_connections[0]["hostaddr"] == "127.0.0.1"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'hostaddr'
+_ test_plaintext_profile_supplies_explicit_address_despite_environment_defaults[PGSERVICE] _
+tests/test_postgresql_endpoint_policy.py:164: in test_plaintext_profile_supplies_explicit_address_despite_environment_defaults
+    assert prepared_connections[0]["hostaddr"] == "127.0.0.1"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'hostaddr'
+=========================== short test summary info ============================
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_rejects_query_endpoint_selectors[host=192.0.2.10] - Failed: DID NOT RAISE <class 'ValueError'>
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_rejects_query_endpoint_selectors[host=127.0.0.1] - Failed: DID NOT RAISE <class 'ValueError'>
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_rejects_query_endpoint_selectors[host=localhost] - Failed: DID NOT RAISE <class 'ValueError'>
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_rejects_query_endpoint_selectors[host=127.0.0.1&host=192.0.2.10] - Failed: DID NOT RAISE <class 'ValueError'>
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_rejects_query_endpoint_selectors[hostaddr=192.0.2.10] - Failed: DID NOT RAISE <class 'ValueError'>
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_rejects_query_endpoint_selectors[hostaddr=127.0.0.1] - Failed: DID NOT RAISE <class 'ValueError'>
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_rejects_query_endpoint_selectors[port=5433] - Failed: DID NOT RAISE <class 'ValueError'>
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_rejects_query_endpoint_selectors[service=unit_profile] - Failed: DID NOT RAISE <class 'ValueError'>
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_rejects_query_endpoint_selectors[%68ost=192.0.2.10] - Failed: DID NOT RAISE <class 'ValueError'>
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_pins_the_validated_loopback_address[127.0.0.1-127.0.0.1] - KeyError: 'hostaddr'
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_pins_the_validated_loopback_address[127.0.0.2-127.0.0.2] - KeyError: 'hostaddr'
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_pins_the_validated_loopback_address[localhost-127.0.0.1] - KeyError: 'hostaddr'
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_pins_the_validated_loopback_address[LOCALHOST-127.0.0.1] - KeyError: 'hostaddr'
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_pins_the_validated_loopback_address[[::1]-::1] - KeyError: 'hostaddr'
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_supplies_explicit_address_despite_environment_defaults[PGHOSTADDR] - KeyError: 'hostaddr'
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_supplies_explicit_address_despite_environment_defaults[PGHOST] - KeyError: 'hostaddr'
+FAILED tests/test_postgresql_endpoint_policy.py::test_plaintext_profile_supplies_explicit_address_despite_environment_defaults[PGSERVICE] - KeyError: 'hostaddr'
+17 failed, 10 passed in 0.12s

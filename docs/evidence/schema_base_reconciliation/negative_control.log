@@ -1,0 +1,9 @@
+PASS test_product_workflow_rejects_any_dirty_tree
+Traceback (most recent call last):
+  File "/mnt/data/grc_continuation/run_contract_check.py", line 23, in <module>
+    scope_values[function_name]()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/mnt/data/grc_continuation/source_merged/tests/test_integrity_contracts.py", line 77, in test_product_workflow_only_cancels_superseded_pull_request_heads
+    assert "${{ github.workflow }}-${{ github.repository }}" in workflow
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

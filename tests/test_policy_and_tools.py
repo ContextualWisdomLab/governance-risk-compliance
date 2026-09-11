@@ -14,7 +14,9 @@ from cwl_grc.cli import main as cli_main
 
 def _client() -> TestClient:
     """Return a TestClient against an isolated in-memory product."""
-    return TestClient(create_app(database_url="sqlite://", evidence_key=None))
+    return TestClient(
+        create_app(database_url="sqlite://", evidence_key=None, schema_mode="development")
+    )
 
 
 def _author_headers() -> dict[str, str]:
@@ -189,6 +191,7 @@ def test_cli_authors_policy_lists_gaps_and_binds_evidence(tmp_path: Path, capsys
     database = tmp_path / "grc_product.sqlite"
     env = {
         "CWL_GRC_DATABASE_URL": f"sqlite:///{database}",
+        "CWL_GRC_SCHEMA_MODE": "development",
         "CWL_GRC_EVIDENCE_KEY": "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
     }
     import os
@@ -271,6 +274,7 @@ def test_cli_authors_policy_lists_gaps_and_binds_evidence(tmp_path: Path, capsys
         assert {item["catalog_identifier"] for item in unfiltered["gaps"]} == {"12.3.1"}
     finally:
         os.environ.pop("CWL_GRC_DATABASE_URL", None)
+        os.environ.pop("CWL_GRC_SCHEMA_MODE", None)
         os.environ.pop("CWL_GRC_EVIDENCE_KEY", None)
 
 
@@ -395,6 +399,8 @@ def test_cli_serve_and_error_paths(tmp_path: Path, capsys, monkeypatch) -> None:
         "CWL_GRC_EVIDENCE_KEY",
         "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
     )
+    monkeypatch.setenv("CWL_GRC_DATABASE_URL", "sqlite://")
+    monkeypatch.setenv("CWL_GRC_SCHEMA_MODE", "development")
     monkeypatch.setattr("cwl_grc.cli.uvicorn.run", fake_run)
     assert cli_main(["serve"]) == 0
     assert captured == {"host": "127.0.0.1", "port": 8080, "title": "CWL GRC"}
@@ -406,6 +412,7 @@ def test_cli_serve_and_error_paths(tmp_path: Path, capsys, monkeypatch) -> None:
     assert cli_main(["policy"]) == 2
     database = tmp_path / "grc_errors.sqlite"
     monkeypatch.setenv("CWL_GRC_DATABASE_URL", f"sqlite:///{database}")
+    monkeypatch.setenv("CWL_GRC_SCHEMA_MODE", "development")
     monkeypatch.setenv("CWL_GRC_EVIDENCE_KEY", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
     assert (
         cli_main(

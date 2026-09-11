@@ -8,7 +8,7 @@ This repository is the ContextualWisdomLab home for policy, control, risk, evide
 
 1. Install with `python -m pip install -e ".[dev]"`.
 2. Generate and store a Fernet key as `CWL_GRC_EVIDENCE_KEY` before using any persistent database.
-3. Run `python -m cwl_grc` or `cwl-grc serve`; both start Uvicorn on loopback only.
+3. Run `python -m cwl_grc` for the local default store, or `cwl-grc serve` after exporting `CWL_GRC_DATABASE_URL` and `CWL_GRC_SCHEMA_MODE`; both start Uvicorn on loopback only.
 4. Open `/` from the same machine, author the next policy, and map it only to official catalog identifiers.
 5. Read the policy-gap list and attach the next evidence on an uncovered mapped control.
 6. Confirm `/healthz` returns `{"status":"ok","service":"cwl-grc"}`.
@@ -78,10 +78,10 @@ python -m cwl_grc
 ```python
 from cwl_grc import create_app
 
-app = create_app()
+app = create_app(database_url="postgresql+psycopg://...", schema_mode="runtime")
 ```
 
-Set `CWL_GRC_EVIDENCE_KEY` for every durable store; startup fails when a persistent database has no key. Ephemeral key generation is limited to explicitly selected in-memory SQLite tests. Set `CWL_GRC_DATABASE_URL` when you are not using the local SQLite file.
+`python -m cwl_grc` is the only entrypoint that selects a local store and the `development` profile for you. Every other caller must state both settings explicitly, either as arguments or through `CWL_GRC_DATABASE_URL` and `CWL_GRC_SCHEMA_MODE`; a missing value fails before an engine or session is created. Set `CWL_GRC_EVIDENCE_KEY` for every durable store; startup fails when a persistent database has no key. Ephemeral key generation is limited to explicitly selected in-memory SQLite tests.
 
 ## Citations
 
