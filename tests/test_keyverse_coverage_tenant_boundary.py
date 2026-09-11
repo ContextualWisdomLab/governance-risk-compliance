@@ -156,3 +156,9 @@ def test_uncovered_controls_are_authenticated_and_tenant_scoped() -> None:
         headers={"Authorization": f"Bearer {insufficient_scope}"},
     )
     assert denied.status_code == 403
+
+    spec = client.get("/openapi.json").json()
+    assert spec["paths"]["/controls/uncovered"]["get"]["security"] == [
+        {"KeyverseBearer": ["grc.policy.read"]}
+    ]
+    assert "security" not in spec["paths"]["/controls"]["get"]
