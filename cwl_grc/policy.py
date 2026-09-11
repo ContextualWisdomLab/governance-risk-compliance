@@ -170,18 +170,33 @@ def list_policy_documents(session: Session) -> list[PolicyDocument]:
     return list(session.query(PolicyDocument).order_by(PolicyDocument.created_at.desc()).all())
 
 
-def list_policy_gaps(session: Session, policy_document_id: str | None) -> list[PolicyGap]:
-    """Return latest-version mappings that have no control-evidence binding."""
+def list_policy_gaps(
+    session: Session,
+    policy_document_id: str | None,
+    *,
+    authored_by_actor: str | None = None,
+    evidence_bound_by_actor: str | None = None,
+) -> list[PolicyGap]:
+    """Return latest-version mappings that have no control-evidence binding.
+
+    ``authored_by_actor`` limits the walk to one officer's policy documents.
+    ``evidence_bound_by_actor`` limits coverage to that officer's own bindings,
+    so a different officer's evidence cannot close this officer's gap.
+    """
     if policy_document_id:
         document = session.get(PolicyDocument, policy_document_id)
         if document is None:
             raise HTTPException(status_code=404, detail="That policy document is not on file.")
         documents = [document]
     else:
-        documents = list(session.query(PolicyDocument).order_by(PolicyDocument.created_at.desc()).all())
-    bound_ids = {
-        row[0] for row in session.query(ControlEvidenceBinding.control_item_id).all()
-    }
+        query = session.query(PolicyDocument)
+        if authored_by_actor is not None:
+            query = query.filter_by(created_by_actor=authored_by_actor)
+        documents = list(query.order_by(PolicyDocument.created_at.desc()).all())
+    binding_query = session.query(ControlEvidenceBinding.control_item_id)
+    if evidence_bound_by_actor is not None:
+        binding_query = binding_query.filter_by(bound_by_actor=evidence_bound_by_actor)
+    bound_ids = {row[0] for row in binding_query.all()}
     gaps: list[PolicyGap] = []
     for document in documents:
         version = current_version(session, document)

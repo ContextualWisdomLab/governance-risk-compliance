@@ -174,3 +174,31 @@ def test_posture_hides_other_officer_policy_gaps_and_evidence() -> None:
     assert row["status"] == "not_assessed"
     assert body["metrics"]["legacy_evidence_only_count"] == 0
     assert body["metrics"]["effective_control_count"] == 0
+
+
+def test_other_officer_evidence_does_not_hide_actor_policy_gap() -> None:
+    """A different officer's evidence must not close this officer's own policy gap."""
+    client = _client()
+    authored = client.post(
+        "/policy-documents",
+        headers={"X-Actor-Id": "officer-preview", "X-Purpose": "policy_authoring"},
+        json={
+            "policy_title": "Logical Access Policy",
+            "policy_body": "Review access grants quarterly.",
+            "control_refs": [
+                {
+                    "framework": FrameworkCode.CSAP_2026.value,
+                    "catalog_identifier": "10.2.1",
+                }
+            ],
+        },
+    )
+    assert authored.status_code == 201
+    _legacy_binding(client, actor="officer-other")
+
+    body = client.get("/workspace/posture", headers=_review_headers()).json()
+    row = next(item for item in body["exact_value_rows"] if item["catalog_identifier"] == "10.2.1")
+
+    assert row["status"] == "not_assessed"
+    assert body["metrics"]["policy_gap_count"] == 1
+    assert body["policy_gap_rows"][0]["catalog_identifier"] == "10.2.1"

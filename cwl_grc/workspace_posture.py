@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from cwl_grc.authorization import PurposeCode
 from cwl_grc.catalog import list_control_items
-from cwl_grc.models import ControlEvidenceBinding, PolicyDocument
+from cwl_grc.models import ControlEvidenceBinding
 from cwl_grc.policy import list_policy_gaps
 
 
@@ -24,18 +24,19 @@ def build_preview_posture(
     The current product has an official external-control catalog and legacy
     evidence bindings, but it does not yet own Keyverse tenant authorization,
     internal control definitions, or effectiveness tests. The projection
-    therefore scopes policy gaps and legacy evidence to the declared actor,
-    records the declared tenant for audit context, and exposes exact-value
-    rows instead of a compliance score.
+    therefore scopes policy gaps and legacy evidence to the declared actor and
+    echoes the declared tenant as a request declaration, without claiming that
+    tenant authorization filters the rows, and exposes exact-value rows instead
+    of a compliance score.
     """
     controls = list_control_items(session, None)
     actor_bound_ids = _actor_bound_control_ids(session, actor_identifier)
-    actor_policy_ids = _actor_policy_ids(session, actor_identifier)
-    policy_gaps = [
-        gap
-        for gap in list_policy_gaps(session, None)
-        if gap.policy_document_id in actor_policy_ids
-    ]
+    policy_gaps = list_policy_gaps(
+        session,
+        None,
+        authored_by_actor=actor_identifier,
+        evidence_bound_by_actor=actor_identifier,
+    )
     status_rows: list[dict[str, str]] = []
     for item in controls:
         if item.control_item_id in actor_bound_ids:
@@ -119,15 +120,5 @@ def _actor_bound_control_ids(session: Session, actor_identifier: str) -> set[str
         control_item_id
         for (control_item_id,) in session.query(ControlEvidenceBinding.control_item_id)
         .filter_by(bound_by_actor=actor_identifier)
-        .all()
-    }
-
-
-def _actor_policy_ids(session: Session, actor_identifier: str) -> set[str]:
-    """Return policy documents authored by this officer."""
-    return {
-        policy_document_id
-        for (policy_document_id,) in session.query(PolicyDocument.policy_document_id)
-        .filter_by(created_by_actor=actor_identifier)
         .all()
     }
