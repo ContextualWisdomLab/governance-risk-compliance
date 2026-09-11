@@ -1,0 +1,58 @@
+name: Production Readiness
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      require_ready:
+        description: Fail unless every production gate is ready
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-readiness-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate production evidence contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+      - name: Checkout exact source revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact source head
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          prune-cache: true
+      - name: Install the hash-locked product
+        run: uv sync --locked --extra dev
+      - name: Validate production evidence contract
+        run: >-
+          uv run python -c
+          'from cwl_grc.production_readiness import main; raise SystemExit(main())'
+          docs/production/production-readiness.json
+      - name: Require every production gate
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.require_ready }}
+        run: >-
+          uv run python -c
+          'from cwl_grc.production_readiness import main; raise SystemExit(main())'
+          docs/production/production-readiness.json --require-ready
