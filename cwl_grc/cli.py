@@ -198,15 +198,14 @@ def _owned_policy_documents(
     session: Session,
     principal: RequestPrincipal | None,
 ) -> list[PolicyDocument]:
-    """List policies, limited to the verified officer and tenant when Keyverse is required."""
+    """List policies, limited to the verified tenant when Keyverse is required."""
     documents = list_policy_documents(session)
     if principal is None:
         return documents
     return [
         document
         for document in documents
-        if document.created_by_actor == principal.actor_identifier
-        and document.tenant_identifier == principal.tenant_identifier
+        if document.tenant_identifier == principal.tenant_identifier
     ]
 
 
