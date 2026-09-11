@@ -10,7 +10,9 @@ from cwl_grc.catalog import FrameworkCode
 
 def _client() -> TestClient:
     """Return a TestClient against an isolated in-memory product."""
-    return TestClient(create_app(database_url="sqlite://", evidence_key=None))
+    return TestClient(
+        create_app(database_url="sqlite://", evidence_key=None, schema_mode="development")
+    )
 
 
 def test_healthz_reports_ok() -> None:

@@ -26,12 +26,18 @@ Ruff/docstrings/compile/lock/clean-tree successful. The separate native lane
 The remaining Product warning is Starlette's httpx2 transition. These results
 are retained as parent evidence, not a later commit's GREEN or release claim.
 
-Two major review findings remain open: schema-ahead errors give inappropriate
+Two major review findings were reported: schema-ahead errors give inappropriate
 migration guidance, and operational entrypoints can implicitly choose SQLite
-and development schema ownership. Keep PR18 Draft until these are causally
-repaired and the exact final head passes the applicable gates. No acceptance,
-exemption or operational safety claim is inferred from this bounded help/tool
-repair. The blocked database diagnostic candidate remains excluded.
+and development schema ownership. Both are now causally repaired on the repair
+branch: `SchemaCompatibilityError` carries a state-specific `recovery_action`
+(behind/uninitialized → migration owner, ahead → compatible build or
+restore/forward-fix, drift/reference/lock → their own guidance) that `cwl-grc
+serve` reports, and `create_app`/officer commands require an explicit
+`CWL_GRC_DATABASE_URL` and `CWL_GRC_SCHEMA_MODE` before any engine or session
+side effect, with local defaults confined to `python -m cwl_grc`. Keep PR18
+Draft until the exact final head passes the applicable gates. No acceptance,
+exemption or operational safety claim is inferred from this bounded repair. The
+blocked database diagnostic candidate remains excluded.
 
 The following endpoint and reconciliation sections are retained history. Their
 statements about which production symbols changed apply to those earlier
@@ -126,8 +132,8 @@ predecessor successes do not transfer.
 | Gap | Required next action |
 | --- | --- |
 | CLI help and observation tool lifecycle | Verify the containing head's Product/SAST and independent review; keep original receipts and historical source intact. |
-| Schema recovery guidance | Distinguish ahead, behind/uninitialized and drift/concurrency conditions; do not direct an incompatible newer store into routine migration. |
-| Operational configuration defaults | Require an explicit store/profile outside dedicated local development; verify configuration failure occurs before schema or connection side effects. |
+| Schema recovery guidance | Repaired: per-state `recovery_action` on `SchemaCompatibilityError`; ahead no longer routes to routine migration. Next: exact-head evidence. |
+| Operational configuration defaults | Repaired: explicit store/profile required before side effects; local defaults limited to `python -m cwl_grc`. Next: exact-head evidence. |
 | Protected-base drift in PR18 | Preserve ordinary ancestry and re-read zero-behind state; regenerate exact-head Product/PostgreSQL/security/review evidence. |
 | Dependency Review availability | Obtain authoritative dependency diff after resolving HTTP403 with canonical owner `.github` issue810. Other scanners cannot replace it. |
 | CodeQL terminal evidence | Obtain exact repository/PR/base/head/language/run-bound scan and callback evidence through `.github` issue1929; dispatch success is not scan success. |

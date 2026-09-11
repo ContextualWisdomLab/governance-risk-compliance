@@ -38,7 +38,7 @@ flowchart LR
 3. **Preview network boundary**: always rejects proxy-forwarded and non-loopback traffic; no runtime override exists before Keyverse authentication.
 4. **Officer CLI**: executable `cwl-grc policy author|revise|list`, `cwl-grc gaps`, `cwl-grc bind`, and local Uvicorn `cwl-grc serve`.
 5. **Database operator CLI**: `cwl-grc database migrate` is the only schema-owning command; `cwl-grc database check` verifies the exact schema and reference vocabulary without DDL.
-6. **Kernel package**: `create_app()` for modular composition; `python -m cwl_grc` for standalone local HTTP.
+6. **Kernel package**: `create_app(database_url=…, schema_mode=…)` for modular composition; `python -m cwl_grc` for standalone local HTTP, and the only entrypoint that defaults the store and profile for local development.
 7. **Store**: 3NF SQLite for the local profile and PostgreSQL 18 for the supported production database profile. PostgreSQL acceptance is exercised on 18.4 with `psycopg[binary]` 3.3.4.
 
 ## Schema ownership and compatibility

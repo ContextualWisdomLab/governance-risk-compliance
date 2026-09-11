@@ -64,9 +64,7 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps(
                 {
                     "error": str(exc),
-                    "next_action": (
-                        "Run the explicit database migration owner, then check compatibility."
-                    ),
+                    "next_action": exc.recovery_action,
                 }
             )
         )
@@ -317,12 +315,19 @@ def _bind_command(namespace: argparse.Namespace) -> int:
 
 
 def _open_session() -> Session:
-    """Open one officer session under the configured schema-ownership profile."""
-    url = os.environ.get(
-        "CWL_GRC_DATABASE_URL",
-        "sqlite:///grc_product.sqlite",
-    )
-    mode = os.environ.get("CWL_GRC_SCHEMA_MODE", "development")
+    """Open one officer session under an explicitly configured ownership profile."""
+    url = os.environ.get("CWL_GRC_DATABASE_URL")
+    if not url:
+        raise ValueError(
+            "CWL_GRC_DATABASE_URL is required for officer commands; "
+            "no implicit local store is selected."
+        )
+    mode = os.environ.get("CWL_GRC_SCHEMA_MODE")
+    if not mode:
+        raise ValueError(
+            "CWL_GRC_SCHEMA_MODE is required for officer commands; "
+            "no implicit schema-ownership profile is selected."
+        )
     if mode not in SCHEMA_MODES:
         allowed = ", ".join(sorted(SCHEMA_MODES))
         raise ValueError(f"CWL GRC schema mode must be one of: {allowed}.")

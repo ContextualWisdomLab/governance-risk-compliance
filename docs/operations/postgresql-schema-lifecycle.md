@@ -16,6 +16,8 @@
 
 A different PostgreSQL major, driver, TLS mode, isolation level, or migration mechanism is unsupported until an ADR and exact acceptance evidence add it.
 
+Every operational entrypoint must state its store and schema-ownership profile explicitly through `CWL_GRC_DATABASE_URL` and `CWL_GRC_SCHEMA_MODE` (or the matching `create_app` arguments). Only `python -m cwl_grc` selects the local SQLite store and the `development` profile on its own. A missing store or profile fails before an engine, session, or migration side effect, so no replica can silently fall back to a local file or DDL-owning mode.
+
 ## Deployment sequence
 
 1. **Freeze the release identity.** Record the exact source SHA, image digest when available, `uv.lock`, supported PostgreSQL version, and expected migration-key set.

@@ -113,7 +113,7 @@ def test_persistent_database_cannot_start_without_an_evidence_key(
     """A durable store never starts with an unrecoverable random evidence key."""
     database_url = f"sqlite:///{tmp_path / 'persistent.sqlite'}"
     with pytest.raises(ValueError, match="evidence key"):
-        create_app(database_url=database_url, evidence_key=None)
+        create_app(database_url=database_url, evidence_key=None, schema_mode="development")
 
 
 def test_audit_events_reject_update_and_delete_at_database_boundary() -> None:

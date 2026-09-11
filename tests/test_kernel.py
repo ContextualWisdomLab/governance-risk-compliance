@@ -20,7 +20,7 @@ from cwl_grc.officer_console import parse_control_ref, render_officer_home
 
 
 def test_module_factory_returns_app() -> None:
-    app = create_app(database_url="sqlite://")
+    app = create_app(database_url="sqlite://", schema_mode="development")
     assert app.title == "CWL GRC"
 
 

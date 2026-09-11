@@ -54,8 +54,32 @@ EXPECTED_PURPOSE_ROWS = frozenset(
 )
 
 
+SCHEMA_MIGRATION_RECOVERY = (
+    "Run the explicit database migration owner, then check compatibility."
+)
+SCHEMA_AHEAD_RECOVERY = (
+    "Deploy an application build compatible with the newer schema, or restore/forward-fix "
+    "the store; do not run routine migration against a newer schema."
+)
+SCHEMA_DEFINITION_RECOVERY = (
+    "Stop the runtime, then restore a compatible build or forward-fix the schema through "
+    "the migration owner."
+)
+SCHEMA_REFERENCE_RECOVERY = (
+    "Stop the runtime; repair shared reference data only through the migration owner."
+)
+SCHEMA_MIGRATION_LOCK_RECOVERY = (
+    "Observe the existing migration owner and retry only after it finishes."
+)
+
+
 class SchemaCompatibilityError(RuntimeError):
     """Signal that the database cannot be served by this exact application build."""
+
+    def __init__(self, message: str, *, recovery_action: str) -> None:
+        """Record the operator recovery action that matches the reported schema state."""
+        super().__init__(message)
+        self.recovery_action = recovery_action
 
 
 @dataclass(frozen=True)
@@ -227,7 +251,8 @@ def _migrate_engine(engine: Engine) -> None:
             ).scalar_one()
             if acquired is not True:
                 raise SchemaCompatibilityError(
-                    "Another PostgreSQL schema migration owns the advisory lock."
+                    "Another PostgreSQL schema migration owns the advisory lock.",
+                    recovery_action=SCHEMA_MIGRATION_LOCK_RECOVERY,
                 )
         Base.metadata.create_all(connection)
         apply_schema_migrations(connection)
@@ -248,14 +273,16 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
     inspector = inspect(engine)
     if not inspector.has_table("schema_migration"):
         raise SchemaCompatibilityError(
-            "The GRC schema is not initialized. Run `cwl-grc database migrate`."
+            "The GRC schema is not initialized. Run `cwl-grc database migrate`.",
+            recovery_action=SCHEMA_MIGRATION_RECOVERY,
         )
     expected_tables = set(Base.metadata.tables)
     missing_tables = expected_tables.difference(inspector.get_table_names())
     if missing_tables:
         raise SchemaCompatibilityError(
             "The GRC schema is behind this binary; required tables are missing: "
-            + ", ".join(sorted(missing_tables))
+            + ", ".join(sorted(missing_tables)),
+            recovery_action=SCHEMA_MIGRATION_RECOVERY,
         )
     missing_columns: dict[str, tuple[str, ...]] = {}
     for table_name, table in Base.metadata.tables.items():
@@ -272,13 +299,15 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
         )
         raise SchemaCompatibilityError(
             "The GRC schema is behind this binary; required columns are missing: "
-            + details
+            + details,
+            recovery_action=SCHEMA_MIGRATION_RECOVERY,
         )
     definition_mismatches = _schema_definition_mismatches(engine, inspector)
     if definition_mismatches:
         raise SchemaCompatibilityError(
             "The GRC schema has incompatible definitions: "
-            + "; ".join(definition_mismatches)
+            + "; ".join(definition_mismatches),
+            recovery_action=SCHEMA_DEFINITION_RECOVERY,
         )
     with engine.connect() as connection:
         receipts = tuple(
@@ -318,13 +347,15 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
     if missing_migrations:
         raise SchemaCompatibilityError(
             "The GRC schema is behind this binary; run the migration owner. "
-            "Missing migrations: " + ", ".join(sorted(missing_migrations))
+            "Missing migrations: " + ", ".join(sorted(missing_migrations)),
+            recovery_action=SCHEMA_MIGRATION_RECOVERY,
         )
     unknown_migrations = receipt_set.difference(EXPECTED_MIGRATION_KEYS)
     if unknown_migrations:
         raise SchemaCompatibilityError(
             "The GRC schema is ahead of this binary; deploy a compatible application. "
-            "Unknown migrations: " + ", ".join(sorted(unknown_migrations))
+            "Unknown migrations: " + ", ".join(sorted(unknown_migrations)),
+            recovery_action=SCHEMA_AHEAD_RECOVERY,
         )
     if (
         framework_rows != EXPECTED_FRAMEWORK_ROWS
@@ -335,7 +366,8 @@ def assert_schema_compatible(engine: Engine) -> tuple[str, ...]:
             "The GRC schema reference data is incomplete or incompatible; "
             "run the migration owner. "
             f"framework_rows={len(framework_rows)}, "
-            f"control_rows={len(control_rows)}, purpose_rows={len(purpose_rows)}."
+            f"control_rows={len(control_rows)}, purpose_rows={len(purpose_rows)}.",
+            recovery_action=SCHEMA_REFERENCE_RECOVERY,
         )
     return receipts
 

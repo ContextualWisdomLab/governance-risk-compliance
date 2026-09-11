@@ -65,11 +65,18 @@ def create_app(
     schema_mode: str | None = None,
 ) -> FastAPI:
     """Build a loopback-only GRC app under an explicit schema-ownership profile."""
-    url = database_url or os.environ.get(
-        "CWL_GRC_DATABASE_URL",
-        "sqlite:///grc_product.sqlite",
-    )
-    mode = schema_mode or os.environ.get("CWL_GRC_SCHEMA_MODE", "development")
+    url = database_url if database_url is not None else os.environ.get("CWL_GRC_DATABASE_URL")
+    if not url:
+        raise ValueError(
+            "CWL_GRC_DATABASE_URL or an explicit database_url is required; "
+            "no implicit local store is selected."
+        )
+    mode = schema_mode if schema_mode is not None else os.environ.get("CWL_GRC_SCHEMA_MODE")
+    if not mode:
+        raise ValueError(
+            "CWL_GRC_SCHEMA_MODE or an explicit schema_mode is required; "
+            "no implicit schema-ownership profile is selected."
+        )
     if mode not in SCHEMA_MODES:
         allowed = ", ".join(sorted(SCHEMA_MODES))
         raise ValueError(f"CWL GRC schema mode must be one of: {allowed}.")

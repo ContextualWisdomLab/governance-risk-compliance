@@ -24,7 +24,9 @@ def test_local_request_classifier_fails_closed() -> None:
 def test_forwarded_remote_preview_is_always_denied(monkeypatch) -> None:  # noqa: ANN001
     """No environment value can expose the unauthenticated HTTP surface."""
     monkeypatch.setenv("CWL_GRC_ALLOW_UNAUTHENTICATED_REMOTE_PREVIEW", "1")
-    client = TestClient(create_app(database_url="sqlite://", evidence_key=None))
+    client = TestClient(
+        create_app(database_url="sqlite://", evidence_key=None, schema_mode="development")
+    )
 
     local = client.get("/healthz")
     forwarded = client.get(

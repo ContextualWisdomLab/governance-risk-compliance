@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Report the recovery action that matches the actual schema state instead of always telling the operator to migrate. A schema that is ahead of the binary now points to a compatible build or restore/forward-fix, while behind, uninitialized, drift, reference-data, and advisory-lock states keep their own correct guidance.
+- Require an explicit store and schema-ownership profile from every operational entrypoint. `create_app` and officer commands now fail before an engine or session is built when `CWL_GRC_DATABASE_URL` or `CWL_GRC_SCHEMA_MODE` is missing, so no replica silently selects a local SQLite file or the DDL-owning development mode. Only `python -m cwl_grc` keeps the local development defaults.
 - Preserve argparse's successful help exit instead of converting zero to usage-error code2. Add17parser regressions, including all existing command help surfaces, configuration-free help, unchanged usage errors and absent/explicit exit codes.
 
 ### Removed
