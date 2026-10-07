@@ -20,6 +20,13 @@
 - Wave 1 legacy-binding projection identity: `binding_id` plus `control_item_id`, tenant-scoped through the bound evidence record, with `unassessed` fan-out only after an authorized `control_requirement_mapping` exists.
 - `docs/product/grc-domain-completion-roadmap.md` defining the closed obligation → requirement → policy → internal control → implementation → test/evidence → risk/audit → remediation → controlled-reporting loop and its release gates.
 - Current doctoring references for ISO 37301:2021 and Amendment 1:2024, ISO 19011:2026 Edition 4, OSCAL 1.2.3, and the NIST OLIR Program without claiming certification or source-text redistribution rights.
+- Issue #14 audit-management slice (local developer preview): `audit_program`, `audit_engagement`, `engagement_criterion`, `engagement_team_member`, `independence_declaration`, `audit_procedure`, `audit_sample_item`, `audit_evidence_link`, `audit_finding`, `audit_finding_revision`, `remediation_action`, `finding_retest`, and `finding_closure`, with JSON routes under `/audit-programs`, `/audit-engagements`, `/audit-procedures`, `/audit-findings`, `/remediation-actions`, and `/audit-remediation/overdue` that each return `next_action`. The declared purpose is validated before the request body, so a missing purpose returns `401` or `403` even when the body is also invalid.
+- Audit criteria reference official `control_item` rows; `internal_control_reference` is a nullable opaque placeholder until the Issue #27 internal-control model lands.
+- Reproducible `seeded_random` sampling via `random.Random(seed).sample`, stored as sorted 1-based ordinals, plus validated `judgmental` and `full_population` selections.
+- Remediation tracking with evidence-backed completion, independent retest, closure only after a passing retest, and a `risk_accepted` placeholder decision record with an expiry of at most 365 days pending Issue #13.
+- Overdue-remediation query for open actions past their due date and unresolved findings past their target date.
+- Declared purposes `audit_engagement` and `remediation_tracking`.
+- Doctoring reference for the IIA Global Internal Audit Standards (2024, effective January 9, 2025), without a conformance claim.
 
 ### Security
 
@@ -32,9 +39,14 @@
 - Pin the CSAP 2026.07 catalog provenance to the official KISA resource notice rather than a generic product page.
 - Pin every Product workflow action to an immutable commit and verify the exact pull-request head before testing.
 - Replace mutable `pip install` resolution with `uv sync --locked`, verify lock freshness, and reject any tracked or untracked dirty tree on every Product run.
+- Reject update/delete of `independence_declaration`, `audit_finding_revision`, `finding_retest`, and `finding_closure` with SQLite and PostgreSQL triggers, recorded by the `0002_audit_management` schema receipt.
+- Serialize finding revisions through `audit_finding.current_revision_number`; stale `expected_revision` writers receive `409 Conflict`.
+- Enforce audit role separation on declared actors: program approver is the audit authority and not the creator; remediation owners are not engagement team members; retesters are non-conflicted team members who are not remediation or action owners; risk-acceptance authority differs from the remediation owner and the retester. These checks are not authentication until Keyverse identity exists.
+- Keep audit tables free of evidence plaintext by referencing `evidence_record_id` only; unknown evidence and audit identifiers return `404`.
 
 ### ADR
 
 - `docs/adr/0001-control-evidence-first-slice.md` — catalog + evidence + gap query, durable history, and the local-only preview boundary as the first GRC product surface.
 - `docs/adr/0002-policy-versioning-official-controls.md` — versioned policies map official controls only; OPA/Rego deferred.
 - `docs/adr/0011-separate-external-requirements-and-internal-controls.md` — preserve external catalogs while adding distinct internal-control definitions, implementations, reviewed mappings, tests, effectiveness results, deficiencies, and purpose-bound evidence usage before risk and audit depend on the model.
+- `docs/adr/0017-audit-program-engagement-finding-closure.md` (Proposed) — Issue #14 audit program, engagement, sampling, finding revision, remediation, retest, and closure records; explicit non-claims for ISO 19011:2026 and IIA Global Internal Audit Standards conformance, tenant isolation, and authentication; follow-ups #4, #12, #13, and #27.
