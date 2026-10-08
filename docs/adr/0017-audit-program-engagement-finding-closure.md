@@ -83,7 +83,9 @@ triggers installed by `integrity_guard_statements`, in addition to the existing
 Finding revisions only append. `audit_finding.current_revision_number` is the
 optimistic concurrency token, using the same conditional-update pattern as
 `policy_document.current_version_number`: a writer that sends a stale
-`expected_revision` receives `409 Conflict` and must reload.
+`expected_revision` receives `409 Conflict` and must reload. HTTP tokens are
+limited to 1..2,147,483,646, reserving one increment within the signed 32-bit
+SQL INTEGER capacity shared by PostgreSQL and SQLite.
 
 Evidence plaintext is never copied into audit tables. Procedures, sample items,
 remediation completions, and retests reference `evidence_record_id`; an unknown
@@ -92,7 +94,17 @@ evidence record returns `404`.
 ### Reproducible sampling
 
 `sample_size` must not exceed `population_size`, and `population_size` must be
-positive.
+positive. One procedure accepts at most 1,000,000 population items and 10,000
+sample items. Full-population testing is therefore limited to 10,000 items.
+Seeds must fit signed 64-bit database integers; negative seeds in that range
+remain valid. Explicit ordinal lists contain at most 10,000 integers. HTTP
+validation and the public sample selector enforce these bounds before selection.
+Audit JSON integers and conflict flags use their declared types without
+coercion. Calendar dates accept `YYYY-MM-DD`, not Unix timestamps.
+Evidence-link `population_ordinal` is restricted to 1..1,000,000 before SQL.
+Unsupported ordinals and revision tokens return JSON `422` with `next_action`
+and do not write rows or events. These per-procedure bounds are not a global
+concurrency or storage quota.
 
 - `seeded_random`: the service selects
   `random.Random(seed).sample(range(1, population_size + 1), sample_size)` and
@@ -122,17 +134,29 @@ positive.
   actor must be a non-conflicted team member and must not be the remediation
   owner or an action owner. A failed retest sets `retest_failed`; the finding
   stays unresolved and new actions are allowed.
-- Closure with `retest_passed` requires that the latest retest passed and that
-  the closing actor is the engagement lead or a supervisor, not the
+- Closure with `retest_passed` requires that the latest retest passed, the
+  closing actor is the engagement lead or a supervisor, and the actor's latest
+  independence declaration is conflict-free. The actor must not be the
   remediation owner. The finding becomes `closed`.
 - Closure with `risk_accepted` requires an acceptance authority who is not the
-  remediation owner and not the team member who performed the retest, and an
+  remediation owner, any action owner, or any engagement team member, and an
   expiry date after today and no more than 365 days ahead. The finding becomes
   `risk_accepted`, not `closed`. This is a bounded placeholder decision record
   until Issue #13 delivers governed risk acceptance.
+- Finding revision and closure, engagement reporting, and engagement closure
+  recheck the acting auditor's latest independence declaration. A current conflict
+  rejects the decision with `409` without writes.
+- Once the latest retest passes, new revisions are rejected with `409` and a
+  closure/new-finding next action, without changing finding content or events,
+  matching the existing new-action guard. Revisions remain possible before any
+  retest and after a failed retest. Close the verified finding or raise a new
+  finding for a changed condition. This is a sequential workflow guard; no
+  revision foreign key or revision-bound retest schema is added, and it does
+  not claim concurrent retest/revision serialization or protect raw SQL changes.
 - Closed and risk-accepted findings reject new revisions, actions, and
   retests.
-- An engagement moves to `reporting` when all procedures are documented, and
+- An engagement moves to `reporting` only when at least one procedure exists
+  and every procedure has linked evidence, and
   to `closed` only when no finding is `open`, `remediation`, or
   `retest_failed`.
 - The overdue query returns open remediation actions whose `due_date` is

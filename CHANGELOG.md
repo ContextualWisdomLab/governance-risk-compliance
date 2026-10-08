@@ -30,6 +30,9 @@
 
 ### Security
 
+- Reject finding revisions after the latest passing retest with JSON `409` and a closure/new-finding next action, without changing revisions or audit events; pre-retest and failed-retest revisions remain available. This is a workflow guard, not a revision-bound retest schema.
+- Bound evidence-link ordinals to 1..1,000,000 and finding revision tokens to 1..2,147,483,646 (reserving one increment within signed 32-bit SQL INTEGER); unsupported values return JSON `422` before SQL, without writes.
+
 - Always deny proxy-forwarded and non-loopback HTTP traffic while the runtime lacks Keyverse-backed identity and tenant authorization; remove the unauthenticated remote-preview bypass entirely.
 - Bind both standalone server entry points to `127.0.0.1`.
 - Require durable Fernet key material for every persistent evidence store; limit ephemeral keys to explicitly selected in-memory tests.
@@ -41,7 +44,9 @@
 - Replace mutable `pip install` resolution with `uv sync --locked`, verify lock freshness, and reject any tracked or untracked dirty tree on every Product run.
 - Reject update/delete of `independence_declaration`, `audit_finding_revision`, `finding_retest`, and `finding_closure` with SQLite and PostgreSQL triggers, recorded by the `0002_audit_management` schema receipt.
 - Serialize finding revisions through `audit_finding.current_revision_number`; stale `expected_revision` writers receive `409 Conflict`.
-- Enforce audit role separation on declared actors: program approver is the audit authority and not the creator; remediation owners are not engagement team members; retesters are non-conflicted team members who are not remediation or action owners; risk-acceptance authority differs from the remediation owner and the retester. These checks are not authentication until Keyverse identity exists.
+- Enforce audit role separation on declared actors: program approver is the audit authority and not the creator; remediation owners are not engagement team members; retesters are non-conflicted team members who are not remediation or action owners; risk-acceptance authority is not the remediation owner, any action owner, or any engagement team member. These checks are not authentication until Keyverse identity exists.
+- Recheck current independence before finding revision or closure and before engagement reporting or closure; a declared conflict blocks the transition without a write.
+- Bound sampling to 1,000,000 population items, 10,000 sample items, and signed 64-bit seeds. Reject implicit integer, Boolean, and calendar-date coercion in audit request models.
 - Keep audit tables free of evidence plaintext by referencing `evidence_record_id` only; unknown evidence and audit identifiers return `404`.
 
 ### ADR

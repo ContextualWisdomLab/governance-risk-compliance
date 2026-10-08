@@ -20,6 +20,10 @@ from sqlalchemy.orm import Session
 
 from cwl_grc.audit import record_audit_event
 from cwl_grc.audit_requests import (
+    MAX_POPULATION_SIZE,
+    MAX_SAMPLE_SIZE,
+    MAX_SELECTION_SEED,
+    MIN_SELECTION_SEED,
     ActionCompletionRequest,
     AuditEngagementRequest,
     AuditProcedureRequest,
@@ -277,6 +281,29 @@ def select_sample_ordinals(
     ordinals: list[int] | None,
 ) -> list[int]:
     """Return the sorted, reproducible 1-based sample for one selection method."""
+    if (
+        type(population_size) is not int
+        or type(sample_size) is not int
+        or type(seed) not in {int, type(None)}
+        or (ordinals is not None and (not isinstance(ordinals, list) or any(type(item) is not int for item in ordinals)))
+    ):
+        raise AuditWorkflowError(
+            400,
+            "Sampling inputs must use integer values.",
+            "Send integer population, sample, seed, and ordinal values.",
+        )
+    if (
+        population_size > MAX_POPULATION_SIZE
+        or sample_size > MAX_SAMPLE_SIZE
+        or (seed is not None and not MIN_SELECTION_SEED <= seed <= MAX_SELECTION_SEED)
+        or (ordinals is not None and len(ordinals) > MAX_SAMPLE_SIZE)
+    ):
+        raise AuditWorkflowError(
+            400,
+            "Sampling inputs exceed the supported limits.",
+            "Use at most 1,000,000 population items, 10,000 sample items, "
+            "and a signed 64-bit selection seed.",
+        )
     if sample_size < 1 or population_size < 1 or sample_size > population_size:
         raise AuditWorkflowError(
             400,
@@ -773,7 +800,16 @@ def revise_finding(
     """Append the next finding edition only when the caller holds the current revision."""
     finding = _get_or_404(session, AuditFinding, finding_id, "audit finding")
     _require_member(session, finding.audit_engagement_id, decision.actor_identifier)
+    _require_non_conflicted(session, finding.audit_engagement_id, decision.actor_identifier)
     _require_unresolved(finding)
+    latest = _latest_retest(session, finding_id)
+    if latest is not None and latest.retest_result == "passed":
+        raise AuditWorkflowError(
+            409,
+            "The latest retest passed; the finding awaits closure.",
+            "Ask the engagement lead or a supervisor to close the finding; "
+            "raise a new finding for a changed condition.",
+        )
     criterion = _engagement_criterion(
         session, finding.audit_engagement_id, request.engagement_criterion_id
     )
@@ -963,6 +999,7 @@ def close_finding(
             "Only the engagement lead or a supervisor may close a finding.",
             "Ask the engagement lead or a supervisor to close the finding.",
         )
+    _require_non_conflicted(session, finding.audit_engagement_id, actor)
     _require_unresolved(finding)
     retest_id: str | None = None
     status = "closed"
@@ -1029,6 +1066,7 @@ def move_to_reporting(
     engagement = _get_or_404(session, AuditEngagement, engagement_id, "audit engagement")
     _require_lead(engagement, decision.actor_identifier)
     _require_status(engagement, "fieldwork", "Move to reporting only from fieldwork.")
+    _require_non_conflicted(session, engagement_id, decision.actor_identifier)
     procedures = (
         session.query(AuditProcedure).filter_by(audit_engagement_id=engagement_id).all()
     )
@@ -1061,6 +1099,7 @@ def close_engagement(
     engagement = _get_or_404(session, AuditEngagement, engagement_id, "audit engagement")
     _require_lead(engagement, decision.actor_identifier)
     _require_status(engagement, "reporting", "Move the engagement to reporting before closing it.")
+    _require_non_conflicted(session, engagement_id, decision.actor_identifier)
     unresolved = (
         session.query(AuditFinding)
         .filter(
