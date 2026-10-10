@@ -15,6 +15,7 @@ from cwl_grc.models import AuditProgram
 
 
 def test_unknown_selection_method_is_rejected_with_a_next_action() -> None:
+    """Reject an unknown sampling method and suggest seeded random selection."""
     with pytest.raises(AuditWorkflowError) as error:
         select_sample_ordinals("haphazard", 240, 25, None, None)
     assert error.value.status_code == 400
@@ -22,6 +23,7 @@ def test_unknown_selection_method_is_rejected_with_a_next_action() -> None:
 
 
 def test_non_audit_validation_errors_keep_the_default_shape() -> None:
+    """Keep non-audit validation errors at 422 with detail but no audit next action."""
     client = TestClient(create_app(database_url="sqlite://", evidence_key=None))
     response = client.post(
         "/policy-documents",

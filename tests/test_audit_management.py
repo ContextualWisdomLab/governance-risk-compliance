@@ -303,6 +303,7 @@ def _events(client: TestClient) -> list[str]:
 
 
 def test_isms_p_access_review_runs_from_program_to_closed_engagement() -> None:
+    """Verify the ISMS-P audit lifecycle, revision history, evidence links, and audit events."""
     client = _client()
     ids = _fieldwork(client)
 
@@ -421,6 +422,7 @@ def test_isms_p_access_review_runs_from_program_to_closed_engagement() -> None:
 
 
 def test_audit_tables_never_store_evidence_plaintext() -> None:
+    """Verify populated audit tables reference evidence without copying its plaintext."""
     client = _client()
     ids = _remediated(client)
     procedure_id = _ok(_procedure(client, ids))["audit_procedure_id"]
@@ -440,6 +442,7 @@ def test_audit_tables_never_store_evidence_plaintext() -> None:
 
 
 def test_program_approval_separates_authority_from_creator() -> None:
+    """Reject self-approval, wrong authorities, and engagement creation before approval."""
     client = _client()
     self_planned = _ok(
         client.post(
@@ -471,6 +474,7 @@ def test_program_approval_separates_authority_from_creator() -> None:
 
 
 def test_program_and_engagement_periods_are_validated() -> None:
+    """Reject reversed program dates and engagement periods outside the approved program."""
     client = _client()
     reversed_program = client.post(
         "/audit-programs",
@@ -538,11 +542,13 @@ def _start_missing(client: TestClient, gap: str) -> dict:
     ],
 )
 def test_engagement_start_names_the_missing_prerequisite(gap: str, named: str) -> None:
+    """Verify each missing start prerequisite is named in the rejection next action."""
     body = _start_missing(_client(), gap)
     assert named in body["next_action"]
 
 
 def test_conflict_redeclaration_is_appended_and_latest_wins() -> None:
+    """Preserve numbered declarations while the latest conflict clearance permits fieldwork."""
     client = _client()
     program_id = _program(client)
     engagement_id = _engagement(client, program_id)
@@ -564,6 +570,7 @@ def test_conflict_redeclaration_is_appended_and_latest_wins() -> None:
 
 
 def test_planning_changes_are_limited_to_planned_engagements_and_planners() -> None:
+    """Validate planning inputs, planner roles, and restrictions after fieldwork starts."""
     client = _client()
     ids = _ready(client)
     engagement_id = ids["engagement"]
@@ -645,6 +652,7 @@ def test_planning_changes_are_limited_to_planned_engagements_and_planners() -> N
 
 
 def test_sampling_is_reproducible_and_validated() -> None:
+    """Verify reproducible sorted samples and reject inconsistent selection parameters."""
     assert select_sample_ordinals("seeded_random", 240, 25, SEED, None) == EXPECTED_SAMPLE
     assert select_sample_ordinals("seeded_random", 240, 25, SEED, None) == EXPECTED_SAMPLE
     assert select_sample_ordinals("full_population", 4, 4, None, None) == [1, 2, 3, 4]
@@ -670,6 +678,7 @@ def test_sampling_is_reproducible_and_validated() -> None:
 
 
 def test_procedures_require_fieldwork_team_and_own_criterion() -> None:
+    """Reject invalid procedure context and inputs while accepting judgmental sampling."""
     client = _client()
     ids = _ready(client)
     _fail(_procedure(client, ids), 409)
@@ -708,6 +717,7 @@ def test_procedures_require_fieldwork_team_and_own_criterion() -> None:
 
 
 def test_evidence_links_require_known_targets_and_fieldwork() -> None:
+    """Validate evidence targets and team membership, then stop linking after reporting."""
     client = _client()
     ids = _fieldwork(client)
     procedure_id = _ok(_procedure(client, ids))["audit_procedure_id"]
@@ -732,6 +742,7 @@ def test_evidence_links_require_known_targets_and_fieldwork() -> None:
 
 
 def test_reporting_requires_at_least_one_procedure() -> None:
+    """Reject reporting without a procedure and name the prerequisite in the next action."""
     client = _client()
     ids = _fieldwork(client)
     body = _fail(client.post(f"/audit-engagements/{ids['engagement']}/reporting", headers=h(LEAD)), 409)
@@ -739,6 +750,7 @@ def test_reporting_requires_at_least_one_procedure() -> None:
 
 
 def test_findings_require_fieldwork_and_an_independent_owner() -> None:
+    """Reject finding creation with invalid state, ownership, criteria, inputs, or headers."""
     client = _client()
     ids = _ready(client)
     url = f"/audit-engagements/{ids['engagement']}/findings"
@@ -755,6 +767,7 @@ def test_findings_require_fieldwork_and_an_independent_owner() -> None:
 
 
 def test_revisions_reject_outsiders_and_foreign_criteria() -> None:
+    """Reject finding revisions by outsiders, with foreign criteria, or with a zero token."""
     client = _client()
     ids = _fieldwork(client)
     finding_id = _finding(client, ids)
@@ -774,6 +787,7 @@ def test_revisions_reject_outsiders_and_foreign_criteria() -> None:
 
 
 def test_stale_revision_from_a_second_session_is_a_conflict(tmp_path: Path) -> None:
+    """Return a conflict when a second session submits an already-consumed revision token."""
     from cwl_grc.audit_management import revise_finding
     from cwl_grc.audit_requests import FindingRevisionRequest
     from cwl_grc.authorization import AuthorizationDecision
@@ -806,6 +820,7 @@ def test_stale_revision_from_a_second_session_is_a_conflict(tmp_path: Path) -> N
 
 
 def test_remediation_actions_belong_to_the_owner() -> None:
+    """Enforce remediation purpose, independent assignment, and evidence-backed completion."""
     client = _client()
     ids = _fieldwork(client)
     finding_id = _finding(client, ids)
@@ -834,6 +849,7 @@ def test_remediation_actions_belong_to_the_owner() -> None:
 
 
 def test_retest_requires_completed_actions_and_an_independent_auditor() -> None:
+    """Verify retest prerequisites, independent actors, and failed-to-passed closure guards."""
     client = _client()
     ids = _fieldwork(client)
     finding_id = _finding(client, ids)
@@ -901,6 +917,7 @@ def test_retest_requires_completed_actions_and_an_independent_auditor() -> None:
 
 
 def test_closure_without_any_retest_is_a_conflict() -> None:
+    """Reject retest-based closure without a retest and identify the required next action."""
     client = _client()
     ids = _remediated(client)
     body = _fail(
@@ -915,6 +932,7 @@ def test_closure_without_any_retest_is_a_conflict() -> None:
 
 
 def test_risk_acceptance_is_time_bounded_and_by_a_different_authority() -> None:
+    """Require a separate risk authority and a future expiry no more than 365 days away."""
     client = _client()
     ids = _remediated(client)
     _ok(_retest(client, ids["finding"], ids["evidence"], "failed"))
@@ -949,6 +967,7 @@ def test_risk_acceptance_is_time_bounded_and_by_a_different_authority() -> None:
 
 
 def test_engagement_closure_waits_for_every_finding() -> None:
+    """Reject premature or unauthorized closure and leave unresolved findings blocking it."""
     client = _client()
     ids = _fieldwork(client)
     procedure_id = _ok(_procedure(client, ids, selection_method="full_population", selection_seed=None, population_size=3, sample_size=3))[
@@ -980,6 +999,7 @@ def test_engagement_closure_waits_for_every_finding() -> None:
 
 
 def test_declarations_close_with_the_engagement() -> None:
+    """Reject new independence declarations after the engagement has closed."""
     client = _client()
     ids = _fieldwork(client)
     procedure = _ok(_procedure(client, ids))
@@ -1003,6 +1023,7 @@ def test_declarations_close_with_the_engagement() -> None:
 
 
 def test_overdue_remediation_is_visible() -> None:
+    """List only overdue unresolved work, default to today, and validate query headers and dates."""
     client = _client()
     ids = _fieldwork(client)
     late_finding = _finding(client, ids, target_date="2026-10-15")
@@ -1027,6 +1048,7 @@ def test_overdue_remediation_is_visible() -> None:
 
 
 def test_overdue_service_excludes_resolved_findings() -> None:
+    """Exclude closed findings and completed actions from the overdue service results."""
     client = _client()
     ids = _remediated(client)
     _ok(_retest(client, ids["finding"], ids["evidence"], "passed"))
@@ -1089,6 +1111,7 @@ def test_overdue_service_excludes_resolved_findings() -> None:
     ],
 )
 def test_unknown_audit_identifiers_return_not_found(method: str, path: str, json_body: dict | None) -> None:
+    """Return a not-on-file rejection for each parameterized missing audit target."""
     client = _client()
     kwargs: dict[str, object] = {"headers": h(AUTHORITY)}
     if json_body is not None:
@@ -1098,6 +1121,7 @@ def test_unknown_audit_identifiers_return_not_found(method: str, path: str, json
 
 
 def test_unknown_finding_for_remediation_tracking_returns_not_found() -> None:
+    """Reject remediation action creation for a finding that is not on file."""
     client = _client()
     response = client.post(
         "/audit-findings/missing/remediation-actions",
@@ -1108,6 +1132,7 @@ def test_unknown_finding_for_remediation_tracking_returns_not_found() -> None:
 
 
 def test_strict_request_validation_states_the_next_action() -> None:
+    """Reject an undeclared program field with validation detail and a next action."""
     client = _client()
     response = client.post(
         "/audit-programs",
@@ -1126,11 +1151,13 @@ def test_strict_request_validation_states_the_next_action() -> None:
 
 
 def test_audit_purposes_are_labelled() -> None:
+    """Verify the exact officer-facing labels for audit and remediation purposes."""
     assert purpose_label(PurposeCode.AUDIT_ENGAGEMENT) == "Plan, perform, and close an audit engagement"
     assert purpose_label(PurposeCode.REMEDIATION_TRACKING) == "Record remediation of an audit finding"
 
 
 def test_immutable_audit_records_reject_update_and_delete() -> None:
+    """Verify SQL guards reject updates and deletes of immutable audit records."""
     client = _client()
     ids = _remediated(client)
     _ok(_retest(client, ids["finding"], ids["evidence"], "passed"))
@@ -1158,6 +1185,7 @@ def test_immutable_audit_records_reject_update_and_delete() -> None:
 
 
 def test_evidence_link_needs_exactly_one_target() -> None:
+    """Verify the database rejects an evidence link with neither procedure nor sample target."""
     client = _client()
     evidence_id = _evidence(client)
     with client.app.state.session_factory() as session:
@@ -1176,6 +1204,7 @@ def test_evidence_link_needs_exactly_one_target() -> None:
 
 
 def test_status_columns_reject_unknown_values() -> None:
+    """Reject an unsupported program status and verify the audit model table names."""
     factory = create_session_factory("sqlite://")
     with factory() as session:
         session.add(
@@ -1199,6 +1228,7 @@ def test_status_columns_reject_unknown_values() -> None:
 
 
 def test_audit_management_receipt_is_idempotent(tmp_path: Path) -> None:
+    """Apply migrations twice and verify one receipt for each expected migration key."""
     engine = create_engine(f"sqlite:///{tmp_path / 'receipts.sqlite'}")
     with engine.begin() as connection:
         connection.execute(
@@ -1227,6 +1257,7 @@ def test_audit_management_receipt_is_idempotent(tmp_path: Path) -> None:
 
 
 def test_audit_integrity_guard_ddl_covers_sqlite_and_postgresql() -> None:
+    """Verify SQLite and PostgreSQL guard DDL covers immutable audit records and events."""
     sqlite_ddl = "\n".join(integrity_guard_statements("sqlite"))
     postgres_ddl = "\n".join(integrity_guard_statements("postgresql"))
     for table in (

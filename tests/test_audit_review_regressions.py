@@ -19,6 +19,7 @@ from test_audit_management import (
     ("risk_acceptance", LEAD), ("reporting", LEAD), ("engagement_closure", LEAD),
 ])
 def test_current_conflict_blocks_decisions_without_writes(operation, actor):
+    """Reject decisions without writes during a current conflict, then accept after clearance."""
     client = _client()
     ids = _remediated(client) if operation in {"closure", "risk_acceptance"} else _fieldwork(client)
     if operation in {"closure", "risk_acceptance"}:
@@ -63,6 +64,7 @@ def test_current_conflict_blocks_decisions_without_writes(operation, actor):
 
 
 def _sample_request(**overrides):
+    """Return a seeded-random access-review request payload with caller overrides."""
     payload = dict(engagement_criterion_id="criterion", procedure_description="Access review",
                    population_description="IdP account register", population_size=240,
                    selection_method="seeded_random", sample_size=25, selection_seed=20260701)
@@ -76,6 +78,7 @@ def _sample_request(**overrides):
     {"selected_ordinals": [1]*10_001},
 ])
 def test_sampling_request_rejects_unsupported_limits(overrides):
+    """Reject sampling request values beyond the supported size and seed limits."""
     with pytest.raises(ValidationError):
         AuditProcedureRequest(**_sample_request(**overrides))
 
@@ -86,6 +89,7 @@ def test_sampling_request_rejects_unsupported_limits(overrides):
     (240, 25, 42, [1]*10_001),
 ])
 def test_public_selector_rejects_limits_before_allocation(population, sample, seed, ordinals):
+    """Reject unsupported sampling limits with a workflow error and a next action."""
     with pytest.raises(AuditWorkflowError) as caught:
         select_sample_ordinals("seeded_random", population, sample, seed, ordinals)
     assert caught.value.status_code == 400
@@ -94,6 +98,7 @@ def test_public_selector_rejects_limits_before_allocation(population, sample, se
 
 
 def test_sampling_limit_edges_preserve_valid_officer_inputs():
+    """Accept boundary sizes and seeds with reproducible, sorted, unique sample ordinals."""
     for seed in (-(2**63), -42, 0, 2**63-1):
         model = AuditProcedureRequest(**_sample_request(population_size=1_000_000, sample_size=10_000,
                                                        selection_seed=seed))
@@ -108,6 +113,7 @@ def test_sampling_limit_edges_preserve_valid_officer_inputs():
 
 
 def test_oversized_http_sampling_is_422_and_preserves_engagement():
+    """Reject an oversized HTTP sampling request without recording events or procedures."""
     client = _client()
     ids = _fieldwork(client)
     before = _events(client)
@@ -125,12 +131,14 @@ def test_oversized_http_sampling_is_422_and_preserves_engagement():
     ("selected_ordinals", ["1"]), ("selected_ordinals", [1.0]),
 ])
 def test_sampling_json_types_match_declared_integer_schema(field, value):
+    """Reject coerced sampling integers, including booleans, strings, and float ordinals."""
     with pytest.raises(ValidationError):
         AuditProcedureRequest(**_sample_request(**{field: value}))
 
 
 @pytest.mark.parametrize("value", [0, 1, "false", "true"])
 def test_independence_requires_a_json_boolean(value):
+    """Reject numeric and string conflict flags instead of coercing them to booleans."""
     from cwl_grc.audit_requests import IndependenceDeclarationRequest
     with pytest.raises(ValidationError):
         IndependenceDeclarationRequest(has_conflict=value, declaration_statement="Conflict declaration.")
@@ -138,6 +146,7 @@ def test_independence_requires_a_json_boolean(value):
 
 @pytest.mark.parametrize("value", [1791244800, 1791244800.0, "1791244800", "2026-10-06T00:00:00"])
 def test_calendar_date_rejects_undocumented_timestamp_inputs(value):
+    """Reject numeric timestamps and datetime strings as audit program calendar dates."""
     from cwl_grc.audit_requests import AuditProgramRequest
     with pytest.raises(ValidationError):
         AuditProgramRequest(program_title="Access audit", period_start=value, period_end="2026-12-31",
@@ -145,6 +154,7 @@ def test_calendar_date_rejects_undocumented_timestamp_inputs(value):
 
 
 def test_strict_calendar_date_and_boolean_preserve_valid_inputs():
+    """Accept date objects, ISO calendar strings, and actual boolean conflict flags."""
     from datetime import date
     from cwl_grc.audit_requests import AuditProgramRequest, IndependenceDeclarationRequest
     for day in (date(2026, 1, 1), "2026-01-01"):
@@ -161,6 +171,7 @@ def test_strict_calendar_date_and_boolean_preserve_valid_inputs():
     (240, 25, 42, [True]), (240, 25, 42, [1.0]),
 ])
 def test_public_selector_rejects_non_integer_sampling_inputs(population, sample, seed, ordinals):
+    """Reject non-integer selector inputs with an integer-specific workflow error."""
     with pytest.raises(AuditWorkflowError) as caught:
         select_sample_ordinals("seeded_random", population, sample, seed, ordinals)
     assert caught.value.status_code == 400
@@ -168,6 +179,7 @@ def test_public_selector_rejects_non_integer_sampling_inputs(population, sample,
 
 
 def _revision_payload(ids, expected=1):
+    """Return a critical finding revision payload with the supplied expected revision token."""
     payload = _finding_payload(ids, severity_rating="critical",
                                condition_statement="All sampled accounts retain privileged access.")
     payload.pop("remediation_owner_actor")
@@ -178,6 +190,7 @@ def _revision_payload(ids, expected=1):
 
 @pytest.mark.parametrize("result", [None, "failed", "passed"])
 def test_revision_retest_state_preserves_verified_finding(result):
+    """Block material revision after a passed retest while allowing no-retest or failed states."""
     client = _client()
     ids = _remediated(client)
     if result is not None:
@@ -216,6 +229,7 @@ def test_revision_retest_state_preserves_verified_finding(result):
     ("expected_revision", 2**31), ("expected_revision", 2**100),
 ])
 def test_sql_bound_http_integers_reject_unsupported_values_without_writes(field, value):
+    """Reject unsupported SQL-bound HTTP integers with JSON 422 and unchanged views and events."""
     from fastapi.testclient import TestClient
     client = TestClient(_client().app, raise_server_exceptions=False)
     ids = _fieldwork(client)
@@ -245,6 +259,7 @@ def test_sql_bound_http_integers_reject_unsupported_values_without_writes(field,
 
 
 def test_sql_bound_integer_upper_edges_reach_normal_workflow():
+    """Accept edge sample ordinals and route a valid stale revision token to a workflow conflict."""
     client = _client()
     ids = _fieldwork(client)
     finding = _finding(client, ids)

@@ -70,6 +70,7 @@ def test_product_workflow_rejects_any_dirty_tree() -> None:
 
 
 def test_product_workflow_only_cancels_superseded_pull_request_heads() -> None:
+    """Verify workflow concurrency isolates runs and cancels only superseded pull requests."""
     workflow = (
         REPOSITORY_ROOT / ".github/workflows/product.yml"
     ).read_text(encoding="utf-8")
