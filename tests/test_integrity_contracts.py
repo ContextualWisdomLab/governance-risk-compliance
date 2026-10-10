@@ -70,6 +70,7 @@ def test_product_workflow_rejects_any_dirty_tree() -> None:
 
 
 def test_product_workflow_only_cancels_superseded_pull_request_heads() -> None:
+    """Verify workflow concurrency isolates runs and cancels only superseded pull requests."""
     workflow = (
         REPOSITORY_ROOT / ".github/workflows/product.yml"
     ).read_text(encoding="utf-8")
@@ -274,12 +275,13 @@ def test_schema_migration_upgrades_legacy_tables_and_is_idempotent(
                 "WHERE policy_version_id = 'version-1'"
             )
         ).scalar_one()
-        receipt_count = connection.execute(
-            text("SELECT COUNT(*) FROM schema_migration")
-        ).scalar_one()
+        receipt_keys = sorted(
+            row[0]
+            for row in connection.execute(text("SELECT migration_key FROM schema_migration"))
+        )
     assert counter == 3
     assert finalized in {True, 1}
-    assert receipt_count == 1
+    assert receipt_keys == ["0001_policy_integrity", "0002_audit_management"]
 
 
 def test_integrity_guard_ddl_covers_supported_and_unknown_dialects() -> None:

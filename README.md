@@ -46,12 +46,58 @@ Policy authoring requires the declared purpose `policy_authoring`. Evidence crea
 
 Framework keys: `csap_2026`, `soc2_tsc_2017`, `isms_p_2023`, `iso27001_2022`, `nist_sp_800_53_r5`, `coso_ic_2013`, `coso_erm_2017`.
 
+## Audit engagements (Issue #14 slice)
+
+Plan an audit program, run an independent engagement against official control criteria, record reproducible samples and evidence references, issue findings, track remediation, and close a finding only after an independent retest passes. This is a **local developer preview**: it runs behind the same loopback-only boundary as the rest of the app and is not a production audit system. See `docs/adr/0017-audit-program-engagement-finding-closure.md`.
+
+Officer workflow and the next action at each step:
+
+1. **Plan the program.** The creator records the period, risk-based rationale, and audit authority. Next: the audit authority, who must not be the creator, approves the program.
+2. **Open an engagement** inside the approved program period. Next: add criteria by framework and official catalog identifier, for example `isms_p_2023` + `2.5.1` for an access-review engagement.
+3. **Staff the team.** Add exactly one `lead` (the engagement's lead auditor), at least one `supervisor`, and any `auditor` members, each with a competence statement. Next: every member files an independence declaration.
+4. **Start fieldwork.** Start succeeds only when every member has declared no conflict. Otherwise the response is `409` and names what is still missing.
+5. **Document procedures.** Choose `seeded_random`, `judgmental`, or `full_population` selection; the response returns the selected 1-based sample ordinals. Next: link existing evidence records to the procedure or a sample item using an integer `population_ordinal` in 1..1,000,000. Out-of-range ordinals and revision tokens receive JSON `422` with `next_action` before any SQL write.
+6. **Issue findings** with condition, cause, effect, severity, rating rationale, and recommendation, and assign a remediation owner who is not on the engagement team. Revisions append before a passing retest; send the current `expected_revision` (1..2,147,483,646) or receive `409` and reload. After the latest retest passes, revisions are rejected with `409` without changes: close the verified finding, or raise a new finding for a changed condition.
+7. **Remediate.** Add remediation actions with an owner and due date. Each action owner completes their own action with an existing evidence record under purpose `remediation_tracking`. Next: request an independent retest. A current conflict declaration blocks finding decisions.
+8. **Retest.** A non-conflicted team member who is not the remediation owner or an action owner retests with evidence. A failed retest sets `retest_failed`; add new actions and retest again.
+9. **Close.** After a passing retest, a currently non-conflicted engagement lead or supervisor closes the finding. Alternatively, an acceptance authority who is not the remediation owner, any action owner, or any engagement team member records `risk_accepted` with an expiry no more than 365 days ahead. That is a placeholder decision record until Issue #13 governed risk acceptance lands; the finding is not reported as `closed`.
+10. **Report and close the engagement.** Move the engagement to `reporting` only when at least one procedure exists and every procedure has linked evidence. The acting lead must also be currently non-conflicted. Close it once no finding is `open`, `remediation`, or `retest_failed`. Check `GET /audit-remediation/overdue` for actions and findings past their dates.
+
+| Action | Route |
+| --- | --- |
+| Create a program | `POST /audit-programs` |
+| Approve a program | `POST /audit-programs/{id}/approval` |
+| Create an engagement | `POST /audit-programs/{id}/engagements` |
+| Read an engagement | `GET /audit-engagements/{id}` |
+| Add a criterion | `POST /audit-engagements/{id}/criteria` (framework + catalog_identifier) |
+| Add a team member | `POST /audit-engagements/{id}/team-members` |
+| Declare independence | `POST /audit-engagements/{id}/independence-declarations` |
+| Start fieldwork | `POST /audit-engagements/{id}/start` |
+| Move to reporting | `POST /audit-engagements/{id}/reporting` |
+| Close the engagement | `POST /audit-engagements/{id}/closure` |
+| Document a procedure and sample | `POST /audit-engagements/{id}/procedures` |
+| Link evidence to a procedure or sample item | `POST /audit-procedures/{id}/evidence-links` |
+| Issue a finding | `POST /audit-engagements/{id}/findings` |
+| Revise a finding | `POST /audit-findings/{id}/revisions` |
+| Read a finding with full revision history | `GET /audit-findings/{id}` |
+| Add a remediation action | `POST /audit-findings/{id}/remediation-actions` |
+| Complete a remediation action | `POST /remediation-actions/{id}/completion` |
+| Record a retest | `POST /audit-findings/{id}/retests` |
+| Close or risk-accept a finding | `POST /audit-findings/{id}/closure` |
+| List overdue remediation | `GET /audit-remediation/overdue?as_of=YYYY-MM-DD` |
+
+Every request sends `X-Actor-Id` and `X-Purpose`, and the declared purpose is checked before the request body. A request without the declared purpose receives `401` or `403` even when its body is also invalid. Use `audit_engagement` for planning, fieldwork, findings, retests, and closure, and `remediation_tracking` for remediation-owner actions. Every response includes `next_action`. Role separation is checked against declared actor identifiers only; it is not proof that different people acted until Keyverse identity is in place.
+
+Limits of this slice: criteria reference official `control_item` rows; the internal control under test is an optional opaque `internal_control_reference` until Issue #27 lands. Workpaper sign-off, auditor competence evidence, quality assessment, and audit reports are not implemented. The slice does not claim conformance with ISO 19011:2026 or the IIA Global Internal Audit Standards, and it does not certify anything.
+
 ## Integrity guarantees
 
 - `audit_event` rows are append-only at the database boundary.
 - A `policy_version` is created open, receives its mappings, and is finalized exactly once.
 - Finalized policy text and mappings cannot be updated, deleted, or extended through SQL.
 - `policy_document.current_version_number` serializes revision allocation; a stale writer receives `409 Conflict` and must reload.
+- Independence declarations, audit finding revisions, finding retests, and finding closures cannot be updated or deleted through SQL. `audit_finding.current_revision_number` serializes finding revisions the same way as policy editions.
+- Audit tables reference `evidence_record_id`; they never copy evidence plaintext.
 - Versioned schema upgrades leave `schema_migration` receipts and upgrade existing first-slice stores before integrity triggers are installed.
 - A persistent database cannot start without explicit `CWL_GRC_EVIDENCE_KEY` material. Ephemeral keys are limited to explicitly selected in-memory tests.
 
