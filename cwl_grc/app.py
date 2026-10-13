@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, Resp
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
+from cwl_grc.audit_routes import register_audit_routes
 from cwl_grc.authorization import PurposeCode, require_purpose, seed_authorization_purposes
 from cwl_grc.catalog import FrameworkCode, list_control_items, seed_control_catalog
 from cwl_grc.coverage import list_uncovered_controls
@@ -84,6 +85,8 @@ def create_app(
 
     app = FastAPI(title="CWL GRC", version="0.1.0")
     app.state.evidence_cipher = cipher
+    app.state.session_factory = factory
+    register_audit_routes(app, get_session)
 
     @app.middleware("http")
     async def enforce_developer_preview_boundary(

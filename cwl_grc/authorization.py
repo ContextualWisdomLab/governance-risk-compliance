@@ -16,10 +16,12 @@ from cwl_grc.models import AuthorizationPurpose
 class PurposeCode(StrEnum):
     """Declared purposes that may touch GRC records."""
 
+    AUDIT_ENGAGEMENT = "audit_engagement"
     COVERAGE_REVIEW = "coverage_review"
     EVIDENCE_BINDING = "evidence_binding"
     HEALTH_PROBE = "health_probe"
     POLICY_AUTHORING = "policy_authoring"
+    REMEDIATION_TRACKING = "remediation_tracking"
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,8 @@ def seed_authorization_purposes(session: Session) -> None:
 def purpose_label(code: PurposeCode) -> str:
     """Return the officer-facing label for a purpose code."""
     match code:
+        case PurposeCode.AUDIT_ENGAGEMENT:
+            return "Plan, perform, and close an audit engagement"
         case PurposeCode.COVERAGE_REVIEW:
             return "Review control coverage"
         case PurposeCode.EVIDENCE_BINDING:
@@ -55,6 +59,8 @@ def purpose_label(code: PurposeCode) -> str:
             return "Probe service health"
         case PurposeCode.POLICY_AUTHORING:
             return "Author or revise a policy"
+        case PurposeCode.REMEDIATION_TRACKING:
+            return "Record remediation of an audit finding"
         case _ as unreachable:  # pragma: no cover
             assert_never(unreachable)
 

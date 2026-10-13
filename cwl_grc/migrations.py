@@ -5,14 +5,40 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime, timezone
 
-from sqlalchemy import Engine, inspect, text
+from sqlalchemy import Connection, Engine, inspect, text
+
+from cwl_grc.models import Base
 
 
 POLICY_INTEGRITY_MIGRATION = "0001_policy_integrity"
+AUDIT_MANAGEMENT_MIGRATION = "0002_audit_management"
+
+AUDIT_MANAGEMENT_TABLES = (
+    "audit_program",
+    "audit_engagement",
+    "engagement_criterion",
+    "engagement_team_member",
+    "independence_declaration",
+    "audit_procedure",
+    "audit_sample_item",
+    "audit_evidence_link",
+    "audit_finding",
+    "audit_finding_revision",
+    "remediation_action",
+    "finding_retest",
+    "finding_closure",
+)
+
+IMMUTABLE_AUDIT_TABLES = (
+    "audit_finding_revision",
+    "independence_declaration",
+    "finding_retest",
+    "finding_closure",
+)
 
 
 def apply_schema_migrations(engine: Engine) -> None:
-    """Upgrade an existing first-slice store before installing integrity guards."""
+    """Upgrade an existing store, recording one idempotent receipt per migration."""
     with engine.begin() as connection:
         connection.execute(
             text(
@@ -24,67 +50,92 @@ def apply_schema_migrations(engine: Engine) -> None:
                 """
             )
         )
-        applied = connection.execute(
-            text(
-                "SELECT migration_key FROM schema_migration "
-                "WHERE migration_key = :migration_key"
-            ),
-            {"migration_key": POLICY_INTEGRITY_MIGRATION},
-        ).scalar_one_or_none()
-        if applied is not None:
-            return
+        if not _migration_applied(connection, POLICY_INTEGRITY_MIGRATION):
+            _apply_policy_integrity(connection)
+            _record_migration(connection, POLICY_INTEGRITY_MIGRATION)
+        if not _migration_applied(connection, AUDIT_MANAGEMENT_MIGRATION):
+            _apply_audit_management(connection)
+            _record_migration(connection, AUDIT_MANAGEMENT_MIGRATION)
 
-        inspector = inspect(connection)
-        additions = (
-            (
-                "policy_document",
-                "current_version_number",
-                "ALTER TABLE policy_document ADD COLUMN "
-                "current_version_number INTEGER NOT NULL DEFAULT 0",
-            ),
-            (
-                "policy_version",
-                "is_finalized",
-                "ALTER TABLE policy_version ADD COLUMN "
-                "is_finalized BOOLEAN NOT NULL DEFAULT TRUE",
-            ),
-        )
-        for table_name, column_name, statement in additions:
-            columns = {column["name"] for column in inspector.get_columns(table_name)}
-            if column_name not in columns:
-                connection.execute(text(statement))
-                inspector = inspect(connection)
 
-        connection.execute(
-            text(
-                """
-                UPDATE policy_document
-                SET current_version_number = COALESCE(
-                    (
-                        SELECT MAX(policy_version.version_number)
-                        FROM policy_version
-                        WHERE policy_version.policy_document_id =
-                              policy_document.policy_document_id
-                    ),
-                    0
-                )
-                WHERE current_version_number = 0
-                """
+def _migration_applied(connection: Connection, migration_key: str) -> bool:
+    """Return whether a migration receipt already exists."""
+    applied = connection.execute(
+        text(
+            "SELECT migration_key FROM schema_migration "
+            "WHERE migration_key = :migration_key"
+        ),
+        {"migration_key": migration_key},
+    ).scalar_one_or_none()
+    return applied is not None
+
+
+def _record_migration(connection: Connection, migration_key: str) -> None:
+    """Insert one migration receipt."""
+    connection.execute(
+        text(
+            "INSERT INTO schema_migration (migration_key, applied_at) "
+            "VALUES (:migration_key, :applied_at)"
+        ),
+        {
+            "migration_key": migration_key,
+            "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
+        },
+    )
+
+
+def _apply_audit_management(connection: Connection) -> None:
+    """Create any missing audit-management tables without touching existing rows."""
+    Base.metadata.create_all(
+        connection,
+        tables=[Base.metadata.tables[name] for name in AUDIT_MANAGEMENT_TABLES],
+        checkfirst=True,
+    )
+
+
+def _apply_policy_integrity(connection: Connection) -> None:
+    """Add policy revision counters and finalization state to a first-slice store."""
+    inspector = inspect(connection)
+    additions = (
+        (
+            "policy_document",
+            "current_version_number",
+            "ALTER TABLE policy_document ADD COLUMN "
+            "current_version_number INTEGER NOT NULL DEFAULT 0",
+        ),
+        (
+            "policy_version",
+            "is_finalized",
+            "ALTER TABLE policy_version ADD COLUMN "
+            "is_finalized BOOLEAN NOT NULL DEFAULT TRUE",
+        ),
+    )
+    for table_name, column_name, statement in additions:
+        columns = {column["name"] for column in inspector.get_columns(table_name)}
+        if column_name not in columns:
+            connection.execute(text(statement))
+            inspector = inspect(connection)
+
+    connection.execute(
+        text(
+            """
+            UPDATE policy_document
+            SET current_version_number = COALESCE(
+                (
+                    SELECT MAX(policy_version.version_number)
+                    FROM policy_version
+                    WHERE policy_version.policy_document_id =
+                          policy_document.policy_document_id
+                ),
+                0
             )
+            WHERE current_version_number = 0
+            """
         )
-        connection.execute(
-            text("UPDATE policy_version SET is_finalized = TRUE WHERE is_finalized IS NULL")
-        )
-        connection.execute(
-            text(
-                "INSERT INTO schema_migration (migration_key, applied_at) "
-                "VALUES (:migration_key, :applied_at)"
-            ),
-            {
-                "migration_key": POLICY_INTEGRITY_MIGRATION,
-                "applied_at": datetime.now(timezone.utc).replace(tzinfo=None),
-            },
-        )
+    )
+    connection.execute(
+        text("UPDATE policy_version SET is_finalized = TRUE WHERE is_finalized IS NULL")
+    )
 
 
 def install_integrity_guards(engine: Engine) -> None:
@@ -98,9 +149,9 @@ def install_integrity_guards(engine: Engine) -> None:
 def integrity_guard_statements(dialect_name: str) -> Sequence[str]:
     """Return complete trigger DDL for SQLite or PostgreSQL."""
     if dialect_name == "sqlite":
-        return _sqlite_integrity_guard_statements()
+        return _sqlite_integrity_guard_statements() + _sqlite_audit_record_guards()
     if dialect_name == "postgresql":
-        return _postgresql_integrity_guard_statements()
+        return _postgresql_integrity_guard_statements() + _postgresql_audit_record_guards()
     raise ValueError(f"Unsupported GRC database dialect: {dialect_name}")
 
 
@@ -257,3 +308,44 @@ def _postgresql_integrity_guard_statements() -> tuple[str, ...]:
         FOR EACH ROW EXECUTE FUNCTION prevent_policy_mapping_mutation()
         """,
     )
+
+
+def _sqlite_audit_record_guards() -> tuple[str, ...]:
+    """Return SQLite triggers that make audit-management decision records immutable."""
+    statements: list[str] = []
+    for table in IMMUTABLE_AUDIT_TABLES:
+        for operation in ("update", "delete"):
+            statements.append(
+                f"""
+        CREATE TRIGGER IF NOT EXISTS {table}_block_{operation}
+        BEFORE {operation.upper()} ON {table}
+        BEGIN
+            SELECT RAISE(ABORT, '{table} is immutable');
+        END
+        """
+            )
+    return tuple(statements)
+
+
+def _postgresql_audit_record_guards() -> tuple[str, ...]:
+    """Return one PostgreSQL function and per-table triggers for immutable audit records."""
+    statements: list[str] = [
+        """
+        CREATE OR REPLACE FUNCTION prevent_audit_record_mutation()
+        RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            RAISE EXCEPTION '% is immutable', TG_TABLE_NAME;
+        END;
+        $$
+        """
+    ]
+    for table in IMMUTABLE_AUDIT_TABLES:
+        statements.append(f"DROP TRIGGER IF EXISTS {table}_immutable ON {table}")
+        statements.append(
+            f"""
+        CREATE TRIGGER {table}_immutable
+        BEFORE UPDATE OR DELETE ON {table}
+        FOR EACH ROW EXECUTE FUNCTION prevent_audit_record_mutation()
+        """
+        )
+    return tuple(statements)
