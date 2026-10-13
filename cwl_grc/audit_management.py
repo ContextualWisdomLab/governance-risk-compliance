@@ -104,6 +104,25 @@ def _get_or_404(session: Session, model: type[ModelT], identifier: str, label: s
     return row
 
 
+def _serialize_finding(session: Session, finding_id: str) -> AuditFinding:
+    """Acquire the database write lock before reading finding decision guards.
+
+    A value-preserving UPDATE holds the shared finding lock until the caller
+    commits or rolls back (SQLite writer lock; PostgreSQL row lock). Refresh
+    the identity-map object only after acquisition, never trust cached state.
+    """
+    with session.no_autoflush:
+        session.execute(
+            update(AuditFinding)
+            .where(AuditFinding.audit_finding_id == finding_id)
+            .values(current_revision_number=AuditFinding.current_revision_number)
+            .execution_options(synchronize_session=False)
+        )
+        finding = _get_or_404(session, AuditFinding, finding_id, "audit finding")
+        session.refresh(finding)
+    return finding
+
+
 def _get_referenced(session: Session, model: type[ModelT], identifier: str) -> ModelT:
     """Load a row that a foreign key guarantees, failing loudly if the store is corrupt.
 
@@ -798,7 +817,7 @@ def revise_finding(
     now: datetime | None = None,
 ) -> AuditFinding:
     """Append the next finding edition only when the caller holds the current revision."""
-    finding = _get_or_404(session, AuditFinding, finding_id, "audit finding")
+    finding = _serialize_finding(session, finding_id)
     _require_member(session, finding.audit_engagement_id, decision.actor_identifier)
     _require_non_conflicted(session, finding.audit_engagement_id, decision.actor_identifier)
     _require_unresolved(finding)
@@ -847,7 +866,7 @@ def create_remediation_action(
     now: datetime | None = None,
 ) -> RemediationAction:
     """Record a remediation action by the finding's remediation owner."""
-    finding = _get_or_404(session, AuditFinding, finding_id, "audit finding")
+    finding = _serialize_finding(session, finding_id)
     if decision.actor_identifier != finding.remediation_owner_actor:
         raise AuditWorkflowError(
             403,
@@ -927,7 +946,7 @@ def record_retest(
     now: datetime | None = None,
 ) -> tuple[FindingRetest, AuditFinding]:
     """Record an independent retest after every remediation action is completed."""
-    finding = _get_or_404(session, AuditFinding, finding_id, "audit finding")
+    finding = _serialize_finding(session, finding_id)
     _require_unresolved(finding)
     actor = decision.actor_identifier
     actions = _actions(session, finding_id)
@@ -990,7 +1009,7 @@ def close_finding(
     after today and at most 365 days ahead, and no claim of a governed
     risk-register workflow.
     """
-    finding = _get_or_404(session, AuditFinding, finding_id, "audit finding")
+    finding = _serialize_finding(session, finding_id)
     actor = decision.actor_identifier
     member = _member(session, finding.audit_engagement_id, actor)
     if member is None or member.team_role not in {"lead", "supervisor"}:

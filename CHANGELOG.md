@@ -30,6 +30,8 @@
 
 ### Security
 
+- Serialize finding revision, remediation-action creation, retest, and closure on the shared finding database write lock before guard reads; refresh cached finding state. Controlled independent SQLite transaction tests cover both revision/retest orders, action/retest and closure/retest races, consecutive retest numbers, stale closed state, and rollback without rejected audit writes. PostgreSQL execution acceptance remains unverified; no schema or dependency change is required.
+
 - Reject finding revisions after the latest passing retest with JSON `409` and a closure/new-finding next action, without changing revisions or audit events; pre-retest and failed-retest revisions remain available. This is a workflow guard, not a revision-bound retest schema.
 - Bound evidence-link ordinals to 1..1,000,000 and finding revision tokens to 1..2,147,483,646 (reserving one increment within signed 32-bit SQL INTEGER); unsupported values return JSON `422` before SQL, without writes.
 

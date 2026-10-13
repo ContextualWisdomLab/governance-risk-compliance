@@ -150,9 +150,9 @@ concurrency or storage quota.
   closure/new-finding next action, without changing finding content or events,
   matching the existing new-action guard. Revisions remain possible before any
   retest and after a failed retest. Close the verified finding or raise a new
-  finding for a changed condition. This is a sequential workflow guard; no
-  revision foreign key or revision-bound retest schema is added, and it does
-  not claim concurrent retest/revision serialization or protect raw SQL changes.
+  finding for a changed condition. The service serializes revision, new-action,
+  retest, and closure decisions as described below; no revision foreign key or
+  revision-bound retest schema is added, and raw SQL changes are not protected.
 - Closed and risk-accepted findings reject new revisions, actions, and
   retests.
 - An engagement moves to `reporting` only when at least one procedure exists
@@ -164,6 +164,34 @@ concurrency or storage quota.
 - Every mutation appends an `audit_event` row. Unknown identifiers return `404`
   without revealing other objects. Service functions accept an injected
   `today` or `now` so tests are deterministic.
+
+### Finding decision transaction order
+
+Before reading decision guards, revision, remediation-action creation, retest,
+and closure issue a value-preserving UPDATE of the shared finding revision
+counter, then refresh the finding object. The write lock lasts until the caller
+commits or rolls back: SQLite serializes writers and PostgreSQL's UPDATE locks
+the matching row. The existing conditional revision increment still rejects
+stale tokens; acquiring the lock does not consume a revision or append an event.
+Do not substitute a Python process lock or timestamp comparisons. Keep service
+transactions short and roll back rejected decisions.
+
+If a passing retest commits first, a waiting revision or new action rechecks
+that latest result and rejects without history or audit writes. If revision
+wins, the retest validates after the revision commits. A new action winning
+first causes a later retest to reject while the action is open. Closure winning
+first causes a later retest to reject the resolved finding; a failed retest
+winning first prevents passing-retest closure. Concurrent retests allocate
+consecutive numbers under the same lock.
+
+The executable regressions use real file-backed SQLite connections, the seeded
+ISMS-P 2023 control 2.5.1, controlled guard-read pauses, bounded waits, and stale
+identity maps. They are not PostgreSQL execution evidence. PostgreSQL behavior
+is described from the UPDATE mechanism only and requires its own real database
+acceptance before a concurrency support claim. Remediation completion does not
+add actions or reopen a finding; its existing completion semantics are unchanged.
+This lock protocol applies to these service paths, not direct SQL writers,
+tenant authorization, or remote deployment.
 
 ### Purposes
 

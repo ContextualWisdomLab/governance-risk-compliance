@@ -97,6 +97,7 @@ Limits of this slice: criteria reference official `control_item` rows; the inter
 - Finalized policy text and mappings cannot be updated, deleted, or extended through SQL.
 - `policy_document.current_version_number` serializes revision allocation; a stale writer receives `409 Conflict` and must reload.
 - Independence declarations, audit finding revisions, finding retests, and finding closures cannot be updated or deleted through SQL. `audit_finding.current_revision_number` serializes finding revisions the same way as policy editions.
+- Finding revision, remediation-action creation, retest, and closure acquire the same database finding write lock before checking current state, and refresh cached finding objects. Keep each service call inside its transaction and commit or roll back promptly. If the passing retest commits first, a later revision or new action receives `409`; if revision commits first, retest checks the revised finding. SQLite transaction tests cover the controlled interleavings; PostgreSQL lock behavior has not been execution-verified by this repair. This is service serialization, not a revision-bound retest schema or a guard against raw SQL.
 - Audit tables reference `evidence_record_id`; they never copy evidence plaintext.
 - Versioned schema upgrades leave `schema_migration` receipts and upgrade existing first-slice stores before integrity triggers are installed.
 - A persistent database cannot start without explicit `CWL_GRC_EVIDENCE_KEY` material. Ephemeral keys are limited to explicitly selected in-memory tests.
