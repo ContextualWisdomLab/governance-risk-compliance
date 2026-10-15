@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import uuid4
 
+from _ci_workflow_contract import execution_contract
+
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine, delete, inspect, text, update
@@ -62,9 +64,7 @@ def _seeded_policy_factory(database_url: str = "sqlite://"):  # noqa: ANN202
 
 def test_product_workflow_rejects_any_dirty_tree() -> None:
     """CI rejects tracked or untracked changes, not only whitespace errors."""
-    workflow = (
-        REPOSITORY_ROOT / ".github/workflows/product.yml"
-    ).read_text(encoding="utf-8")
+    workflow = execution_contract(REPOSITORY_ROOT, ".github/workflows/product.yml")
     assert "git diff --check" in workflow
     assert 'test -z "$(git status --porcelain)"' in workflow
 
